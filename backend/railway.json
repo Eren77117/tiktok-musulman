@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "echo FILES: && ls && echo DIST: && ls dist/ 2>&1 && npx prisma migrate deploy && node dist/index.js",
+    "startCommand": "echo PWD:$(pwd) && ls /app/dist/ 2>&1 && npx prisma migrate deploy && node /app/dist/index.js",
     "restartPolicyType": "ON_FAILURE"
   }
 }
