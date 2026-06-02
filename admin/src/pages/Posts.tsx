@@ -1,6 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle, XCircle, Eye } from 'lucide-react';
+import { CheckCircle, XCircle, Eye, AlertTriangle } from 'lucide-react';
 import { api } from '../api/client';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Post {
   id: string;
@@ -14,6 +18,12 @@ interface Post {
   _count: { reports: number };
 }
 
+const STATUS_BADGE: Record<string, React.ReactElement> = {
+  ACTIVE: <Badge variant="success">Active</Badge>,
+  REMOVED: <Badge variant="destructive">Removed</Badge>,
+  PENDING: <Badge variant="warning">Pending</Badge>,
+};
+
 export default function Posts() {
   const qc = useQueryClient();
 
@@ -23,97 +33,106 @@ export default function Posts() {
   });
 
   const statusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) =>
-      api.patch(`/admin/posts/${id}/status`, { status }),
+    mutationFn: ({ id, status }: { id: string; status: string }) => api.patch(`/admin/posts/${id}/status`, { status }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-posts'] }),
   });
 
   return (
-    <div className="p-6 space-y-4">
-      <h2 className="text-lg font-semibold text-white">Posts</h2>
+    <div className="p-6 space-y-4 animate-slide-up">
+      <div>
+        <h1 className="text-xl font-semibold text-white">Posts</h1>
+        <p className="text-sm text-gray-500 mt-0.5">{data?.items.length ?? 0} videos</p>
+      </div>
 
-      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-800">
-              {['Post', 'Author', 'Views', 'Likes', 'Reports', 'Status', 'Actions'].map((h) => (
-                <th key={h} className="text-left px-4 py-3 text-xs text-gray-500 uppercase tracking-wide font-medium">
-                  {h}
-                </th>
+      <div className="rounded-xl border border-white/[0.06] overflow-hidden bg-white/[0.02]">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Video</TableHead>
+              <TableHead>Author</TableHead>
+              <TableHead>Views</TableHead>
+              <TableHead>Likes</TableHead>
+              <TableHead>Reports</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading &&
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  {Array.from({ length: 8 }).map((_, j) => (
+                    <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                  ))}
+                </TableRow>
               ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-800">
-            {isLoading && (
-              <tr>
-                <td colSpan={7} className="text-center py-8 text-gray-500">
-                  Loading...
-                </td>
-              </tr>
-            )}
-            {data?.items.map((post) => (
-              <tr key={post.id} className="hover:bg-gray-800/50 transition-colors">
-                <td className="px-4 py-3">
+            {!isLoading && data?.items.map((post) => (
+              <TableRow key={post.id}>
+                <TableCell>
                   <div className="flex items-center gap-3">
-                    {post.thumbnail_url ? (
-                      <img src={post.thumbnail_url} className="w-10 h-14 rounded object-cover bg-gray-800" />
-                    ) : (
-                      <div className="w-10 h-14 rounded bg-gray-800 flex items-center justify-center">
-                        <Eye size={12} className="text-gray-600" />
-                      </div>
-                    )}
-                    <p className="text-gray-300 text-xs max-w-xs truncate">{post.caption ?? '(no caption)'}</p>
+                    <div className="w-10 h-14 rounded-md overflow-hidden bg-white/[0.05] border border-white/[0.06] shrink-0">
+                      {post.thumbnail_url ? (
+                        <img src={post.thumbnail_url} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Eye size={12} className="text-gray-700" />
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 max-w-[160px] truncate">
+                      {post.caption ?? <span className="text-gray-600 italic">No caption</span>}
+                    </p>
                   </div>
-                </td>
-                <td className="px-4 py-3 text-gray-400 text-xs">@{post.user.username}</td>
-                <td className="px-4 py-3 text-gray-400">{post.view_count.toLocaleString()}</td>
-                <td className="px-4 py-3 text-gray-400">{post.like_count.toLocaleString()}</td>
-                <td className="px-4 py-3">
+                </TableCell>
+                <TableCell className="text-xs text-gray-400">@{post.user.username}</TableCell>
+                <TableCell className="text-sm text-gray-300">{post.view_count.toLocaleString()}</TableCell>
+                <TableCell className="text-sm text-gray-300">{post.like_count.toLocaleString()}</TableCell>
+                <TableCell>
                   {post._count.reports > 0 ? (
-                    <span className="text-xs text-red-400">{post._count.reports}</span>
+                    <div className="flex items-center gap-1 text-xs text-red-400">
+                      <AlertTriangle size={11} />
+                      {post._count.reports}
+                    </div>
                   ) : (
-                    <span className="text-xs text-gray-600">0</span>
+                    <span className="text-gray-600 text-xs">—</span>
                   )}
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full ${
-                      post.status === 'ACTIVE'
-                        ? 'bg-emerald-900/50 text-emerald-300'
-                        : post.status === 'REMOVED'
-                        ? 'bg-red-900/50 text-red-300'
-                        : 'bg-yellow-900/50 text-yellow-300'
-                    }`}
-                  >
-                    {post.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex gap-2">
+                </TableCell>
+                <TableCell>{STATUS_BADGE[post.status] ?? <Badge variant="secondary">{post.status}</Badge>}</TableCell>
+                <TableCell className="text-xs text-gray-600">
+                  {new Date(post.created_at).toLocaleDateString()}
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-1">
                     {post.status !== 'ACTIVE' && (
-                      <button
+                      <Button
+                        variant="ghost" size="icon"
                         onClick={() => statusMutation.mutate({ id: post.id, status: 'ACTIVE' })}
-                        className="p-1.5 hover:bg-emerald-900/40 rounded text-emerald-400 transition-colors"
-                        title="Approve"
+                        title="Approve" className="h-7 w-7 hover:text-emerald-400"
                       >
-                        <CheckCircle size={14} />
-                      </button>
+                        <CheckCircle size={13} />
+                      </Button>
                     )}
                     {post.status !== 'REMOVED' && (
-                      <button
+                      <Button
+                        variant="ghost" size="icon"
                         onClick={() => statusMutation.mutate({ id: post.id, status: 'REMOVED' })}
-                        className="p-1.5 hover:bg-red-900/40 rounded text-red-400 transition-colors"
-                        title="Remove"
+                        title="Remove" className="h-7 w-7 hover:text-red-400"
                       >
-                        <XCircle size={14} />
-                      </button>
+                        <XCircle size={13} />
+                      </Button>
                     )}
                   </div>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+            {!isLoading && !data?.items.length && (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center text-gray-600 py-12">No posts</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       </div>
     </div>
   );

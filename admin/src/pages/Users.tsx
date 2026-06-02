@@ -1,7 +1,12 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, Ban, CheckCircle, Shield } from 'lucide-react';
+import { Search, Ban, CheckCircle, UserCog } from 'lucide-react';
 import { api } from '../api/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface User {
   id: string;
@@ -20,17 +25,16 @@ interface User {
 export default function Users() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const timer = useRef<ReturnType<typeof setTimeout>>();
   const qc = useQueryClient();
 
   const { data, isLoading } = useQuery<{ items: User[] }>({
     queryKey: ['admin-users', debouncedSearch],
-    queryFn: () =>
-      api.get('/admin/users', { params: { search: debouncedSearch || undefined, limit: 50 } }).then((r) => r.data),
+    queryFn: () => api.get('/admin/users', { params: { search: debouncedSearch || undefined, limit: 50 } }).then((r) => r.data),
   });
 
   const banMutation = useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
-      api.post(`/admin/users/${id}/ban`, { reason }),
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => api.post(`/admin/users/${id}/ban`, { reason }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
   });
 
@@ -41,106 +45,113 @@ export default function Users() {
 
   const handleSearch = (v: string) => {
     setSearch(v);
-    clearTimeout((window as unknown as { _st: ReturnType<typeof setTimeout> })._st);
-    (window as unknown as { _st: ReturnType<typeof setTimeout> })._st = setTimeout(() => setDebouncedSearch(v), 400);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setDebouncedSearch(v), 400);
   };
 
   const handleBan = (user: User) => {
-    const reason = prompt(`Ban reason for @${user.username}:`);
-    if (reason) banMutation.mutate({ id: user.id, reason });
+    const reason = window.prompt(`Ban reason for @${user.username}:`);
+    if (reason?.trim()) banMutation.mutate({ id: user.id, reason });
+  };
+
+  const roleBadge = (role: string) => {
+    if (role === 'ADMIN') return <Badge>Admin</Badge>;
+    if (role === 'MODERATOR') return <Badge variant="secondary">Mod</Badge>;
+    return <span className="text-xs text-gray-600">User</span>;
   };
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-6 space-y-4 animate-slide-up">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-white">Users</h2>
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-          <input
+        <div>
+          <h1 className="text-xl font-semibold text-white">Users</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {data?.items.length ?? 0} accounts
+          </p>
+        </div>
+        <div className="relative w-56">
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
+          <Input
             value={search}
             onChange={(e) => handleSearch(e.target.value)}
             placeholder="Search users..."
-            className="bg-gray-900 border border-gray-800 rounded-lg pl-8 pr-3 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500 w-56"
+            className="pl-8"
           />
         </div>
       </div>
 
-      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-800">
-              {['User', 'Email', 'Gender', 'Role', 'Posts', 'Followers', 'Status', 'Actions'].map((h) => (
-                <th key={h} className="text-left px-4 py-3 text-xs text-gray-500 uppercase tracking-wide font-medium">
-                  {h}
-                </th>
+      <div className="rounded-xl border border-white/[0.06] overflow-hidden bg-white/[0.02]">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>User</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Gender</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Posts</TableHead>
+              <TableHead>Followers</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading &&
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  {Array.from({ length: 8 }).map((_, j) => (
+                    <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                  ))}
+                </TableRow>
               ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-800">
-            {isLoading && (
-              <tr>
-                <td colSpan={8} className="text-center py-8 text-gray-500">
-                  Loading...
-                </td>
-              </tr>
-            )}
-            {data?.items.map((user) => (
-              <tr key={user.id} className="hover:bg-gray-800/50 transition-colors">
-                <td className="px-4 py-3">
-                  <div>
-                    <p className="font-medium text-white">{user.display_name}</p>
-                    <p className="text-gray-500 text-xs">@{user.username}</p>
+            {!isLoading && data?.items.map((user) => (
+              <TableRow key={user.id}>
+                <TableCell>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500/30 to-purple-600/30 border border-white/10 flex items-center justify-center text-xs font-bold text-indigo-300 shrink-0">
+                      {user.display_name[0]?.toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-white">{user.display_name}</p>
+                      <p className="text-xs text-gray-600">@{user.username}</p>
+                    </div>
                   </div>
-                </td>
-                <td className="px-4 py-3 text-gray-400 text-xs">{user.email}</td>
-                <td className="px-4 py-3 text-gray-400 text-xs capitalize">{user.gender.toLowerCase()}</td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full ${
-                      user.role === 'ADMIN'
-                        ? 'bg-purple-900/50 text-purple-300'
-                        : user.role === 'MODERATOR'
-                        ? 'bg-blue-900/50 text-blue-300'
-                        : 'bg-gray-800 text-gray-400'
-                    }`}
-                  >
-                    {user.role}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-gray-400">{user.post_count}</td>
-                <td className="px-4 py-3 text-gray-400">{user.follower_count.toLocaleString()}</td>
-                <td className="px-4 py-3">
+                </TableCell>
+                <TableCell className="text-gray-400 text-xs">{user.email}</TableCell>
+                <TableCell className="text-gray-500 text-xs capitalize">{user.gender.toLowerCase()}</TableCell>
+                <TableCell>{roleBadge(user.role)}</TableCell>
+                <TableCell className="text-gray-400">{user.post_count}</TableCell>
+                <TableCell className="text-gray-400">{user.follower_count.toLocaleString()}</TableCell>
+                <TableCell>
                   {user.is_banned ? (
-                    <span className="text-xs text-red-400">Banned</span>
+                    <Badge variant="destructive">Banned</Badge>
                   ) : (
-                    <span className="text-xs text-emerald-400">Active</span>
+                    <Badge variant="success">Active</Badge>
                   )}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex gap-2">
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-1">
                     {user.is_banned ? (
-                      <button
-                        onClick={() => unbanMutation.mutate(user.id)}
-                        className="p-1.5 hover:bg-emerald-900/40 rounded text-emerald-400 transition-colors"
-                        title="Unban"
-                      >
-                        <CheckCircle size={14} />
-                      </button>
+                      <Button variant="ghost" size="icon" onClick={() => unbanMutation.mutate(user.id)} title="Unban" className="h-7 w-7 hover:text-emerald-400">
+                        <CheckCircle size={13} />
+                      </Button>
                     ) : (
-                      <button
-                        onClick={() => handleBan(user)}
-                        className="p-1.5 hover:bg-red-900/40 rounded text-red-400 transition-colors"
-                        title="Ban"
-                      >
-                        <Ban size={14} />
-                      </button>
+                      <Button variant="ghost" size="icon" onClick={() => handleBan(user)} title="Ban" className="h-7 w-7 hover:text-red-400">
+                        <Ban size={13} />
+                      </Button>
                     )}
                   </div>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+            {!isLoading && !data?.items.length && (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center text-gray-600 py-12">
+                  No users found
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       </div>
     </div>
   );

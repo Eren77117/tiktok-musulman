@@ -10,3 +10,5 @@ mobile/ios/build/
 mobile/android/build/
 mobile/ios/Pods/
 mobile/.gradle/
+admin/.env.production
+admin/dist/

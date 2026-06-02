@@ -1,6 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle, XCircle } from 'lucide-react';
+import { CheckCircle, XCircle, ShieldAlert } from 'lucide-react';
 import { api } from '../api/client';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Report {
   id: string;
@@ -22,85 +26,95 @@ export default function Reports() {
   });
 
   const resolveMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) =>
-      api.patch(`/admin/reports/${id}`, { status }),
+    mutationFn: ({ id, status }: { id: string; status: string }) => api.patch(`/admin/reports/${id}`, { status }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-reports'] }),
   });
 
-  return (
-    <div className="p-6 space-y-4">
-      <h2 className="text-lg font-semibold text-white">
-        Reports
-        {data?.items.length ? (
-          <span className="ml-2 text-xs bg-red-900/50 text-red-300 px-2 py-0.5 rounded-full">
-            {data.items.length} pending
-          </span>
-        ) : null}
-      </h2>
+  const pendingCount = data?.items.filter((r) => r.status === 'PENDING').length ?? 0;
 
-      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-800">
-              {['Reporter', 'Target', 'Reason', 'Date', 'Actions'].map((h) => (
-                <th key={h} className="text-left px-4 py-3 text-xs text-gray-500 uppercase tracking-wide font-medium">
-                  {h}
-                </th>
+  return (
+    <div className="p-6 space-y-4 animate-slide-up">
+      <div className="flex items-center gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-white">Reports</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Content moderation queue</p>
+        </div>
+        {pendingCount > 0 && (
+          <Badge variant="destructive" className="text-sm px-2.5 py-1">
+            <ShieldAlert size={11} className="mr-1" />
+            {pendingCount} pending
+          </Badge>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-white/[0.06] overflow-hidden bg-white/[0.02]">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Reporter</TableHead>
+              <TableHead>Target</TableHead>
+              <TableHead>Reason</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading &&
+              Array.from({ length: 4 }).map((_, i) => (
+                <TableRow key={i}>
+                  {Array.from({ length: 6 }).map((_, j) => (
+                    <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                  ))}
+                </TableRow>
               ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-800">
-            {isLoading && (
-              <tr>
-                <td colSpan={5} className="text-center py-8 text-gray-500">
-                  Loading...
-                </td>
-              </tr>
-            )}
-            {!isLoading && data?.items.length === 0 && (
-              <tr>
-                <td colSpan={5} className="text-center py-8 text-gray-600">
-                  No pending reports
-                </td>
-              </tr>
-            )}
-            {data?.items.map((report) => (
-              <tr key={report.id} className="hover:bg-gray-800/50 transition-colors">
-                <td className="px-4 py-3 text-gray-400 text-xs">@{report.reporter.username}</td>
-                <td className="px-4 py-3 text-gray-400 text-xs">
-                  {report.reported_user ? `@${report.reported_user.username}` : 'Post'}
-                </td>
-                <td className="px-4 py-3">
-                  <p className="text-gray-300 text-xs">{report.reason}</p>
-                  {report.description && (
-                    <p className="text-gray-600 text-xs mt-0.5 truncate max-w-xs">{report.description}</p>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-gray-500 text-xs">
+            {!isLoading && data?.items.map((report) => (
+              <TableRow key={report.id}>
+                <TableCell className="text-xs text-gray-400">@{report.reporter.username}</TableCell>
+                <TableCell className="text-xs text-gray-400">
+                  {report.reported_user
+                    ? <span className="text-indigo-400">@{report.reported_user.username}</span>
+                    : <span className="text-purple-400">Post</span>
+                  }
+                </TableCell>
+                <TableCell>
+                  <span className="text-xs text-gray-300 bg-white/[0.05] rounded px-2 py-0.5">{report.reason}</span>
+                </TableCell>
+                <TableCell className="text-xs text-gray-600 max-w-[200px] truncate">
+                  {report.description ?? '—'}
+                </TableCell>
+                <TableCell className="text-xs text-gray-600">
                   {new Date(report.created_at).toLocaleDateString()}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex gap-2">
-                    <button
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost" size="icon"
                       onClick={() => resolveMutation.mutate({ id: report.id, status: 'RESOLVED' })}
-                      className="p-1.5 hover:bg-emerald-900/40 rounded text-emerald-400 transition-colors"
-                      title="Resolve"
+                      title="Resolve" className="h-7 w-7 hover:text-emerald-400"
                     >
-                      <CheckCircle size={14} />
-                    </button>
-                    <button
+                      <CheckCircle size={13} />
+                    </Button>
+                    <Button
+                      variant="ghost" size="icon"
                       onClick={() => resolveMutation.mutate({ id: report.id, status: 'DISMISSED' })}
-                      className="p-1.5 hover:bg-gray-700 rounded text-gray-400 transition-colors"
-                      title="Dismiss"
+                      title="Dismiss" className="h-7 w-7 hover:text-gray-400"
                     >
-                      <XCircle size={14} />
-                    </button>
+                      <XCircle size={13} />
+                    </Button>
                   </div>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+            {!isLoading && !data?.items.length && (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-gray-600 py-12">
+                  No pending reports
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       </div>
     </div>
   );

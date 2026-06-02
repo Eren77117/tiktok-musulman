@@ -25,11 +25,26 @@ import { uploadRoutes } from './routes/upload';
 import { adminRoutes } from './routes/admin';
 import { supportRoutes } from './routes/support';
 
-const app = Fastify({ logger: { transport: { target: 'pino-pretty' } } });
+const app = Fastify({
+  logger: env.NODE_ENV === 'development'
+    ? { transport: { target: 'pino-pretty' } }
+    : true,
+});
 
 async function bootstrap() {
   await app.register(cors, {
-    origin: [env.CORS_ORIGIN, 'http://localhost:5173', 'http://localhost:3000'],
+    origin: (origin, cb) => {
+      const allowed = [
+        env.CORS_ORIGIN,
+        'http://localhost:5173',
+        'http://localhost:3000',
+      ];
+      if (!origin || allowed.includes(origin) || origin.endsWith('.vercel.app')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Not allowed by CORS'), false);
+      }
+    },
     credentials: true,
   });
 

@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { MessageSquare, Send, Clock } from 'lucide-react';
 import { api } from '../api/client';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 interface Ticket {
   id: string;
@@ -11,6 +16,13 @@ interface Ticket {
   created_at: string;
   user: { id: string; username: string; email: string };
 }
+
+const STATUS_BADGE: Record<string, React.ReactElement> = {
+  OPEN: <Badge variant="warning">Open</Badge>,
+  IN_PROGRESS: <Badge>In Progress</Badge>,
+  RESOLVED: <Badge variant="success">Resolved</Badge>,
+  CLOSED: <Badge variant="secondary">Closed</Badge>,
+};
 
 export default function Tickets() {
   const qc = useQueryClient();
@@ -27,86 +39,113 @@ export default function Tickets() {
       api.patch(`/admin/tickets/${id}`, { admin_reply, status: 'RESOLVED' }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-tickets'] });
-      setSelected(null);
       setReply('');
+      setSelected(null);
     },
   });
 
-  const statusColor: Record<string, string> = {
-    OPEN: 'bg-yellow-900/50 text-yellow-300',
-    IN_PROGRESS: 'bg-blue-900/50 text-blue-300',
-    RESOLVED: 'bg-emerald-900/50 text-emerald-300',
-    CLOSED: 'bg-gray-800 text-gray-400',
-  };
-
   return (
-    <div className="p-6 space-y-4">
-      <h2 className="text-lg font-semibold text-white">Support Tickets</h2>
+    <div className="p-6 space-y-4 animate-slide-up">
+      <div>
+        <h1 className="text-xl font-semibold text-white">Support Tickets</h1>
+        <p className="text-sm text-gray-500 mt-0.5">User support requests</p>
+      </div>
 
-      <div className="grid grid-cols-2 gap-4 h-[calc(100vh-10rem)]">
-        <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-auto">
-          {isLoading && <p className="text-center py-8 text-gray-500">Loading...</p>}
+      <div className="grid grid-cols-5 gap-4 h-[calc(100vh-10rem)]">
+        {/* Ticket list */}
+        <div className="col-span-2 rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-auto">
+          {isLoading &&
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="p-4 border-b border-white/[0.04]">
+                <Skeleton className="h-4 w-3/4 mb-2" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            ))}
           {data?.map((ticket) => (
             <button
               key={ticket.id}
               onClick={() => { setSelected(ticket); setReply(ticket.admin_reply ?? ''); }}
-              className={`w-full text-left p-4 border-b border-gray-800 hover:bg-gray-800/50 transition-colors ${
-                selected?.id === ticket.id ? 'bg-gray-800' : ''
-              }`}
+              className={cn(
+                'w-full text-left p-4 border-b border-white/[0.04] transition-colors hover:bg-white/[0.04]',
+                selected?.id === ticket.id && 'bg-white/[0.06]',
+              )}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-white truncate">{ticket.subject}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">@{ticket.user.username}</p>
+                  <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+                    <span>@{ticket.user.username}</span>
+                    <span>·</span>
+                    <Clock size={10} />
+                    <span>{new Date(ticket.created_at).toLocaleDateString()}</span>
+                  </p>
                 </div>
-                <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${statusColor[ticket.status] ?? ''}`}>
-                  {ticket.status}
-                </span>
+                <div className="shrink-0 mt-0.5">{STATUS_BADGE[ticket.status]}</div>
               </div>
             </button>
           ))}
+          {!isLoading && !data?.length && (
+            <div className="flex flex-col items-center justify-center h-40 text-gray-600 text-sm gap-2">
+              <MessageSquare size={20} className="opacity-30" />
+              No tickets
+            </div>
+          )}
         </div>
 
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 flex flex-col">
+        {/* Ticket detail */}
+        <div className="col-span-3 rounded-xl border border-white/[0.06] bg-white/[0.02] flex flex-col overflow-hidden">
           {selected ? (
             <>
-              <div className="flex-1 space-y-3 overflow-auto">
-                <div>
-                  <h3 className="font-medium text-white">{selected.subject}</h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {selected.user.email} — {new Date(selected.created_at).toLocaleDateString()}
-                  </p>
+              <div className="p-5 border-b border-white/[0.06]">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-semibold text-white">{selected.subject}</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">{selected.user.email}</p>
+                  </div>
+                  {STATUS_BADGE[selected.status]}
                 </div>
-                <div className="bg-gray-800 rounded-lg p-3 text-sm text-gray-300">{selected.description}</div>
+              </div>
+
+              <div className="flex-1 p-5 space-y-4 overflow-auto">
+                {/* User message */}
+                <div className="bg-white/[0.04] rounded-xl p-4 text-sm text-gray-300 leading-relaxed">
+                  {selected.description}
+                </div>
+
+                {/* Admin reply */}
                 {selected.admin_reply && (
-                  <div className="bg-indigo-900/30 border border-indigo-700/50 rounded-lg p-3 text-sm text-indigo-200">
-                    <p className="text-xs text-indigo-400 mb-1">Your reply</p>
-                    {selected.admin_reply}
+                  <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4">
+                    <p className="text-xs font-medium text-indigo-400 mb-2">Your reply</p>
+                    <p className="text-sm text-indigo-200 leading-relaxed">{selected.admin_reply}</p>
                   </div>
                 )}
               </div>
+
               {selected.status !== 'RESOLVED' && selected.status !== 'CLOSED' && (
-                <div className="mt-4 space-y-2">
+                <div className="p-4 border-t border-white/[0.06] space-y-2">
                   <textarea
                     value={reply}
                     onChange={(e) => setReply(e.target.value)}
                     placeholder="Write a reply..."
                     rows={3}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 resize-none"
+                    className="w-full bg-white/[0.05] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30 resize-none placeholder:text-gray-600"
                   />
-                  <button
+                  <Button
                     onClick={() => replyMutation.mutate({ id: selected.id, admin_reply: reply })}
                     disabled={!reply.trim() || replyMutation.isPending}
-                    className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg py-2 text-sm font-medium transition-colors"
+                    className="w-full"
+                    size="sm"
                   >
-                    Send & Resolve
-                  </button>
+                    <Send size={13} />
+                    Send &amp; Resolve
+                  </Button>
                 </div>
               )}
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-gray-600 text-sm">
-              Select a ticket
+            <div className="flex-1 flex flex-col items-center justify-center text-gray-600 gap-3">
+              <MessageSquare size={32} className="opacity-20" />
+              <p className="text-sm">Select a ticket to view</p>
             </div>
           )}
         </div>

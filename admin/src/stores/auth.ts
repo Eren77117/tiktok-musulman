@@ -7,6 +7,7 @@ interface User {
   email: string;
   display_name: string;
   role: string;
+  avatar_url: string | null;
 }
 
 interface AuthStore {
@@ -24,7 +25,7 @@ export const useAuth = create<AuthStore>((set) => ({
   login: async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password });
     if (!['ADMIN', 'MODERATOR'].includes(data.user.role)) {
-      throw new Error('Access denied. Admin or moderator account required.');
+      throw new Error('Admin or moderator account required.');
     }
     localStorage.setItem('access_token', data.access_token);
     localStorage.setItem('refresh_token', data.refresh_token);
@@ -32,11 +33,20 @@ export const useAuth = create<AuthStore>((set) => ({
   },
 
   logout: () => {
+    try {
+      const refresh = localStorage.getItem('refresh_token');
+      if (refresh) api.post('/auth/logout', { refresh_token: refresh }).catch(() => {});
+    } catch {}
     localStorage.clear();
     set({ user: null });
   },
 
   loadMe: async () => {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      set({ loading: false });
+      return;
+    }
     try {
       const { data } = await api.get('/auth/me');
       if (['ADMIN', 'MODERATOR'].includes(data.role)) {
@@ -46,6 +56,8 @@ export const useAuth = create<AuthStore>((set) => ({
         set({ user: null, loading: false });
       }
     } catch {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
       set({ user: null, loading: false });
     }
   },
