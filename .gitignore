@@ -1,0 +1,12 @@
+node_modules/
+.env
+dist/
+build/
+*.log
+.DS_Store
+backend/uploads/
+mobile/vendor/
+mobile/ios/build/
+mobile/android/build/
+mobile/ios/Pods/
+mobile/.gradle/

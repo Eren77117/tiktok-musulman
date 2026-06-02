@@ -1,0 +1,10 @@
+{
+  "name": "tiktok-musulman",
+  "private": true,
+  "workspaces": ["backend", "admin"],
+  "scripts": {
+    "backend": "npm --workspace=backend run dev",
+    "admin": "npm --workspace=admin run dev",
+    "setup": "npm install && npm --workspace=backend run db:generate && npm --workspace=backend run db:migrate"
+  }
+}

@@ -1,0 +1,397 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum Role {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum PostStatus {
+  PENDING
+  ACTIVE
+  REMOVED
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
+
+enum NotificationType {
+  LIKE
+  COMMENT
+  FOLLOW
+  MENTION
+  LIVE_START
+  MESSAGE_REQUEST
+  MESSAGE_REQUEST_ACCEPTED
+  SYSTEM
+}
+
+enum ConversationRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+model User {
+  id                String   @id @default(uuid())
+  username          String   @unique
+  email             String   @unique
+  password_hash     String
+  display_name      String
+  bio               String?
+  avatar_url        String?
+  gender            Gender
+  role              Role     @default(USER)
+  is_verified       Boolean  @default(false)
+  is_banned         Boolean  @default(false)
+  ban_reason        String?
+  follower_count    Int      @default(0)
+  following_count   Int      @default(0)
+  post_count        Int      @default(0)
+  like_count        Int      @default(0)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  refresh_tokens    RefreshToken[]
+  posts             Post[]
+  stories           Story[]
+  comments          Comment[]
+  likes             Like[]
+  follows_given     Follow[]          @relation("follower")
+  follows_received  Follow[]          @relation("following")
+  favorites         Favorite[]
+  notifications     Notification[]
+  sent_requests     ConversationRequest[] @relation("requester")
+  received_requests ConversationRequest[] @relation("recipient")
+  sent_messages     Message[]         @relation("sender")
+  live_sessions     LiveSession[]
+  reports_filed     Report[]          @relation("reporter")
+  reports_against   Report[]          @relation("reported_user")
+  audit_logs        AuditLog[]
+  support_tickets   SupportTicket[]
+
+  @@index([username])
+  @@index([email])
+}
+
+model RefreshToken {
+  id         String   @id @default(uuid())
+  token      String   @unique
+  user_id    String
+  expires_at DateTime
+  created_at DateTime @default(now())
+  revoked    Boolean  @default(false)
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([token])
+}
+
+model Post {
+  id            String     @id @default(uuid())
+  user_id       String
+  video_url     String
+  thumbnail_url String?
+  caption       String?
+  duration      Float
+  view_count    Int        @default(0)
+  like_count    Int        @default(0)
+  comment_count Int        @default(0)
+  share_count   Int        @default(0)
+  status        PostStatus @default(ACTIVE)
+  is_public     Boolean    @default(true)
+  sound_id      String?
+  created_at    DateTime   @default(now())
+  updated_at    DateTime   @updatedAt
+
+  user      User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  sound     Sound?     @relation(fields: [sound_id], references: [id])
+  comments  Comment[]
+  likes     Like[]
+  favorites Favorite[]
+  reports   Report[]
+  post_categories PostCategory[]
+
+  @@index([user_id])
+  @@index([created_at])
+  @@index([status])
+}
+
+model Sound {
+  id          String   @id @default(uuid())
+  title       String
+  artist      String?
+  url         String
+  duration    Float
+  use_count   Int      @default(0)
+  is_trending Boolean  @default(false)
+  created_at  DateTime @default(now())
+
+  posts Post[]
+
+  @@index([is_trending])
+}
+
+model Category {
+  id         String @id @default(uuid())
+  name       String @unique
+  slug       String @unique
+  icon_url   String?
+  post_count Int    @default(0)
+
+  post_categories PostCategory[]
+
+  @@index([slug])
+}
+
+model PostCategory {
+  post_id     String
+  category_id String
+
+  post     Post     @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [category_id], references: [id], onDelete: Cascade)
+
+  @@id([post_id, category_id])
+}
+
+model Story {
+  id         String   @id @default(uuid())
+  user_id    String
+  media_url  String
+  media_type String   @default("image")
+  duration   Int      @default(5)
+  view_count Int      @default(0)
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  user  User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  views StoryView[]
+
+  @@index([user_id])
+  @@index([expires_at])
+}
+
+model StoryView {
+  id         String   @id @default(uuid())
+  story_id   String
+  viewer_id  String
+  created_at DateTime @default(now())
+
+  story Story @relation(fields: [story_id], references: [id], onDelete: Cascade)
+
+  @@unique([story_id, viewer_id])
+}
+
+model Comment {
+  id         String   @id @default(uuid())
+  post_id    String
+  user_id    String
+  parent_id  String?
+  content    String
+  like_count Int      @default(0)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  post     Post      @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  parent   Comment?  @relation("replies", fields: [parent_id], references: [id])
+  replies  Comment[] @relation("replies")
+  likes    Like[]
+
+  @@index([post_id])
+  @@index([user_id])
+}
+
+model Like {
+  id         String   @id @default(uuid())
+  user_id    String
+  post_id    String?
+  comment_id String?
+  created_at DateTime @default(now())
+
+  user    User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  post    Post?    @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  comment Comment? @relation(fields: [comment_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, post_id])
+  @@unique([user_id, comment_id])
+  @@index([user_id])
+}
+
+model Follow {
+  id           String   @id @default(uuid())
+  follower_id  String
+  following_id String
+  created_at   DateTime @default(now())
+
+  follower  User @relation("follower", fields: [follower_id], references: [id], onDelete: Cascade)
+  following User @relation("following", fields: [following_id], references: [id], onDelete: Cascade)
+
+  @@unique([follower_id, following_id])
+  @@index([follower_id])
+  @@index([following_id])
+}
+
+model Favorite {
+  id         String   @id @default(uuid())
+  user_id    String
+  post_id    String
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [post_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, post_id])
+  @@index([user_id])
+}
+
+model Notification {
+  id          String           @id @default(uuid())
+  user_id     String
+  type        NotificationType
+  title       String
+  body        String
+  data        Json?
+  is_read     Boolean          @default(false)
+  created_at  DateTime         @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, is_read])
+  @@index([created_at])
+}
+
+model ConversationRequest {
+  id           String                    @id @default(uuid())
+  requester_id String
+  recipient_id String
+  status       ConversationRequestStatus @default(PENDING)
+  created_at   DateTime                  @default(now())
+  updated_at   DateTime                  @updatedAt
+
+  requester    User            @relation("requester", fields: [requester_id], references: [id], onDelete: Cascade)
+  recipient    User            @relation("recipient", fields: [recipient_id], references: [id], onDelete: Cascade)
+  conversation Conversation?
+
+  @@unique([requester_id, recipient_id])
+  @@index([recipient_id, status])
+}
+
+model Conversation {
+  id          String   @id @default(uuid())
+  request_id  String   @unique
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  request  ConversationRequest @relation(fields: [request_id], references: [id], onDelete: Cascade)
+  messages Message[]
+}
+
+model Message {
+  id              String   @id @default(uuid())
+  conversation_id String
+  sender_id       String
+  content         String
+  media_url       String?
+  is_read         Boolean  @default(false)
+  created_at      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  sender       User         @relation("sender", fields: [sender_id], references: [id], onDelete: Cascade)
+
+  @@index([conversation_id, created_at])
+  @@index([sender_id])
+}
+
+model LiveSession {
+  id           String    @id @default(uuid())
+  user_id      String
+  title        String
+  stream_key   String    @unique @default(uuid())
+  viewer_count Int       @default(0)
+  is_active    Boolean   @default(true)
+  started_at   DateTime  @default(now())
+  ended_at     DateTime?
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([is_active])
+}
+
+model Report {
+  id               String       @id @default(uuid())
+  reporter_id      String
+  reported_user_id String?
+  reported_post_id String?
+  reason           String
+  description      String?
+  status           ReportStatus @default(PENDING)
+  moderator_note   String?
+  created_at       DateTime     @default(now())
+  updated_at       DateTime     @updatedAt
+
+  reporter      User  @relation("reporter", fields: [reporter_id], references: [id])
+  reported_user User? @relation("reported_user", fields: [reported_user_id], references: [id])
+  reported_post Post? @relation(fields: [reported_post_id], references: [id])
+
+  @@index([status])
+  @@index([created_at])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  user_id    String?
+  action     String
+  entity     String
+  entity_id  String?
+  metadata   Json?
+  ip_address String?
+  created_at DateTime @default(now())
+
+  user User? @relation(fields: [user_id], references: [id])
+
+  @@index([user_id])
+  @@index([created_at])
+  @@index([action])
+}
+
+model SupportTicket {
+  id          String        @id @default(uuid())
+  user_id     String
+  subject     String
+  description String
+  status      TicketStatus  @default(OPEN)
+  admin_reply String?
+  created_at  DateTime      @default(now())
+  updated_at  DateTime      @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([status])
+}
