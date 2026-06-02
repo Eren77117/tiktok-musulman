@@ -1,6 +1,5 @@
 import 'dotenv/config';
 import './config/env';
-import { createServer } from 'http';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
@@ -8,6 +7,7 @@ import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import staticFiles from '@fastify/static';
 import path from 'path';
+import fs from 'fs';
 import { env } from './config/env';
 import { prisma } from './config/database';
 import { createSocketServer } from './websocket/server';
@@ -25,6 +25,18 @@ import { uploadRoutes } from './routes/upload';
 import { adminRoutes } from './routes/admin';
 import { supportRoutes } from './routes/support';
 
+process.stdout.write(`[STARTUP] Node ${process.version}\n`);
+
+process.on('uncaughtException', (err) => {
+  process.stdout.write(`[FATAL] ${err.message}\n`);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  process.stdout.write(`[FATAL] ${String(reason)}\n`);
+  process.exit(1);
+});
+
 const app = Fastify({
   logger: env.NODE_ENV === 'development'
     ? { transport: { target: 'pino-pretty' } }
@@ -32,31 +44,16 @@ const app = Fastify({
 });
 
 async function bootstrap() {
-  await app.register(cors, {
-    origin: true, // allow all origins (mobile app has no origin header)
-    credentials: true,
-  });
-
-  await app.register(jwt, {
-    secret: env.JWT_ACCESS_SECRET,
-  });
-
-  await app.register(rateLimit, {
-    max: 100,
-    timeWindow: '1 minute',
-  });
-
-  await app.register(multipart, {
-    limits: { fileSize: env.UPLOAD_MAX_SIZE_MB * 1024 * 1024 },
-  });
+  await app.register(cors, { origin: true, credentials: true });
+  await app.register(jwt, { secret: env.JWT_ACCESS_SECRET });
+  await app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
+  await app.register(multipart, { limits: { fileSize: env.UPLOAD_MAX_SIZE_MB * 1024 * 1024 } });
 
   const uploadsDir = path.join(process.cwd(), 'uploads');
-  const fs = await import('fs');
   fs.mkdirSync(uploadsDir, { recursive: true });
-
   await app.register(staticFiles, { root: uploadsDir, prefix: '/uploads/' });
 
-  app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
+  app.get('/health', async () => ({ status: 'ok', ts: new Date().toISOString() }));
 
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(userRoutes, { prefix: '/api/users' });
@@ -78,18 +75,17 @@ async function bootstrap() {
     return reply.status(500).send({ error: 'Internal server error' });
   });
 
-  const httpServer = createServer(app.server);
-  createSocketServer(httpServer);
+  // Attach Socket.io to Fastify's actual HTTP server (NOT a new server)
+  createSocketServer(app.server);
 
-  await app.ready();
+  // Let Fastify handle listen — routes are on app.server
+  await app.listen({ port: env.PORT, host: '0.0.0.0' });
 
-  httpServer.listen(env.PORT, '0.0.0.0', () => {
-    console.log(`Backend running on http://localhost:${env.PORT}`);
-  });
+  process.stdout.write(`[OK] Backend running on port ${env.PORT}\n`);
 
   const shutdown = async () => {
+    await app.close();
     await prisma.$disconnect();
-    httpServer.close();
     process.exit(0);
   };
 
@@ -97,19 +93,7 @@ async function bootstrap() {
   process.on('SIGINT', shutdown);
 }
 
-process.on('uncaughtException', (err) => {
-  process.stdout.write(`[FATAL] uncaughtException: ${err.message}\n${err.stack}\n`);
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (reason) => {
-  process.stdout.write(`[FATAL] unhandledRejection: ${String(reason)}\n`);
-  process.exit(1);
-});
-
-process.stdout.write(`[STARTUP] Node ${process.version} starting...\n`);
-
 bootstrap().catch((err) => {
-  process.stdout.write(`[FATAL] bootstrap error: ${err.message}\n${err.stack}\n`);
+  process.stdout.write(`[FATAL] ${err.message}\n${err.stack}\n`);
   process.exit(1);
 });
