@@ -9,7 +9,7 @@ interface AuthSocket extends Socket {
 
 export function createSocketServer(httpServer: HttpServer) {
   const io = new Server(httpServer, {
-    cors: { origin: env.CORS_ORIGIN, methods: ['GET', 'POST'] },
+    cors: { origin: '*', methods: ['GET', 'POST'] },
     transports: ['websocket', 'polling'],
   });
 

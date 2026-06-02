@@ -33,23 +33,12 @@ const app = Fastify({
 
 async function bootstrap() {
   await app.register(cors, {
-    origin: (origin, cb) => {
-      const allowed = [
-        env.CORS_ORIGIN,
-        'http://localhost:5173',
-        'http://localhost:3000',
-      ];
-      if (!origin || allowed.includes(origin) || origin.endsWith('.vercel.app')) {
-        cb(null, true);
-      } else {
-        cb(new Error('Not allowed by CORS'), false);
-      }
-    },
+    origin: true, // allow all origins (mobile app has no origin header)
     credentials: true,
   });
 
   await app.register(jwt, {
-    secret: { public: env.JWT_ACCESS_SECRET, private: env.JWT_ACCESS_SECRET },
+    secret: env.JWT_ACCESS_SECRET,
   });
 
   await app.register(rateLimit, {
