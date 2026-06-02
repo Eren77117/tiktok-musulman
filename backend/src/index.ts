@@ -97,7 +97,19 @@ async function bootstrap() {
   process.on('SIGINT', shutdown);
 }
 
+process.on('uncaughtException', (err) => {
+  process.stdout.write(`[FATAL] uncaughtException: ${err.message}\n${err.stack}\n`);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  process.stdout.write(`[FATAL] unhandledRejection: ${String(reason)}\n`);
+  process.exit(1);
+});
+
+process.stdout.write(`[STARTUP] Node ${process.version} starting...\n`);
+
 bootstrap().catch((err) => {
-  console.error(err);
+  process.stdout.write(`[FATAL] bootstrap error: ${err.message}\n${err.stack}\n`);
   process.exit(1);
 });
