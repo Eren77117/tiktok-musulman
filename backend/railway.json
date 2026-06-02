@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "npx prisma generate && npx prisma migrate deploy && npx tsx src/index.ts",
+    "startCommand": "sh start.sh",
     "restartPolicyType": "ON_FAILURE"
   }
 }
