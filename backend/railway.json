@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "npx prisma migrate deploy && node dist/index.js",
+    "startCommand": "echo '=== DIAG ===' && ls dist/ && echo '=== ENV ===' && echo NODE_ENV=$NODE_ENV PORT=$PORT && npx prisma migrate deploy && node dist/index.js",
     "restartPolicyType": "ON_FAILURE"
   }
 }
