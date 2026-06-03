@@ -5,55 +5,181 @@ import { z } from 'zod';
 
 const createPostSchema = z.object({
   caption: z.string().max(500).optional(),
-  video_url: z.string().url(),
-  thumbnail_url: z.string().url().optional(),
-  duration: z.number().positive(),
+  video_url: z.string().min(1),
+  thumbnail_url: z.string().optional(),
+  duration: z.number().min(0),
   sound_id: z.string().uuid().optional(),
   category_ids: z.array(z.string().uuid()).optional(),
   is_public: z.boolean().default(true),
 });
 
-export async function postRoutes(app: FastifyInstance) {
-  app.get('/feed', { preHandler: authenticate }, async (req, reply) => {
-    const { cursor, limit = '10' } = req.query as { cursor?: string; limit?: string };
+const POST_INCLUDE = {
+  user: {
+    select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true },
+  },
+  sound: { select: { id: true, title: true, artist: true, url: true } },
+  post_categories: { include: { category: { select: { id: true, name: true, slug: true } } } },
+} as const;
 
-    const posts = await prisma.post.findMany({
-      where: { status: 'ACTIVE', is_public: true },
-      take: parseInt(limit) + 1,
-      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-      orderBy: [{ view_count: 'desc' }, { created_at: 'desc' }],
-      include: {
-        user: {
-          select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true },
-        },
-        sound: { select: { id: true, title: true, artist: true, url: true } },
-        post_categories: { include: { category: { select: { id: true, name: true, slug: true } } } },
-        _count: { select: { likes: true, comments: true } },
+// TikTok-style engagement score
+function engagementScore(post: {
+  like_count: number;
+  comment_count: number;
+  share_count: number;
+  view_count: number;
+  created_at: Date;
+}, categoryBoost = 1.0): number {
+  const ageHours = (Date.now() - new Date(post.created_at).getTime()) / (1000 * 60 * 60);
+  const decayFactor = Math.pow(0.97, ageHours);
+
+  const base =
+    post.like_count * 10 +
+    post.comment_count * 15 +
+    post.share_count * 8 +
+    Math.min(post.view_count, 10000) * 0.5;
+
+  return base * decayFactor * categoryBoost;
+}
+
+async function getUserPreferredCategories(userId: string): Promise<Set<string>> {
+  const recentLikes = await prisma.like.findMany({
+    where: { user_id: userId, post_id: { not: null } },
+    orderBy: { created_at: 'desc' },
+    take: 50,
+    include: {
+      post: {
+        include: { post_categories: { select: { category_id: true } } },
       },
-    });
+    },
+  });
 
-    const hasMore = posts.length > parseInt(limit);
-    const items = hasMore ? posts.slice(0, -1) : posts;
+  const cats = new Set<string>();
+  for (const like of recentLikes) {
+    like.post?.post_categories.forEach(pc => cats.add(pc.category_id));
+  }
+  return cats;
+}
+
+async function buildFeedItems(userId: string, seenIds: string[], poolSize = 80) {
+  const preferredCats = await getUserPreferredCategories(userId);
+
+  const posts = await prisma.post.findMany({
+    where: {
+      status: 'ACTIVE',
+      is_public: true,
+      video_url: { not: '' },
+      NOT: seenIds.length > 0 ? { id: { in: seenIds } } : undefined,
+    },
+    take: poolSize,
+    orderBy: { created_at: 'desc' },
+    include: {
+      ...POST_INCLUDE,
+      _count: { select: { likes: true, comments: true } },
+    },
+  });
+
+  const scored = posts.map(p => {
+    const postCats = new Set(p.post_categories.map(pc => pc.category_id));
+    const boost = preferredCats.size > 0 && [...postCats].some(c => preferredCats.has(c)) ? 1.5 : 1.0;
+    return { post: p, score: engagementScore(p, boost) };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.map(s => s.post);
+}
+
+export async function postRoutes(app: FastifyInstance) {
+  // ── FEED (TikTok algorithm) ─────────────────────────────────────────
+  app.get('/feed', { preHandler: authenticate }, async (req, reply) => {
+    const { cursor, limit = '10', seen } = req.query as {
+      cursor?: string; limit?: string; seen?: string;
+    };
+    const lim = Math.min(parseInt(limit), 20);
+    const seenIds = seen ? seen.split(',').filter(Boolean) : [];
+
+    const allScored = await buildFeedItems(req.currentUser!.id, seenIds);
+
+    // Cursor: find index of cursor post, skip forward
+    let startIdx = 0;
+    if (cursor) {
+      const idx = allScored.findIndex(p => p.id === cursor);
+      startIdx = idx >= 0 ? idx + 1 : 0;
+    }
+
+    const page = allScored.slice(startIdx, startIdx + lim + 1);
+    const hasMore = page.length > lim;
+    const items = hasMore ? page.slice(0, lim) : page;
 
     const likedIds = await prisma.like.findMany({
-      where: {
-        user_id: req.currentUser!.id,
-        post_id: { in: items.map((p) => p.id) },
-      },
+      where: { user_id: req.currentUser!.id, post_id: { in: items.map(p => p.id) } },
       select: { post_id: true },
     });
-    const likedSet = new Set(likedIds.map((l) => l.post_id));
+    const likedSet = new Set(likedIds.map(l => l.post_id));
 
-    const result = items.map((p) => ({
+    const result = items.map(p => ({
       ...p,
+      like_count: p.like_count,
+      comment_count: p.comment_count,
       is_liked: likedSet.has(p.id),
-      categories: p.post_categories.map((pc) => pc.category),
+      categories: p.post_categories.map(pc => pc.category),
       post_categories: undefined,
     }));
 
     return reply.send({ items: result, next_cursor: hasMore ? items[items.length - 1].id : null });
   });
 
+  // ── TRENDING ────────────────────────────────────────────────────────
+  app.get('/trending', { preHandler: authenticate }, async (req, reply) => {
+    const { category, limit = '20' } = req.query as { category?: string; limit?: string };
+    const lim = parseInt(limit);
+
+    const where: Record<string, unknown> = { status: 'ACTIVE', is_public: true, video_url: { not: '' } };
+
+    if (category && category !== 'all') {
+      const cat = await prisma.category.findFirst({ where: { slug: category } });
+      if (cat) {
+        where.post_categories = { some: { category_id: cat.id } };
+      }
+    }
+
+    const posts = await prisma.post.findMany({
+      where,
+      take: lim * 3,
+      orderBy: { created_at: 'desc' },
+      include: {
+        user: { select: { id: true, username: true, display_name: true } },
+        post_categories: { include: { category: { select: { id: true, name: true, slug: true } } } },
+      },
+    });
+
+    const scored = posts
+      .map(p => ({ post: p, score: engagementScore(p) }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, lim);
+
+    return reply.send({
+      items: scored.map(s => ({
+        ...s.post,
+        categories: s.post.post_categories.map(pc => pc.category),
+        post_categories: undefined,
+      })),
+    });
+  });
+
+  // ── VIEW TRACKING ───────────────────────────────────────────────────
+  app.post('/:id/view', { preHandler: authenticate }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { watch_time = 0 } = req.body as { watch_time?: number };
+
+    await prisma.post.update({
+      where: { id },
+      data: { view_count: { increment: 1 } },
+    }).catch(() => {});
+
+    return reply.send({ ok: true });
+  });
+
+  // ── CREATE POST ─────────────────────────────────────────────────────
   app.post('/', { preHandler: authenticate }, async (req, reply) => {
     const parsed = createPostSchema.safeParse(req.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
@@ -80,18 +206,12 @@ export async function postRoutes(app: FastifyInstance) {
     return reply.status(201).send(post);
   });
 
+  // ── GET ONE ─────────────────────────────────────────────────────────
   app.get('/:id', { preHandler: authenticate }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const post = await prisma.post.findUnique({
       where: { id, status: 'ACTIVE' },
-      include: {
-        user: {
-          select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true },
-        },
-        sound: true,
-        post_categories: { include: { category: true } },
-        _count: { select: { likes: true, comments: true } },
-      },
+      include: { ...POST_INCLUDE, _count: { select: { likes: true, comments: true } } },
     });
     if (!post) return reply.status(404).send({ error: 'Post not found' });
 
@@ -104,28 +224,27 @@ export async function postRoutes(app: FastifyInstance) {
     return reply.send({
       ...post,
       is_liked: !!isLiked,
-      categories: post.post_categories.map((pc) => pc.category),
+      categories: post.post_categories.map(pc => pc.category),
       post_categories: undefined,
     });
   });
 
+  // ── DELETE ──────────────────────────────────────────────────────────
   app.delete('/:id', { preHandler: authenticate }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const post = await prisma.post.findUnique({ where: { id } });
     if (!post) return reply.status(404).send({ error: 'Not found' });
-
     if (post.user_id !== req.currentUser!.id && req.currentUser!.role === 'USER') {
       return reply.status(403).send({ error: 'Forbidden' });
     }
-
     await prisma.$transaction([
       prisma.post.delete({ where: { id } }),
       prisma.user.update({ where: { id: post.user_id }, data: { post_count: { decrement: 1 } } }),
     ]);
-
     return reply.send({ success: true });
   });
 
+  // ── LIKE / UNLIKE ───────────────────────────────────────────────────
   app.post('/:id/like', { preHandler: authenticate }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const userId = req.currentUser!.id;
@@ -155,8 +274,8 @@ export async function postRoutes(app: FastifyInstance) {
         data: {
           user_id: post.user_id,
           type: 'LIKE',
-          title: 'New like',
-          body: 'Someone liked your post',
+          title: 'Nouveau like',
+          body: 'Quelqu\'un a aimé votre publication',
           data: { post_id: id, liker_id: userId },
         },
       });
@@ -165,12 +284,13 @@ export async function postRoutes(app: FastifyInstance) {
     return reply.send({ liked: true });
   });
 
+  // ── USER POSTS ──────────────────────────────────────────────────────
   app.get('/user/:userId', { preHandler: authenticate }, async (req, reply) => {
     const { userId } = req.params as { userId: string };
     const { cursor, limit = '12' } = req.query as { cursor?: string; limit?: string };
 
     const posts = await prisma.post.findMany({
-      where: { user_id: userId, status: 'ACTIVE', is_public: true },
+      where: { user_id: userId, status: 'ACTIVE', is_public: true, video_url: { not: '' } },
       take: parseInt(limit) + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       orderBy: { created_at: 'desc' },
