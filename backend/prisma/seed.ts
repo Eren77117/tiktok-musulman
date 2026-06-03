@@ -5,34 +5,46 @@ const prisma = new PrismaClient();
 
 const SEED_VIDEOS = [
   {
-    caption: 'Rappel du jour — La patience est la clé du paradis. Prends soin de ton coeur.',
+    caption: 'Rappel du jour — La patience est la clé du paradis. Prends soin de ton coeur. #rappel #islam #patience',
     video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-    thumbnail_url: null,
+    thumbnail_url: 'https://picsum.photos/seed/nour1/400/711',
     duration: 15,
   },
   {
-    caption: 'Motivation matinale — Commence ta journée avec Bismillah et avance avec confiance.',
+    caption: 'Motivation matinale — Commence ta journée avec Bismillah et avance avec confiance. #motivation #islam',
     video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
-    thumbnail_url: null,
+    thumbnail_url: 'https://picsum.photos/seed/nour2/400/711',
     duration: 15,
   },
   {
-    caption: 'Récitation Sourate Al-Fatiha — Que cette récitation apaise vos coeurs.',
+    caption: 'Récitation Sourate Al-Fatiha — Que cette récitation apaise vos coeurs. #coran #fatiha',
     video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
-    thumbnail_url: null,
+    thumbnail_url: 'https://picsum.photos/seed/nour3/400/711',
     duration: 15,
   },
   {
-    caption: 'Lifestyle halal — Nourrir son corps et son âme avec ce qui est pur.',
+    caption: 'Lifestyle halal — Nourrir son corps et son âme avec ce qui est pur. #halal #lifestyle',
     video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4',
-    thumbnail_url: null,
+    thumbnail_url: 'https://picsum.photos/seed/nour4/400/711',
     duration: 15,
   },
   {
-    caption: 'Hadith du jour — "Le meilleur d\'entre vous est celui qui a les meilleures moeurs." (Sahih Muslim)',
+    caption: 'Hadith du jour — "Le meilleur d\'entre vous est celui qui a les meilleures moeurs." (Sahih Muslim) #hadith #sunnah',
     video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4',
-    thumbnail_url: null,
+    thumbnail_url: 'https://picsum.photos/seed/nour5/400/711',
     duration: 55,
+  },
+  {
+    caption: 'Dua du matin — Protège-toi avec ces invocations puissantes. #dua #dikr #matin',
+    video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    thumbnail_url: 'https://picsum.photos/seed/nour6/400/711',
+    duration: 30,
+  },
+  {
+    caption: 'Les 5 piliers de l\'Islam expliqués simplement. #islam #piliers #education',
+    video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    thumbnail_url: 'https://picsum.photos/seed/nour7/400/711',
+    duration: 25,
   },
 ];
 

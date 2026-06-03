@@ -117,16 +117,47 @@ export async function authRoutes(app: FastifyInstance) {
     return reply.send({ success: true });
   });
 
+  app.post('/change-password', { preHandler: authenticate }, async (req, reply) => {
+    const { current_password, new_password } = req.body as { current_password: string; new_password: string };
+    if (!current_password || !new_password) return reply.status(400).send({ error: 'Champs manquants' });
+    if (new_password.length < 8) return reply.status(400).send({ error: 'Mot de passe trop court (8 caractères min)' });
+
+    const user = await prisma.user.findUnique({ where: { id: req.currentUser!.id } });
+    if (!user) return reply.status(404).send({ error: 'Utilisateur introuvable' });
+
+    const valid = await verifyPassword(current_password, user.password_hash);
+    if (!valid) return reply.status(401).send({ error: 'Mot de passe actuel incorrect' });
+
+    const password_hash = await hashPassword(new_password);
+    await prisma.user.update({ where: { id: user.id }, data: { password_hash } });
+    await prisma.auditLog.create({ data: { user_id: user.id, action: 'CHANGE_PASSWORD', entity: 'User', entity_id: user.id } });
+    return reply.send({ success: true });
+  });
+
   app.get('/me', { preHandler: authenticate }, async (req, reply) => {
-    const user = await prisma.user.findUnique({
-      where: { id: req.currentUser!.id },
-      select: {
-        id: true, username: true, email: true, display_name: true,
-        bio: true, avatar_url: true, gender: true, role: true,
-        is_verified: true, follower_count: true, following_count: true,
-        post_count: true, like_count: true, created_at: true,
-      },
-    });
-    return reply.send(user);
+    const userId = req.currentUser!.id;
+    const [user, followerCount, followingCount, postCount] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true, username: true, email: true, display_name: true,
+          bio: true, avatar_url: true, gender: true, role: true,
+          is_verified: true, like_count: true, created_at: true,
+        },
+      }),
+      prisma.follow.count({ where: { following_id: userId } }),
+      prisma.follow.count({ where: { follower_id: userId } }),
+      prisma.post.count({ where: { user_id: userId, status: 'ACTIVE' } }),
+    ]);
+
+    // Sync denormalized counts
+    if (user) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { follower_count: followerCount, following_count: followingCount, post_count: postCount },
+      }).catch(() => {});
+    }
+
+    return reply.send({ ...user, follower_count: followerCount, following_count: followingCount, post_count: postCount });
   });
 }

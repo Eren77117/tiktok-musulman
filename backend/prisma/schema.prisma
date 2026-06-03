@@ -83,6 +83,7 @@ model User {
   follows_given     Follow[]          @relation("follower")
   follows_received  Follow[]          @relation("following")
   favorites         Favorite[]
+  post_views        PostView[]
   notifications     Notification[]
   sent_requests     ConversationRequest[] @relation("requester")
   received_requests ConversationRequest[] @relation("recipient")
@@ -132,8 +133,9 @@ model Post {
   sound     Sound?     @relation(fields: [sound_id], references: [id])
   comments  Comment[]
   likes     Like[]
-  favorites Favorite[]
-  reports   Report[]
+  favorites   Favorite[]
+  reports     Report[]
+  post_views  PostView[]
   post_categories PostCategory[]
 
   @@index([user_id])
@@ -267,6 +269,23 @@ model Favorite {
 
   @@unique([user_id, post_id])
   @@index([user_id])
+}
+
+model PostView {
+  id            String   @id @default(uuid())
+  user_id       String
+  post_id       String
+  watch_time_ms Int      @default(0)
+  completed     Boolean  @default(false)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [post_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, post_id])
+  @@index([user_id])
+  @@index([post_id])
 }
 
 model Notification {

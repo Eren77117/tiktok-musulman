@@ -4,7 +4,7 @@ import { API_BASE_URL } from '../constants';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 30000,   // 30s — Railway cold starts can be slow
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -41,12 +41,12 @@ api.interceptors.request.use(async (config) => {
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
-    if (error.code === 'ECONNABORTED') {
-      error.message = 'Server timeout. Check connection.';
+    if (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK') {
+      error.message = 'Délai dépassé. Vérifie ta connexion internet.';
       return Promise.reject(error);
     }
     if (!error.response) {
-      error.message = 'Network error. Check your connection.';
+      error.message = 'Erreur réseau. Vérifie ta connexion internet.';
       return Promise.reject(error);
     }
     if (error.response?.status === 401) {

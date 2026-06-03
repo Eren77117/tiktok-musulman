@@ -21,22 +21,30 @@ const POST_INCLUDE = {
   post_categories: { include: { category: { select: { id: true, name: true, slug: true } } } },
 } as const;
 
-// TikTok-style engagement score
+// TikTok-style engagement score with watch time
 function engagementScore(post: {
   like_count: number;
   comment_count: number;
   share_count: number;
   view_count: number;
   created_at: Date;
+  avg_watch_ms?: number;
+  duration?: number;
 }, categoryBoost = 1.0): number {
   const ageHours = (Date.now() - new Date(post.created_at).getTime()) / (1000 * 60 * 60);
   const decayFactor = Math.pow(0.97, ageHours);
+
+  // Watch time completion rate bonus (0 to 25 points)
+  const durationMs = (post.duration ?? 15) * 1000;
+  const completionRate = post.avg_watch_ms ? Math.min(post.avg_watch_ms / durationMs, 1) : 0;
+  const watchBonus = completionRate * 25;
 
   const base =
     post.like_count * 10 +
     post.comment_count * 15 +
     post.share_count * 8 +
-    Math.min(post.view_count, 10000) * 0.5;
+    Math.min(post.view_count, 10000) * 0.5 +
+    watchBonus * Math.min(post.view_count, 1000);
 
   return base * decayFactor * categoryBoost;
 }
@@ -166,15 +174,25 @@ export async function postRoutes(app: FastifyInstance) {
     });
   });
 
-  // ── VIEW TRACKING ───────────────────────────────────────────────────
+  // ── VIEW TRACKING + WATCH TIME ─────────────────────────────────────
   app.post('/:id/view', { preHandler: authenticate }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    const { watch_time = 0 } = req.body as { watch_time?: number };
+    const { watch_time = 0, completed = false } = req.body as { watch_time?: number; completed?: boolean };
+    const userId = req.currentUser!.id;
 
     await prisma.post.update({
       where: { id },
       data: { view_count: { increment: 1 } },
     }).catch(() => {});
+
+    // Store watch time for personalization algo
+    if (watch_time > 0) {
+      await prisma.postView.upsert({
+        where: { user_id_post_id: { user_id: userId, post_id: id } },
+        create: { user_id: userId, post_id: id, watch_time_ms: Math.round(watch_time * 1000), completed },
+        update: { watch_time_ms: { increment: Math.round(watch_time * 1000) }, completed: completed || undefined },
+      }).catch(() => {});
+    }
 
     return reply.send({ ok: true });
   });
@@ -282,6 +300,29 @@ export async function postRoutes(app: FastifyInstance) {
     }
 
     return reply.send({ liked: true });
+  });
+
+  // ── LIKED POSTS ─────────────────────────────────────────────────────
+  app.get('/liked', { preHandler: authenticate }, async (req, reply) => {
+    const userId = req.currentUser!.id;
+    const { cursor, limit = '12' } = req.query as { cursor?: string; limit?: string };
+
+    const likes = await prisma.like.findMany({
+      where: { user_id: userId, post_id: { not: null } },
+      take: parseInt(limit) + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      orderBy: { created_at: 'desc' },
+      include: {
+        post: { select: { id: true, thumbnail_url: true, view_count: true, like_count: true } },
+      },
+    });
+
+    const hasMore = likes.length > parseInt(limit);
+    const items = hasMore ? likes.slice(0, -1) : likes;
+    return reply.send({
+      items: items.map((l) => l.post).filter(Boolean),
+      next_cursor: hasMore ? items[items.length - 1].id : null,
+    });
   });
 
   // ── USER POSTS ──────────────────────────────────────────────────────

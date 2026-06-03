@@ -1,16 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, Image, TouchableOpacity,
-  ScrollView, ActivityIndicator, Alert,
+  FlatList, ActivityIndicator, Alert, Dimensions, ActionSheetIOS, Platform,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../../navigation';
 import { useAuthStore } from '../../stores/authStore';
+import { useTheme } from '../../hooks/useTheme';
 import { api } from '../../api/client';
 import { COLORS, FONT, SPACING, RADIUS, SHADOW } from '../../constants/theme';
-import { IcBack, IcFollow, IcFollowing, IcMail } from '../../components/ui/Icons';
+import { IcBack, IcFollow, IcFollowing, IcMail, IcHeart, IcPlay, IcCheck, IcMore } from '../../components/ui/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
 
@@ -28,194 +29,307 @@ interface Profile {
   gender: 'MALE' | 'FEMALE';
 }
 
+interface Post {
+  id: string;
+  thumbnail_url: string | null;
+  view_count: number;
+  like_count: number;
+  caption: string | null;
+}
+
+const { width: W } = Dimensions.get('window');
+const CELL = (W - 2) / 3;
+
 function fmtNum(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
+  return String(n ?? 0);
 }
 
 export default function UserProfileScreen({ route, navigation }: Props) {
-  const { username } = route.params;
+  const { username, userId } = route.params;
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
+  const theme = useTheme();
   const qc = useQueryClient();
 
   const { data: profile, isLoading } = useQuery<Profile>({
     queryKey: ['profile', username],
     queryFn: () => api.get(`/users/${username}`).then(r => r.data),
+    refetchOnWindowFocus: true,
+  });
+
+  const { data: postsData, isLoading: postsLoading } = useQuery<{ items: Post[] }>({
+    queryKey: ['user-posts-public', userId || profile?.id],
+    queryFn: () => api.get(`/posts/user/${userId || profile?.id}`).then(r => r.data).catch(() => ({ items: [] })),
+    enabled: !!(userId || profile?.id),
   });
 
   const followMutation = useMutation({
     mutationFn: () => api.post(`/users/${profile?.id}/follow`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['profile', username] }),
+    onMutate: () => {
+      qc.setQueryData(['profile', username], (old: any) => old ? {
+        ...old,
+        is_following: !old.is_following,
+        follower_count: old.is_following ? old.follower_count - 1 : old.follower_count + 1,
+      } : old);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['profile', username] }),
   });
+
+  const handleOptions = () => {
+    const options = ['Signaler', 'Bloquer', 'Ne plus voir dans le feed', 'Annuler'];
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options, cancelButtonIndex: 3, destructiveButtonIndex: 1 },
+        (i) => {
+          if (i === 0) {
+            Alert.alert('Signalement envoyé', 'Merci, nous examinerons ce profil.');
+            api.post('/reports', { target_type: 'user', target_id: profile?.id, reason: 'inappropriate' }).catch(() => {});
+          } else if (i === 1) {
+            Alert.alert('Bloquer', `Bloquer @${profile?.username} ?`, [
+              { text: 'Annuler', style: 'cancel' },
+              { text: 'Bloquer', style: 'destructive', onPress: () => {
+                api.post(`/users/${profile?.id}/block`).catch(() => {});
+                navigation.goBack();
+              }},
+            ]);
+          } else if (i === 2) {
+            Alert.alert('Masqué', `Tu ne verras plus @${profile?.username} dans ton feed.`);
+            api.post(`/users/${profile?.id}/hide`).catch(() => {});
+          }
+        },
+      );
+    } else {
+      Alert.alert('Options', '', [
+        { text: 'Signaler', onPress: () => { api.post('/reports', { target_type: 'user', target_id: profile?.id, reason: 'inappropriate' }).catch(() => {}); Alert.alert('Signalement envoyé'); }},
+        { text: 'Bloquer', style: 'destructive', onPress: () => { api.post(`/users/${profile?.id}/block`).catch(() => {}); navigation.goBack(); }},
+        { text: 'Ne plus voir dans le feed', onPress: () => Alert.alert('Masqué') },
+        { text: 'Annuler', style: 'cancel' },
+      ]);
+    }
+  };
 
   const handleMessage = () => {
     if (!user || !profile) return;
-
-    const sameGender = user.gender === profile.gender;
-    if (!sameGender) {
-      Alert.alert(
-        'Messagerie restreinte',
-        'Sur Nour, les messages entre hommes et femmes non mahrams ne sont pas autorisés.',
-        [{ text: 'Compris' }],
-      );
+    if (user.gender !== profile.gender) {
+      Alert.alert('Messagerie restreinte',
+        'Sur Nour, la messagerie entre hommes et femmes non mahrams n\'est pas autorisée.',
+        [{ text: 'Compris' }]);
       return;
     }
-
     navigation.navigate('Messages');
   };
 
   if (isLoading) {
     return (
-      <View style={[styles.loading, { paddingTop: insets.top }]}>
+      <View style={[styles.loading, { backgroundColor: theme.bg, paddingTop: insets.top }]}>
         <ActivityIndicator color={COLORS.primary} size="large" />
       </View>
     );
   }
 
   if (!profile) return null;
-
   const isOwnProfile = user?.id === profile.id;
+  const posts = postsData?.items ?? [];
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, { backgroundColor: theme.bg, paddingTop: insets.top }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.borderLight }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.7}>
-          <IcBack size={24} color={COLORS.text} />
+          <IcBack size={24} color={theme.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>@{profile.username}</Text>
-        <View style={{ width: 40 }} />
+        <Text style={[styles.headerTitle, { color: theme.text }]}>@{profile.username}</Text>
+        {!isOwnProfile && (
+          <TouchableOpacity onPress={handleOptions} style={styles.backBtn} activeOpacity={0.7}>
+            <IcMore size={22} color={theme.text} />
+          </TouchableOpacity>
+        )}
+        {isOwnProfile && <View style={{ width: 40 }} />}
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Avatar + info */}
-        <View style={styles.hero}>
-          <View style={styles.avatarWrap}>
-            {profile.avatar_url ? (
-              <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatar, styles.avatarFallback]}>
-                <Text style={styles.avatarInitial}>{profile.display_name[0]?.toUpperCase()}</Text>
+      <FlatList
+        data={posts}
+        keyExtractor={p => p.id}
+        numColumns={3}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ gap: 1, paddingBottom: 40 }}
+        columnWrapperStyle={{ gap: 1 }}
+        ListHeaderComponent={
+          <View style={[styles.hero, { backgroundColor: theme.surface, borderBottomColor: theme.borderLight }]}>
+            {/* Avatar */}
+            <TouchableOpacity style={styles.avatarWrap} activeOpacity={0.85}>
+              {profile.avatar_url
+                ? <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
+                : <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: theme.primaryBg }]}>
+                    <Text style={styles.avatarInitial}>{profile.display_name[0]?.toUpperCase()}</Text>
+                  </View>
+              }
+              {profile.is_verified && (
+                <View style={styles.verifiedBadge}>
+                  <IcCheck size={9} color={COLORS.white} strokeWidth={3} />
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <Text style={[styles.displayName, { color: theme.text }]}>{profile.display_name}</Text>
+            {profile.bio
+              ? <Text style={[styles.bio, { color: theme.textMuted }]}>{profile.bio}</Text>
+              : null
+            }
+
+            {/* Stats */}
+            <View style={styles.statsRow}>
+              <StatItem label="Publications" value={profile.post_count} theme={theme} />
+              <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
+              <StatItem label="Abonnés" value={profile.follower_count} theme={theme} />
+              <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
+              <StatItem label="Abonnements" value={profile.following_count} theme={theme} />
+            </View>
+
+            {/* Actions */}
+            {!isOwnProfile && (
+              <View style={styles.actions}>
+                <TouchableOpacity
+                  style={[styles.followBtn, profile.is_following && { backgroundColor: theme.surface, borderWidth: 1.5, borderColor: theme.border }]}
+                  onPress={() => followMutation.mutate()}
+                  disabled={followMutation.isPending}
+                  activeOpacity={0.8}
+                >
+                  {profile.is_following
+                    ? <IcFollowing size={15} color={theme.textMuted} />
+                    : <IcFollow size={15} color={COLORS.white} />
+                  }
+                  <Text style={[styles.followText, profile.is_following && { color: theme.textMuted }]}>
+                    {profile.is_following ? 'Abonné' : 'Suivre'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.messageBtn, { borderColor: COLORS.primary, backgroundColor: theme.surface }]}
+                  onPress={handleMessage}
+                  activeOpacity={0.8}
+                >
+                  <IcMail size={15} color={COLORS.primary} />
+                  <Text style={[styles.messageBtnText, { color: COLORS.primary }]}>Message</Text>
+                </TouchableOpacity>
               </View>
             )}
-            {profile.is_verified && (
-              <View style={styles.verifiedBadge}>
-                <Text style={styles.verifiedText}>✓</Text>
+
+            {/* Grid header */}
+            <View style={[styles.gridHeader, { borderTopColor: theme.borderLight }]}>
+              <IcPlay size={16} color={COLORS.primary} />
+              <Text style={[styles.gridHeaderText, { color: theme.text }]}>Vidéos ({profile.post_count})</Text>
+            </View>
+          </View>
+        }
+        renderItem={({ item: p }) => (
+          <TouchableOpacity
+            style={[styles.cell, { backgroundColor: theme.surface }]}
+            onPress={() => navigation.navigate('VideoPlayer', { postId: p.id })}
+            activeOpacity={0.85}
+          >
+            {p.thumbnail_url
+              ? <Image source={{ uri: p.thumbnail_url }} style={styles.cellImg} resizeMode="cover" />
+              : <View style={[styles.cellImg, styles.cellFallback, { backgroundColor: theme.card }]}>
+                  <IcPlay size={24} color={COLORS.primaryLight} />
+                </View>
+            }
+            <View style={styles.cellOverlay}>
+              <IcPlay size={10} color={COLORS.white} />
+              <Text style={styles.cellCount}>{fmtNum(p.view_count)}</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+        ListEmptyComponent={
+          postsLoading
+            ? <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
+            : (
+              <View style={styles.empty}>
+                <Text style={[styles.emptyText, { color: theme.textMuted }]}>Aucune publication</Text>
               </View>
-            )}
-          </View>
+            )
+        }
+      />
+    </View>
+  );
+}
 
-          <Text style={styles.displayName}>{profile.display_name}</Text>
-          {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
-
-          {/* Stats */}
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{fmtNum(profile.post_count)}</Text>
-              <Text style={styles.statLabel}>Publications</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{fmtNum(profile.follower_count)}</Text>
-              <Text style={styles.statLabel}>Abonnés</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{fmtNum(profile.following_count)}</Text>
-              <Text style={styles.statLabel}>Abonnements</Text>
-            </View>
-          </View>
-
-          {/* Actions */}
-          {!isOwnProfile && (
-            <View style={styles.actions}>
-              <TouchableOpacity
-                style={[styles.followBtn, profile.is_following && styles.followingBtn]}
-                onPress={() => followMutation.mutate()}
-                disabled={followMutation.isPending}
-                activeOpacity={0.8}
-              >
-                {profile.is_following
-                  ? <IcFollowing size={16} color={COLORS.textMuted} />
-                  : <IcFollow size={16} color={COLORS.white} />
-                }
-                <Text style={[styles.followText, profile.is_following && styles.followingText]}>
-                  {profile.is_following ? 'Abonné' : 'Suivre'}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.messageBtn}
-                onPress={handleMessage}
-                activeOpacity={0.8}
-              >
-                <IcMail size={16} color={COLORS.primary} />
-                <Text style={styles.messageBtnText}>Message</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-      </ScrollView>
+function StatItem({ label, value, theme }: { label: string; value: number; theme: any }) {
+  return (
+    <View style={styles.statItem}>
+      <Text style={[styles.statValue, { color: theme.text }]}>{fmtNum(value)}</Text>
+      <Text style={[styles.statLabel, { color: theme.textMuted }]}>{label}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg },
-  loading: { flex: 1, backgroundColor: COLORS.bg, alignItems: 'center', justifyContent: 'center' },
+  container: { flex: 1 },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SPACING.md, paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: COLORS.borderLight, backgroundColor: COLORS.white,
+    paddingHorizontal: SPACING.md, paddingVertical: 12, borderBottomWidth: 1,
   },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: FONT.size.base, fontWeight: FONT.weight.semibold, color: COLORS.text },
-  content: { paddingBottom: 40 },
-  hero: { alignItems: 'center', paddingVertical: SPACING.xl, paddingHorizontal: SPACING.lg, gap: SPACING.sm },
+  headerTitle: { fontSize: FONT.size.base, fontWeight: FONT.weight.semibold },
 
-  avatarWrap: { position: 'relative' },
-  avatar: { width: 96, height: 96, borderRadius: 48 },
-  avatarFallback: {
-    backgroundColor: COLORS.primaryBg, borderWidth: 3, borderColor: COLORS.primary,
-    alignItems: 'center', justifyContent: 'center',
+  hero: {
+    alignItems: 'center', paddingVertical: SPACING.lg,
+    paddingHorizontal: SPACING.lg, gap: SPACING.sm,
+    borderBottomWidth: 1,
   },
-  avatarInitial: { fontSize: 38, fontWeight: FONT.weight.bold, color: COLORS.primary },
+  avatarWrap: { position: 'relative', marginBottom: 4 },
+  avatar: { width: 88, height: 88, borderRadius: 44 },
+  avatarFallback: { borderWidth: 3, borderColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
+  avatarInitial: { fontSize: 34, fontWeight: FONT.weight.bold, color: COLORS.primary },
   verifiedBadge: {
-    position: 'absolute', bottom: 0, right: 0,
-    width: 24, height: 24, borderRadius: 12,
+    position: 'absolute', bottom: 2, right: 2,
+    width: 22, height: 22, borderRadius: 11,
     backgroundColor: COLORS.primary, borderWidth: 2, borderColor: COLORS.white,
     alignItems: 'center', justifyContent: 'center',
   },
-  verifiedText: { color: COLORS.white, fontSize: 11, fontWeight: FONT.weight.bold },
 
-  displayName: { fontSize: FONT.size.xxl, fontWeight: FONT.weight.bold, color: COLORS.text, letterSpacing: -0.3 },
-  bio: { fontSize: FONT.size.sm, color: COLORS.textMuted, textAlign: 'center', lineHeight: 20 },
+  displayName: { fontSize: FONT.size.xxl, fontWeight: FONT.weight.bold, letterSpacing: -0.3 },
+  bio: { fontSize: FONT.size.sm, textAlign: 'center', lineHeight: 20 },
 
   statsRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.lg, marginTop: 4 },
-  statItem: { alignItems: 'center', gap: 2 },
-  statValue: { fontSize: FONT.size.xl, fontWeight: FONT.weight.bold, color: COLORS.text },
-  statLabel: { fontSize: FONT.size.xs, color: COLORS.textMuted },
-  statDivider: { width: 1, height: 30, backgroundColor: COLORS.border },
+  statItem: { alignItems: 'center', gap: 2, minWidth: 70 },
+  statValue: { fontSize: FONT.size.xl, fontWeight: FONT.weight.bold },
+  statLabel: { fontSize: FONT.size.xs },
+  statDivider: { width: 1, height: 30 },
 
-  actions: { flexDirection: 'row', gap: 10, marginTop: 6 },
+  actions: { flexDirection: 'row', gap: 10, marginTop: 4 },
   followBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: COLORS.primary, borderRadius: RADIUS.full,
     paddingHorizontal: 28, paddingVertical: 10, ...SHADOW.green,
   },
-  followingBtn: {
-    backgroundColor: COLORS.white, borderWidth: 1.5, borderColor: COLORS.border,
-    shadowColor: 'transparent',
-  },
   followText: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold, color: COLORS.white },
-  followingText: { color: COLORS.textMuted },
   messageBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: COLORS.white, borderRadius: RADIUS.full,
-    paddingHorizontal: 20, paddingVertical: 10,
-    borderWidth: 1.5, borderColor: COLORS.primary,
+    borderRadius: RADIUS.full, paddingHorizontal: 20, paddingVertical: 10,
+    borderWidth: 1.5,
   },
-  messageBtnText: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold, color: COLORS.primary },
+  messageBtnText: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold },
+
+  gridHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    width: '100%', paddingTop: SPACING.md, marginTop: 4,
+    borderTopWidth: 1,
+  },
+  gridHeaderText: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold },
+
+  cell: { width: CELL, height: CELL * (16 / 9) },
+  cellImg: { width: '100%', height: '100%' },
+  cellFallback: { alignItems: 'center', justifyContent: 'center' },
+  cellOverlay: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    padding: 4, backgroundColor: 'rgba(0,0,0,0.4)',
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+  },
+  cellCount: { fontSize: 10, color: COLORS.white },
+  empty: { alignItems: 'center', paddingTop: 40 },
+  emptyText: { fontSize: FONT.size.base },
 });

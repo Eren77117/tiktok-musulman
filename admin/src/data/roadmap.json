@@ -1,274 +1,68 @@
 {
   "lastUpdated": "2026-06-03",
+  "version": "2.0",
   "items": [
-    {
-      "id": "1",
-      "title": "Upload vidéo end-to-end",
-      "description": "Mobile → backend → URL absolue → post créé avec durée réelle",
-      "status": "done",
-      "priority": "critical",
-      "category": "feature",
-      "tags": [
-        "mobile",
-        "backend",
-        "upload"
-      ]
-    },
-    {
-      "id": "2",
-      "title": "Algorithme feed TikTok-style",
-      "description": "Score = likes×10 + comments×15 + shares×8 + views×0.5 + time decay + category boost",
-      "status": "done",
-      "priority": "critical",
-      "category": "feature",
-      "tags": [
-        "backend",
-        "algorithm",
-        "feed"
-      ]
-    },
-    {
-      "id": "3",
-      "title": "Icônes premium Lucide React Native",
-      "description": "Remplacement total emoji/unicode par lucide-react-native + react-native-svg",
-      "status": "done",
-      "priority": "high",
-      "category": "design",
-      "tags": [
-        "mobile",
-        "design",
-        "icons"
-      ]
-    },
-    {
-      "id": "4",
-      "title": "Suppression popups développeur",
-      "description": "LogBox.ignoreAllLogs() — aucun popup dev visible par les utilisateurs",
-      "status": "done",
-      "priority": "high",
-      "category": "bug",
-      "tags": [
-        "mobile"
-      ]
-    },
-    {
-      "id": "5",
-      "title": "Routing complet — 3 écrans manquants",
-      "description": "ExploreScreen, ThreadsScreen, SettingsScreen créés et routés",
-      "status": "done",
-      "priority": "critical",
-      "category": "bug",
-      "tags": [
-        "mobile",
-        "navigation"
-      ]
-    },
-    {
-      "id": "6",
-      "title": "Route /api/threads backend",
-      "description": "GET/POST /threads avec like, reply_count, pagination cursor",
-      "status": "done",
-      "priority": "high",
-      "category": "feature",
-      "tags": [
-        "backend"
-      ]
-    },
-    {
-      "id": "7",
-      "title": "Tracking vues vidéo",
-      "description": "POST /posts/:id/view — incrémente view_count, base pour algo",
-      "status": "done",
-      "priority": "high",
-      "category": "feature",
-      "tags": [
-        "backend",
-        "algorithm"
-      ]
-    },
-    {
-      "id": "8",
-      "title": "5 vidéos seed de test",
-      "description": "prisma/seed.ts avec 5 posts MP4 public CDN + comptes test homme/femme",
-      "status": "done",
-      "priority": "medium",
-      "category": "feature",
-      "tags": [
-        "backend",
-        "test"
-      ]
-    },
-    {
-      "id": "9",
-      "title": "Cloudinary — upload production",
-      "description": "Configurer CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET sur Railway pour stockage permanent",
-      "status": "in_progress",
-      "priority": "critical",
-      "category": "infra",
-      "tags": [
-        "backend",
-        "infra",
-        "upload"
-      ]
-    },
-    {
-      "id": "10",
-      "title": "Seed données Railway",
-      "description": "Exécuter DATABASE_URL=<railway_url> npx prisma db seed depuis backend/",
-      "status": "done",
-      "priority": "critical",
-      "category": "infra",
-      "tags": [
-        "backend",
-        "infra"
-      ]
-    },
-    {
-      "id": "11",
-      "title": "Lecteur vidéo inline (swipe vertical)",
-      "description": "Lecteur vidéo fullscreen swipeable type TikTok avec react-native-video — autoplay au scroll",
-      "status": "done",
-      "priority": "high",
-      "category": "feature",
-      "tags": [
-        "mobile",
-        "video"
-      ]
-    },
-    {
-      "id": "12",
-      "title": "Système de following — restriction messages H/F",
-      "description": "Un homme ne peut pas initier un DM à une femme (et vice versa). Déjà dans backend mais à affiner côté mobile",
-      "status": "in_progress",
-      "priority": "critical",
-      "category": "feature",
-      "tags": [
-        "mobile",
-        "backend",
-        "rules"
-      ]
-    },
-    {
-      "id": "13",
-      "title": "Profil — édition photo + bio",
-      "description": "Formulaire d'édition du profil : photo de profil, bio, nom affiché",
-      "status": "todo",
-      "priority": "high",
-      "category": "feature",
-      "tags": [
-        "mobile",
-        "profile"
-      ]
-    },
-    {
-      "id": "14",
-      "title": "Push notifications",
-      "description": "Intégration FCM/APNs pour notifications likes, messages, abonnés",
-      "status": "todo",
-      "priority": "medium",
-      "category": "feature",
-      "tags": [
-        "mobile",
-        "backend"
-      ]
-    },
-    {
-      "id": "15",
-      "title": "Mode sombre complet",
-      "description": "Dark mode sur tous les écrans avec COLORS dark tokens déjà définis dans theme.ts",
-      "status": "todo",
-      "priority": "medium",
-      "category": "design",
-      "tags": [
-        "mobile",
-        "design"
-      ]
-    },
-    {
-      "id": "16",
-      "title": "Onboarding / tutoriel",
-      "description": "3 écrans d'onboarding au premier lancement avec valeurs et règles de l'app",
-      "status": "todo",
-      "priority": "medium",
-      "category": "feature",
-      "tags": [
-        "mobile",
-        "ux"
-      ]
-    },
-    {
-      "id": "17",
-      "title": "Recherche vidéos + utilisateurs améliorée",
-      "description": "Recherche plein texte sur captions et usernames, résultats vidéos dans explore",
-      "status": "todo",
-      "priority": "medium",
-      "category": "feature",
-      "tags": [
-        "mobile",
-        "backend",
-        "search"
-      ]
-    },
-    {
-      "id": "18",
-      "title": "Compression vidéo avant upload",
-      "description": "Réduire taille vidéo côté mobile avant envoi (ffmpeg ou react-native-compressor)",
-      "status": "todo",
-      "priority": "medium",
-      "category": "feature",
-      "tags": [
-        "mobile",
-        "upload"
-      ]
-    },
-    {
-      "id": "19",
-      "title": "Analytics admin — métriques d'engagement",
-      "description": "Dashboard admin avec graphiques: vues/jour, uploads/jour, rétention, top catégories",
-      "status": "todo",
-      "priority": "low",
-      "category": "admin",
-      "tags": [
-        "admin",
-        "analytics"
-      ]
-    },
-    {
-      "id": "20",
-      "title": "Modération contenu — signalements",
-      "description": "Workflow admin pour traiter les reports, bans, suppression contenu inapproprié",
-      "status": "todo",
-      "priority": "high",
-      "category": "admin",
-      "tags": [
-        "admin",
-        "moderation"
-      ]
-    },
-    {
-      "id": "21",
-      "title": "Tests unitaires — auth + algo feed",
-      "description": "Jest tests sur: login/register, scoring algorithm, gender messaging rule",
-      "status": "todo",
-      "priority": "low",
-      "category": "test",
-      "tags": [
-        "backend",
-        "test"
-      ]
-    },
-    {
-      "id": "22",
-      "title": "Build production iOS — App Store",
-      "description": "Archive Xcode, certificats distribution, soumission TestFlight puis App Store",
-      "status": "todo",
-      "priority": "high",
-      "category": "infra",
-      "tags": [
-        "mobile",
-        "infra",
-        "release"
-      ]
-    }
+    { "id": "1",  "title": "Upload vidéo end-to-end", "description": "Mobile → fetch() natif multipart → URL absolue → post créé", "status": "done", "priority": "critical", "category": "feature", "tags": ["mobile","backend","upload"] },
+    { "id": "2",  "title": "Algorithme feed TikTok-style", "description": "Score engagement (likes×10 + comments×15 + decay) + boost catégories préférées", "status": "done", "priority": "critical", "category": "feature", "tags": ["backend","algorithm"] },
+    { "id": "3",  "title": "Icônes Lucide React Native SVG", "description": "Tous les icônes via lucide-react-native — zéro emoji ni caractère spécial", "status": "done", "priority": "high", "category": "design", "tags": ["mobile","design"] },
+    { "id": "4",  "title": "Suppression overlays développeur", "description": "LogBox.ignoreAllLogs + ErrorBoundary global — aucun écran rouge visible", "status": "done", "priority": "high", "category": "bug", "tags": ["mobile"] },
+    { "id": "5",  "title": "Routing complet — 5 tabs + stack screens", "description": "ExploreScreen, SettingsScreen, PostDetailScreen, UserProfileScreen, ConversationScreen routés", "status": "done", "priority": "critical", "category": "bug", "tags": ["mobile","navigation"] },
+    { "id": "6",  "title": "Route /api/threads backend", "description": "GET/POST/like threads — déployé sur Railway", "status": "done", "priority": "high", "category": "feature", "tags": ["backend"] },
+    { "id": "7",  "title": "Tracking vues vidéo", "description": "POST /posts/:id/view — base pour l'algorithme personnalisé", "status": "done", "priority": "high", "category": "feature", "tags": ["backend","algorithm"] },
+    { "id": "8",  "title": "6 vidéos seed Railway", "description": "Seed via API directement sur la DB Railway", "status": "done", "priority": "medium", "category": "infra", "tags": ["backend","test"] },
+    { "id": "9",  "title": "Feed TikTok fullscreen vertical", "description": "FlatList pagingEnabled snapToInterval + VideoPlayerItem + autoplay selon visibilité", "status": "done", "priority": "critical", "category": "feature", "tags": ["mobile","video"] },
+    { "id": "10", "title": "Tabs Pour Toi / Fils dans Home", "description": "Header overlay avec 2 onglets — vidéos plein écran + fils texte style Twitter", "status": "done", "priority": "high", "category": "feature", "tags": ["mobile","navigation"] },
+    { "id": "11", "title": "Overlay vidéo — avatar profil + like + comment + partage + save à droite", "description": "5 boutons overlay droit : avatar cliquable → profil, like avec count, comment, partage, save. Username + caption + son en bas gauche", "status": "done", "priority": "high", "category": "feature", "tags": ["mobile","video"] },
+    { "id": "12", "title": "Navigation : Home|Explorer|Plus|Messages|Profil", "description": "5 tabs — bouton + central arrondi vert, Messages remplace Threads dans la barre", "status": "done", "priority": "critical", "category": "feature", "tags": ["mobile","navigation"] },
+    { "id": "13", "title": "Modifier le profil — display_name + bio", "description": "Modal EditProfile — PATCH /users/me — nom affiché + bio", "status": "done", "priority": "high", "category": "feature", "tags": ["mobile","profile"] },
+    { "id": "14", "title": "Fils — création texte depuis Home", "description": "Composer dans l'onglet Fils — POST /threads — texte 280 chars max", "status": "done", "priority": "high", "category": "feature", "tags": ["mobile","threads"] },
+
+    { "id": "15", "title": "Cloudinary — stockage vidéos production", "description": "CLOUDINARY_CLOUD_NAME + API_KEY + API_SECRET sur Railway — upload → URL permanente CDN", "status": "in_progress", "priority": "critical", "category": "infra", "tags": ["backend","infra"] },
+
+    { "id": "16", "title": "Backend — route save/unsave vidéo", "description": "POST /posts/:id/save (toggle) + GET /users/me/favorites avec pagination cursor. Table saved_posts en DB", "status": "todo", "priority": "critical", "category": "backend", "tags": ["backend"] },
+    { "id": "17", "title": "Favoris — bouton save appelle API + onglet profil", "description": "VideoPlayerItem: POST /posts/:id/save au lieu de setState local. Onglet Favoris dans ProfileScreen charge GET /favorites", "status": "todo", "priority": "critical", "category": "feature", "tags": ["mobile","profile"] },
+    { "id": "18", "title": "Bouton + — bottom sheet choix Vidéo / Fil", "description": "Tap + ouvre BottomSheet avec 2 options : Publier une vidéo (→ UploadScreen) et Nouveau fil (→ ThreadComposerScreen)", "status": "todo", "priority": "critical", "category": "feature", "tags": ["mobile","navigation"] },
+    { "id": "19", "title": "Thread composer fullscreen avec média", "description": "ThreadComposerScreen : texte 500 chars + attach image (launchImageLibrary) + vidéo courte — upload Cloudinary inline, progress bar, POST /threads avec media_url + media_type", "status": "todo", "priority": "high", "category": "feature", "tags": ["mobile","threads","upload"] },
+    { "id": "20", "title": "Backend — threads avec media_url + media_type", "description": "Migration Prisma : ajouter media_url String? + media_type String? à la table threads. Endpoint POST /threads accepte ces champs", "status": "todo", "priority": "high", "category": "backend", "tags": ["backend"] },
+    { "id": "21", "title": "Dark mode — hook useTheme() + application complète", "description": "Hook useTheme() retourne couleurs selon isDark. Chaque écran utilise theme.bg, theme.text etc. — plus aucun hardcode COLORS.bg dans les styles. App.tsx charge thème sauvegardé au démarrage", "status": "todo", "priority": "high", "category": "design", "tags": ["mobile","design"] },
+    { "id": "22", "title": "Profil — photo de profil modifiable", "description": "Tap avatar dans ProfileScreen → ActionSheet Prendre une photo / Choisir depuis galerie → upload /upload/image → PATCH /users/me { avatar_url }. Affichage immédiat optimiste", "status": "todo", "priority": "high", "category": "feature", "tags": ["mobile","profile"] },
+    { "id": "23", "title": "Profil — 4 onglets : Vidéos / Fils / J'aime / Favoris", "description": "ProfileScreen 4 tabs : Vidéos (grille 3 col), Fils (liste threads), J'aime (grille liked posts GET /posts/liked), Favoris (grille saved GET /favorites)", "status": "todo", "priority": "high", "category": "feature", "tags": ["mobile","profile"] },
+    { "id": "24", "title": "Profil utilisateur — follow/unfollow + stats", "description": "UserProfileScreen : bouton Suivre/Abonné — POST /users/:id/follow (toggle), compteurs followers/following en temps réel, ses vidéos + fils", "status": "todo", "priority": "high", "category": "feature", "tags": ["mobile","profile","social"] },
+    { "id": "25", "title": "Backend — /users/:id/follow toggle", "description": "POST /users/:id/follow — toggle follow/unfollow, retourne { following: bool, follower_count: int }. Table follows en DB", "status": "todo", "priority": "high", "category": "backend", "tags": ["backend"] },
+    { "id": "26", "title": "Profil — liste followers/following cliquables", "description": "Tap compteur Abonnés → FollowersScreen liste, tap Abonnements → FollowingScreen — chaque user avec bouton Suivre/Ne plus suivre", "status": "todo", "priority": "medium", "category": "feature", "tags": ["mobile","profile","social"] },
+    { "id": "27", "title": "Backend — /users/:id/followers + /following", "description": "GET paginated avec cursor — chaque user inclut is_following boolean pour l'utilisateur connecté", "status": "todo", "priority": "medium", "category": "backend", "tags": ["backend"] },
+    { "id": "28", "title": "Explorer — grille trending + catégories + recherche", "description": "Grid 3 colonnes thumbnails, scroll infini, tabs catégories (Rappel/Coran/Motivation/Lifestyle/Tout), barre recherche sticky — résultats vidéos + users unifiés", "status": "todo", "priority": "high", "category": "feature", "tags": ["mobile","explore"] },
+    { "id": "29", "title": "Explorer — threads par catégorie", "description": "Section Fils dans chaque catégorie — liste threads filtrés — mix vidéos + fils dans même onglet", "status": "todo", "priority": "medium", "category": "feature", "tags": ["mobile","explore"] },
+    { "id": "30", "title": "Recherche — résultats unifiés vidéos + users + hashtags", "description": "SearchResultsScreen : 3 onglets Vidéos / Comptes / Hashtags — résultats en temps réel avec debounce 300ms, historique recherches sauvegardé AsyncStorage", "status": "todo", "priority": "high", "category": "feature", "tags": ["mobile","search"] },
+    { "id": "31", "title": "Backend — /search amélioré + hashtags", "description": "Recherche plein texte PostgreSQL tsvector sur captions + usernames. Index hashtags depuis captions. Endpoint /search?q= retourne { users[], posts[], hashtags[] }", "status": "todo", "priority": "medium", "category": "backend", "tags": ["backend","search"] },
+    { "id": "32", "title": "Hashtags — parsing cliquable + pages", "description": "Parser #hashtag dans captions/fils → TouchableOpacity vert → HashtagScreen (grille vidéos + compte publications)", "status": "todo", "priority": "medium", "category": "feature", "tags": ["mobile","backend"] },
+    { "id": "33", "title": "Messages — liste conversations fonctionnelle", "description": "MessagesScreen : GET /messages/conversations → liste avec avatar, nom, dernier message tronqué, timestamp relatif, badge rouge nombre non-lus", "status": "todo", "priority": "high", "category": "feature", "tags": ["mobile","messages"] },
+    { "id": "34", "title": "Messages — conversation temps réel Socket.io", "description": "ConversationScreen : envoi/réception instant via Socket.io, bulles chat (moi droite/autre gauche), scroll to bottom auto, indicateur typing, marquage lu", "status": "todo", "priority": "high", "category": "feature", "tags": ["mobile","messages","realtime"] },
+    { "id": "35", "title": "Backend — Socket.io messages", "description": "Events : message:send, message:received, conversation:typing, message:read — rooms isolées par conversation_id — auth JWT pour connexion socket", "status": "todo", "priority": "high", "category": "backend", "tags": ["backend","realtime"] },
+    { "id": "36", "title": "Messages — système demande de contact H/F", "description": "Onglet Demandes dans MessagesScreen — liste pending requests, bouton Accepter/Refuser. Règle : H ne peut PAS initier vers F sans demande acceptée (et vice versa). Interface d'envoi demande depuis profil", "status": "todo", "priority": "critical", "category": "feature", "tags": ["mobile","messages","rules"] },
+    { "id": "37", "title": "Settings — persistance preferences serveur", "description": "GET /users/me/settings au chargement + PATCH à chaque toggle — notifications_posts, notifications_messages, notifications_followers, account_private — synchronisé entre appareils", "status": "todo", "priority": "medium", "category": "feature", "tags": ["mobile","settings"] },
+    { "id": "38", "title": "Backend — /users/me/settings", "description": "Table user_settings — GET retourne tous les params, PATCH met à jour champs envoyés. Paramètres : notifications_enabled, account_private, show_activity, allow_dm_requests", "status": "todo", "priority": "medium", "category": "backend", "tags": ["backend"] },
+    { "id": "39", "title": "Notifications — écran in-app complet", "description": "NotificationsScreen : onglets Tout/Mentions/Abonnés — like (cœur rouge), commentaire, nouvel abonné, mention — tap → navigate vers post/profil. Marquage tout lu", "status": "todo", "priority": "medium", "category": "feature", "tags": ["mobile","notifications"] },
+    { "id": "40", "title": "Backend — système notifications in-app", "description": "Table notifications (user_id, type, actor_id, post_id, read_at) — créée automatiquement à chaque like/comment/follow/mention. GET /notifications + POST /notifications/read-all", "status": "todo", "priority": "medium", "category": "backend", "tags": ["backend","notifications"] },
+    { "id": "41", "title": "Notifications push APNs/FCM", "description": "Intégration Firebase — enregistrement token au login, envoi push sur like/comment/follow/message — background + foreground handling, deep link vers écran concerné", "status": "todo", "priority": "medium", "category": "feature", "tags": ["mobile","backend","notifications"] },
+    { "id": "42", "title": "Commentaires — bottom sheet TikTok-style", "description": "Remplacer PostDetailScreen plein écran par un BottomSheet draggable sur la vidéo — commentaires sans quitter le feed — hauteur 70% écran, handleIndicator en haut", "status": "todo", "priority": "high", "category": "feature", "tags": ["mobile","video"] },
+    { "id": "43", "title": "Commentaires — réponses imbriquées", "description": "Tap 'Répondre' sous un commentaire → champ reply pré-rempli @username. Affichage replies en accordéon. GET /comments/:id/replies", "status": "todo", "priority": "medium", "category": "feature", "tags": ["mobile","backend"] },
+    { "id": "44", "title": "Partage vidéo — Share natif + deeplink", "description": "Bouton partage → Share.share() avec URL deeplink nour://post/:id — share_count incrémenté POST /posts/:id/share", "status": "todo", "priority": "medium", "category": "feature", "tags": ["mobile","backend"] },
+    { "id": "45", "title": "Signalement contenu + utilisateurs", "description": "BottomSheet signalement depuis options vidéo et profil : motifs prédéfinis (contenu inapproprié, spam, etc.) — POST /reports — confirmation message", "status": "todo", "priority": "high", "category": "feature", "tags": ["mobile","moderation"] },
+    { "id": "46", "title": "Blocage utilisateurs", "description": "Option Bloquer depuis profil utilisateur — POST /users/:id/block — l'utilisateur bloqué disparaît du feed, explorer et messages", "status": "todo", "priority": "high", "category": "feature", "tags": ["mobile","moderation"] },
+    { "id": "47", "title": "Backend — /reports + /users/:id/block", "description": "Table reports (reporter_id, target_type, target_id, reason). Table blocked_users. Filtre automatique dans feed + messages pour bloqeurs/bloqués", "status": "todo", "priority": "high", "category": "backend", "tags": ["backend","moderation"] },
+    { "id": "48", "title": "Fils — ThreadDetailScreen avec réponses", "description": "Tap un thread → ThreadDetailScreen : fil principal en haut, liste réponses dessous, composer reply épinglé en bas, @mention auto", "status": "todo", "priority": "medium", "category": "feature", "tags": ["mobile","threads"] },
+    { "id": "49", "title": "Fils — repost + citation", "description": "Bouton repost sur un fil → repost direct (compte incrémenté) ou quote (composer pré-rempli avec contenu cité, type='quote')", "status": "todo", "priority": "low", "category": "feature", "tags": ["mobile","threads"] },
+    { "id": "50", "title": "Mentions @username cliquables partout", "description": "Parser @username dans captions vidéos, fils, commentaires → navigate UserProfile — couleur primaire", "status": "todo", "priority": "medium", "category": "feature", "tags": ["mobile"] },
+    { "id": "51", "title": "Compression vidéo + progress upload", "description": "react-native-compressor avant envoi — barre progression réelle (onUploadProgress axios) — bouton annuler, retry sur échec réseau", "status": "todo", "priority": "medium", "category": "feature", "tags": ["mobile","upload"] },
+    { "id": "52", "title": "Onboarding — 3 écrans premier lancement", "description": "Écran 1: bienvenue + valeurs app. Écran 2: règles messagerie H/F. Écran 3: sélection catégories préférées (Rappel/Coran/etc.) — AsyncStorage 'onboarding_done' = true après", "status": "todo", "priority": "medium", "category": "feature", "tags": ["mobile","ux"] },
+    { "id": "53", "title": "Stories — 24h (cercle avatar)", "description": "Upload photo/vidéo courte → expire après 24h. Cercles avatars scrollables horizontalement en haut du feed Fils. Viewer plein écran avec progress bar multi-segments", "status": "todo", "priority": "low", "category": "feature", "tags": ["mobile","backend"] },
+    { "id": "54", "title": "Duos / Stitch TikTok-style", "description": "Bouton Duo depuis options vidéo → enregistrement caméra côte à côte avec la vidéo originale — référence original_post_id", "status": "todo", "priority": "low", "category": "feature", "tags": ["mobile","backend"] },
+    { "id": "55", "title": "Badge vérification compte", "description": "Workflow : bouton Demander vérification dans Settings → admin approuve → badge ✓ vert sur profil + fils + overlay vidéo", "status": "todo", "priority": "low", "category": "feature", "tags": ["mobile","admin"] },
+    { "id": "56", "title": "Admin — dashboard métriques", "description": "Graphiques Recharts : vues/jour, uploads/jour, utilisateurs actifs, top catégories, taux rétention 7j/30j, map géographique si dispo", "status": "todo", "priority": "low", "category": "admin", "tags": ["admin","analytics"] },
+    { "id": "57", "title": "Admin — modération signalements", "description": "Liste signalements avec filtres statut, type de contenu — actions : Bannir compte / Avertir / Supprimer contenu / Rejeter signalement — log audit", "status": "todo", "priority": "high", "category": "admin", "tags": ["admin","moderation"] },
+    { "id": "58", "title": "Admin — gestion utilisateurs", "description": "Table users avec filtres (vérifié, banni, date inscription) — profil détail — actions ban/dé-ban/vérifier/promouvoir modérateur", "status": "todo", "priority": "medium", "category": "admin", "tags": ["admin"] },
+    { "id": "59", "title": "Build iOS — TestFlight beta", "description": "Archive Xcode + certificat distribution + provisioning profile → soumission TestFlight — lien beta partageable", "status": "todo", "priority": "high", "category": "infra", "tags": ["mobile","infra","release"] },
+    { "id": "60", "title": "Build Android — APK signé / Play Store", "description": "keystore + gradlew assembleRelease + signed APK → soumission Google Play interne test track", "status": "todo", "priority": "high", "category": "infra", "tags": ["mobile","infra","release"] }
   ]
 }

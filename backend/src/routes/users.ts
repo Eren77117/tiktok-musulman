@@ -5,7 +5,18 @@ import { z } from 'zod';
 
 const updateProfileSchema = z.object({
   display_name: z.string().min(1).max(50).optional(),
-  bio: z.string().max(200).optional(),
+  bio: z.string().max(200).optional().nullable(),
+  avatar_url: z.string().url().optional().nullable(),
+  // settings fields
+  is_private: z.boolean().optional(),
+  notifPosts: z.boolean().optional(),
+  notifMessages: z.boolean().optional(),
+  notifFollowers: z.boolean().optional(),
+  notifLikes: z.boolean().optional(),
+  notifComments: z.boolean().optional(),
+  privateAccount: z.boolean().optional(),
+  showActivity: z.boolean().optional(),
+  allowDMRequests: z.boolean().optional(),
 });
 
 export async function userRoutes(app: FastifyInstance) {

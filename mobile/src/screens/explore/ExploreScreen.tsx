@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View, Text, TextInput, StyleSheet, FlatList,
-  TouchableOpacity, Image, ActivityIndicator, ScrollView,
+  TouchableOpacity, Image, ActivityIndicator, ScrollView, Dimensions,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../../api/client';
 import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, SPACING, RADIUS, SHADOW } from '../../constants/theme';
+import { IcSearch, IcClose, IcHeart, IcUsers, IcPlay } from '../../components/ui/Icons';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -19,6 +20,7 @@ interface UserResult {
   display_name: string;
   avatar_url: string | null;
   follower_count: number;
+  is_verified: boolean;
 }
 
 interface Post {
@@ -31,12 +33,17 @@ interface Post {
 }
 
 const CATEGORIES = [
-  { id: 'all', label: 'Tout', icon: '✦' },
-  { id: 'rappel', label: 'Rappel', icon: '◑' },
-  { id: 'coran', label: 'Coran', icon: '◈' },
-  { id: 'motivation', label: 'Motivation', icon: '◆' },
-  { id: 'lifestyle', label: 'Lifestyle', icon: '◇' },
+  { id: 'all', label: 'Tout' },
+  { id: 'rappel', label: 'Rappel' },
+  { id: 'coran', label: 'Coran' },
+  { id: 'motivation', label: 'Motivation' },
+  { id: 'lifestyle', label: 'Lifestyle' },
+  { id: 'famille', label: 'Famille' },
+  { id: 'science', label: 'Science' },
 ];
+
+const { width: W } = Dimensions.get('window');
+const CELL = (W - 2) / 3;
 
 export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
@@ -44,126 +51,140 @@ export default function ExploreScreen() {
   const [query, setQuery] = useState('');
   const [debouncedQ, setDebouncedQ] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
+  const [searchTab, setSearchTab] = useState<'videos' | 'users'>('videos');
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: searchData, isLoading: searchLoading } = useQuery<{ users?: UserResult[]; posts?: Post[] }>({
     queryKey: ['search', debouncedQ],
-    queryFn: () => api.get('/search', { params: { q: debouncedQ } }).then((r) => r.data),
+    queryFn: () => api.get('/search', { params: { q: debouncedQ } }).then((r) => r.data).catch(() => ({})),
     enabled: debouncedQ.length > 1,
   });
 
   const { data: trending, isLoading: trendingLoading } = useQuery<{ items?: Post[] }>({
     queryKey: ['trending', activeCategory],
-    queryFn: () => api.get('/posts/trending', {
-      params: activeCategory !== 'all' ? { category: activeCategory, limit: 20 } : { limit: 20 },
-    }).then((r) => r.data).catch(() => ({ items: [] })),
-    enabled: !debouncedQ,
+    queryFn: () =>
+      api.get('/posts/trending', {
+        params: activeCategory !== 'all' ? { category: activeCategory, limit: 30 } : { limit: 30 },
+      }).then((r) => r.data).catch(() => ({ items: [] })),
+    enabled: debouncedQ.length < 2,
   });
 
   const handleChange = (v: string) => {
     setQuery(v);
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => setDebouncedQ(v), 400);
-  };
-
-  const clearSearch = () => {
-    setQuery('');
-    setDebouncedQ('');
+    searchTimer.current = setTimeout(() => setDebouncedQ(v), 350);
   };
 
   const isSearching = debouncedQ.length > 1;
 
+  const renderGridItem = useCallback(({ item: p }: { item: Post }) => (
+    <TouchableOpacity
+      style={styles.cell}
+      onPress={() => navigation.navigate('PostDetail', { postId: p.id })}
+      activeOpacity={0.85}
+    >
+      {p.thumbnail_url ? (
+        <Image source={{ uri: p.thumbnail_url }} style={styles.cellImg} resizeMode="cover" />
+      ) : (
+        <View style={[styles.cellImg, styles.cellFallback]}>
+          <IcPlay size={28} color={COLORS.primaryLight} />
+        </View>
+      )}
+      <View style={styles.cellOverlay}>
+        <IcHeart size={11} color={COLORS.white} />
+        <Text style={styles.cellCount}>{fmtNum(p.like_count)}</Text>
+      </View>
+    </TouchableOpacity>
+  ), [navigation]);
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Explorer</Text>
-      </View>
-
       {/* Search bar */}
-      <View style={styles.searchWrap}>
+      <View style={[styles.searchWrap, { backgroundColor: COLORS.white, borderBottomColor: COLORS.borderLight }]}>
         <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>⌕</Text>
+          <IcSearch size={18} color={COLORS.textMuted} />
           <TextInput
             style={styles.searchInput}
             value={query}
             onChangeText={handleChange}
-            placeholder="Chercher utilisateurs, vidéos..."
+            placeholder="Rechercher vidéos, utilisateurs..."
             placeholderTextColor={COLORS.textPlaceholder}
             autoCapitalize="none"
             returnKeyType="search"
           />
           {query.length > 0 && (
-            <TouchableOpacity onPress={clearSearch} style={styles.clearBtn}>
-              <Text style={styles.clearIcon}>✕</Text>
+            <TouchableOpacity onPress={() => { setQuery(''); setDebouncedQ(''); }} activeOpacity={0.7}>
+              <IcClose size={16} color={COLORS.textMuted} />
             </TouchableOpacity>
           )}
         </View>
       </View>
 
       {isSearching ? (
-        // ── Search results ──
-        searchLoading ? (
-          <View style={styles.center}>
-            <ActivityIndicator color={COLORS.primary} size="large" />
+        <View style={{ flex: 1 }}>
+          {/* Search tabs */}
+          <View style={styles.searchTabs}>
+            <TouchableOpacity style={[styles.searchTab, searchTab === 'videos' && styles.searchTabActive]} onPress={() => setSearchTab('videos')} activeOpacity={0.8}>
+              <Text style={[styles.searchTabText, searchTab === 'videos' && styles.searchTabTextActive]}>Vidéos ({searchData?.posts?.length ?? 0})</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.searchTab, searchTab === 'users' && styles.searchTabActive]} onPress={() => setSearchTab('users')} activeOpacity={0.8}>
+              <Text style={[styles.searchTabText, searchTab === 'users' && styles.searchTabTextActive]}>Comptes ({searchData?.users?.length ?? 0})</Text>
+            </TouchableOpacity>
           </View>
-        ) : (
-          <FlatList
-            data={searchData?.users ?? []}
-            keyExtractor={(u) => u.id}
-            contentContainerStyle={styles.listContent}
-            ListHeaderComponent={
-              searchData?.users?.length ? (
-                <Text style={styles.sectionLabel}>Utilisateurs</Text>
-              ) : null
-            }
-            renderItem={({ item: u }) => (
-              <TouchableOpacity
-                style={styles.userRow}
-                onPress={() => navigation.navigate('UserProfile', { userId: u.id, username: u.username })}
-                activeOpacity={0.7}
-              >
-                <View style={styles.avatar}>
+
+          {searchLoading ? (
+            <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
+          ) : searchTab === 'users' ? (
+            <FlatList
+              data={searchData?.users ?? []}
+              keyExtractor={(u) => u.id}
+              contentContainerStyle={styles.listContent}
+              renderItem={({ item: u }) => (
+                <TouchableOpacity
+                  style={styles.userRow}
+                  onPress={() => navigation.navigate('UserProfile', { userId: u.id, username: u.username })}
+                  activeOpacity={0.7}
+                >
                   {u.avatar_url ? (
-                    <Image source={{ uri: u.avatar_url }} style={styles.avatarImg} />
+                    <Image source={{ uri: u.avatar_url }} style={styles.userAvatar} />
                   ) : (
-                    <View style={[styles.avatarImg, styles.avatarFallback]}>
-                      <Text style={styles.avatarInitial}>{u.display_name[0]?.toUpperCase()}</Text>
+                    <View style={[styles.userAvatar, styles.userAvatarFallback]}>
+                      <Text style={styles.userAvatarInitial}>{u.display_name[0]?.toUpperCase()}</Text>
                     </View>
                   )}
-                </View>
-                <View style={styles.userInfo}>
-                  <Text style={styles.displayName}>{u.display_name}</Text>
-                  <Text style={styles.username}>@{u.username} · {u.follower_count.toLocaleString()} abonnés</Text>
-                </View>
-                <Text style={styles.chevron}>›</Text>
-              </TouchableOpacity>
-            )}
-            ListEmptyComponent={
-              <View style={styles.emptyWrap}>
-                <Text style={styles.emptyIcon}>⌕</Text>
-                <Text style={styles.emptyTitle}>Aucun résultat</Text>
-                <Text style={styles.emptySubtitle}>Essayez d'autres termes</Text>
-              </View>
-            }
-          />
-        )
+                  <View style={styles.userInfo}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Text style={styles.displayName}>{u.display_name}</Text>
+                      {u.is_verified && <View style={styles.verifiedDot} />}
+                    </View>
+                    <Text style={styles.username}>@{u.username} · {fmtNum(u.follower_count)} abonnés</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={<EmptySearch />}
+            />
+          ) : (
+            <FlatList
+              data={searchData?.posts ?? []}
+              keyExtractor={(p) => p.id}
+              numColumns={3}
+              contentContainerStyle={{ gap: 1 }}
+              columnWrapperStyle={{ gap: 1 }}
+              renderItem={renderGridItem}
+              ListEmptyComponent={<EmptySearch />}
+            />
+          )}
+        </View>
       ) : (
-        // ── Trending / Category browse ──
         <FlatList
           data={trending?.items ?? []}
           keyExtractor={(p) => p.id}
-          numColumns={2}
-          columnWrapperStyle={styles.gridRow}
-          contentContainerStyle={styles.listContent}
+          numColumns={3}
+          contentContainerStyle={{ gap: 1 }}
+          columnWrapperStyle={{ gap: 1 }}
           ListHeaderComponent={
             <View>
-              {/* Categories */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.categoriesRow}
-              >
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catsRow}>
                 {CATEGORIES.map((cat) => (
                   <TouchableOpacity
                     key={cat.id}
@@ -171,42 +192,18 @@ export default function ExploreScreen() {
                     onPress={() => setActiveCategory(cat.id)}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.catIcon}>{cat.icon}</Text>
-                    <Text style={[styles.catLabel, activeCategory === cat.id && styles.catLabelActive]}>
-                      {cat.label}
-                    </Text>
+                    <Text style={[styles.catLabel, activeCategory === cat.id && styles.catLabelActive]}>{cat.label}</Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
-              <Text style={styles.sectionLabel}>Tendances</Text>
             </View>
           }
-          renderItem={({ item: p }) => (
-            <TouchableOpacity
-              style={styles.gridCard}
-              onPress={() => navigation.navigate('PostDetail', { postId: p.id })}
-              activeOpacity={0.85}
-            >
-              {p.thumbnail_url ? (
-                <Image source={{ uri: p.thumbnail_url }} style={styles.gridImg} resizeMode="cover" />
-              ) : (
-                <View style={[styles.gridImg, styles.gridImgFallback]}>
-                  <Text style={styles.gridFallbackIcon}>▶</Text>
-                </View>
-              )}
-              <View style={styles.gridOverlay}>
-                <Text style={styles.gridViews}>♥ {fmtNum(p.like_count)}</Text>
-              </View>
-            </TouchableOpacity>
-          )}
+          renderItem={renderGridItem}
           ListEmptyComponent={
             trendingLoading ? (
-              <View style={styles.center}>
-                <ActivityIndicator color={COLORS.primary} />
-              </View>
+              <ActivityIndicator color={COLORS.primary} style={{ marginTop: 60 }} />
             ) : (
               <View style={styles.emptyWrap}>
-                <Text style={styles.emptyIcon}>◎</Text>
                 <Text style={styles.emptyTitle}>Aucun contenu</Text>
                 <Text style={styles.emptySubtitle}>Revenez bientôt</Text>
               </View>
@@ -218,94 +215,80 @@ export default function ExploreScreen() {
   );
 }
 
+function EmptySearch() {
+  return (
+    <View style={styles.emptyWrap}>
+      <IcSearch size={40} color={COLORS.primaryLight} />
+      <Text style={styles.emptyTitle}>Aucun résultat</Text>
+      <Text style={styles.emptySubtitle}>Essayez d'autres termes</Text>
+    </View>
+  );
+}
+
 function fmtNum(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
+  return String(n ?? 0);
 }
 
-const GRID_ITEM_WIDTH = '48%';
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg },
+  container: { flex: 1, backgroundColor: '#000' },
 
-  header: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 12,
+  searchWrap: {
+    padding: SPACING.sm, paddingHorizontal: SPACING.md,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.borderLight,
-    backgroundColor: COLORS.white,
   },
-  headerTitle: { fontSize: FONT.size.xl, fontWeight: FONT.weight.bold, color: COLORS.text },
-
-  searchWrap: { padding: SPACING.md, paddingBottom: 0 },
   searchBar: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: COLORS.inputBg,
-    borderRadius: RADIUS.full,
-    paddingHorizontal: SPACING.md,
+    backgroundColor: COLORS.inputBg, borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.md, paddingVertical: 10,
     borderWidth: 1, borderColor: COLORS.border,
   },
-  searchIcon: { fontSize: 18, color: COLORS.textMuted },
-  searchInput: { flex: 1, paddingVertical: 12, fontSize: FONT.size.base, color: COLORS.text },
-  clearBtn: { padding: 4 },
-  clearIcon: { fontSize: 14, color: COLORS.textMuted },
+  searchInput: { flex: 1, fontSize: FONT.size.base },
 
-  listContent: { padding: SPACING.md, paddingTop: SPACING.sm },
-  sectionLabel: {
-    fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold,
-    color: COLORS.textMuted, marginBottom: SPACING.sm, marginTop: SPACING.sm,
+  searchTabs: {
+    flexDirection: 'row', backgroundColor: COLORS.white,
+    borderBottomWidth: 1, borderBottomColor: COLORS.borderLight,
   },
+  searchTab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
+  searchTabActive: { borderBottomWidth: 2, borderBottomColor: COLORS.primary },
+  searchTabText: { fontSize: FONT.size.sm, color: COLORS.textMuted },
+  searchTabTextActive: { color: COLORS.primary, fontWeight: FONT.weight.semibold },
 
-  // User row
+  listContent: { padding: SPACING.sm, gap: 8 },
   userRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: COLORS.white, borderRadius: RADIUS.md,
-    padding: SPACING.sm, marginBottom: 8,
-    borderWidth: 1, borderColor: COLORS.borderLight, ...SHADOW.sm,
+    padding: SPACING.sm, borderWidth: 1, borderColor: COLORS.borderLight,
   },
-  avatar: { width: 48, height: 48, borderRadius: 24, overflow: 'hidden' },
-  avatarImg: { width: 48, height: 48 },
-  avatarFallback: { backgroundColor: COLORS.primaryBg, alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { fontSize: 18, fontWeight: FONT.weight.bold, color: COLORS.primary },
+  userAvatar: { width: 48, height: 48, borderRadius: 24 },
+  userAvatarFallback: { backgroundColor: COLORS.primaryBg, alignItems: 'center', justifyContent: 'center' },
+  userAvatarInitial: { fontSize: 18, fontWeight: FONT.weight.bold, color: COLORS.primary },
   userInfo: { flex: 1 },
   displayName: { fontSize: FONT.size.base, fontWeight: FONT.weight.semibold, color: COLORS.text },
-  username: { fontSize: FONT.size.xs, color: COLORS.textMuted, marginTop: 2 },
-  chevron: { fontSize: 20, color: COLORS.textSubtle },
+  username: { fontSize: FONT.size.xs, color: COLORS.textMuted, marginTop: 1 },
+  verifiedDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.primary },
 
-  // Categories
-  categoriesRow: { paddingVertical: SPACING.sm, gap: 8 },
+  catsRow: { padding: SPACING.sm, paddingHorizontal: SPACING.md, gap: 8, backgroundColor: COLORS.white },
   catChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: COLORS.white, borderRadius: RADIUS.full,
-    paddingHorizontal: 14, paddingVertical: 8,
-    borderWidth: 1.5, borderColor: COLORS.border,
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: RADIUS.full,
+    backgroundColor: COLORS.bg, borderWidth: 1.5, borderColor: COLORS.border,
   },
   catChipActive: { backgroundColor: COLORS.primaryBg, borderColor: COLORS.primary },
-  catIcon: { fontSize: 14 },
   catLabel: { fontSize: FONT.size.sm, fontWeight: FONT.weight.medium, color: COLORS.textMuted },
   catLabelActive: { color: COLORS.primary, fontWeight: FONT.weight.semibold },
 
-  // Grid
-  gridRow: { justifyContent: 'space-between', marginBottom: 8 },
-  gridCard: {
-    width: GRID_ITEM_WIDTH, aspectRatio: 4 / 5,
-    borderRadius: RADIUS.md, overflow: 'hidden',
-    backgroundColor: COLORS.primaryBg,
-  },
-  gridImg: { width: '100%', height: '100%' },
-  gridImgFallback: { alignItems: 'center', justifyContent: 'center' },
-  gridFallbackIcon: { fontSize: 32, color: COLORS.primaryLight },
-  gridOverlay: {
+  cell: { width: CELL, height: CELL * (16 / 9), backgroundColor: '#111' },
+  cellImg: { width: '100%', height: '100%' },
+  cellFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#1a1a1a' },
+  cellOverlay: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    padding: 8, backgroundColor: 'rgba(0,0,0,0.35)',
+    padding: 4, backgroundColor: 'rgba(0,0,0,0.4)',
+    flexDirection: 'row', alignItems: 'center', gap: 3,
   },
-  gridViews: { fontSize: FONT.size.xs, color: COLORS.white, fontWeight: FONT.weight.medium },
+  cellCount: { fontSize: FONT.size.xs, color: COLORS.white },
 
-  // Empty
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
-  emptyWrap: { alignItems: 'center', paddingTop: 60, gap: 8 },
-  emptyIcon: { fontSize: 48, color: COLORS.primaryLight, marginBottom: 8 },
+  emptyWrap: { alignItems: 'center', paddingTop: 60, gap: 10, backgroundColor: COLORS.bg },
   emptyTitle: { fontSize: FONT.size.lg, fontWeight: FONT.weight.semibold, color: COLORS.text },
   emptySubtitle: { fontSize: FONT.size.sm, color: COLORS.textMuted },
 });

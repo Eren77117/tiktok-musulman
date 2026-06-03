@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
+  Modal, Pressable,
 } from 'react-native';
+import { useTheme } from '../hooks/useTheme';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -9,28 +11,30 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../stores/authStore';
 import { COLORS, FONT, SPACING, RADIUS, SHADOW } from '../constants/theme';
 import {
-  IcHome, IcExplore, IcCreate, IcThreads,
+  IcHome, IcExplore, IcCreate, IcMail,
   IcProfile, IcBrand,
 } from '../components/ui/Icons';
 
-// Auth screens
+// Auth
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 
-// Main screens
+// Main tabs
 import FeedScreen from '../screens/feed/FeedScreen';
 import ExploreScreen from '../screens/explore/ExploreScreen';
 import CreateScreen from '../screens/upload/UploadScreen';
-import ThreadsScreen from '../screens/threads/ThreadsScreen';
+import MessagesScreen from '../screens/messages/MessagesScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 
-// Detail screens
+// Stack screens
 import PostDetailScreen from '../screens/feed/PostDetailScreen';
 import UserProfileScreen from '../screens/profile/UserProfileScreen';
-import MessagesScreen from '../screens/messages/MessagesScreen';
 import ConversationScreen from '../screens/messages/ConversationScreen';
 import NotificationsScreen from '../screens/notifications/NotificationsScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
+import ThreadComposerScreen from '../screens/threads/ThreadComposerScreen';
+import SoundScreen from '../screens/sound/SoundScreen';
+import VideoPlayerScreen from '../screens/feed/VideoPlayerScreen';
 
 export type RootStackParamList = {
   Auth: undefined;
@@ -41,6 +45,9 @@ export type RootStackParamList = {
   Messages: undefined;
   Notifications: undefined;
   Settings: undefined;
+  ThreadComposer: undefined;
+  Sound: { soundId: string; title: string; artist?: string | null };
+  VideoPlayer: { postId: string };
 };
 
 export type AuthStackParamList = {
@@ -52,7 +59,7 @@ export type TabParamList = {
   Home: undefined;
   Explore: undefined;
   Create: undefined;
-  Threads: undefined;
+  Messages: undefined;
   Profile: undefined;
 };
 
@@ -61,61 +68,94 @@ const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
 
 const TAB_LABELS: Record<string, string> = {
-  Home: 'Accueil', Explore: 'Explorer', Create: '', Threads: 'Fils', Profile: 'Profil',
+  Home: 'Accueil', Explore: 'Explorer', Create: '', Messages: 'Messages', Profile: 'Profil',
 };
 
-function TabIcon({ name, focused }: { name: string; focused: boolean }) {
-  const color = focused ? COLORS.tabActive : COLORS.tabInactive;
+function TabIcon({ name, focused, theme }: { name: string; focused: boolean; theme: any }) {
+  const color = focused ? theme.tabActive : theme.tabInactive;
   const size = 22;
   switch (name) {
-    case 'Home':    return <IcHome    size={size} color={color} />;
-    case 'Explore': return <IcExplore size={size} color={color} />;
-    case 'Threads': return <IcThreads size={size} color={color} />;
-    case 'Profile': return <IcProfile size={size} color={color} />;
-    default:        return null;
+    case 'Home':     return <IcHome    size={size} color={color} />;
+    case 'Explore':  return <IcExplore size={size} color={color} />;
+    case 'Messages': return <IcMail    size={size} color={color} />;
+    case 'Profile':  return <IcProfile size={size} color={color} />;
+    default:         return null;
   }
 }
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
+  const [showCreateSheet, setShowCreateSheet] = useState(false);
 
   return (
-    <View style={[styles.tabBar, { paddingBottom: insets.bottom + 8 }, SHADOW.md]}>
-      {state.routes.map((route: any, index: number) => {
-        const isFocused = state.index === index;
-        const isCreate = route.name === 'Create';
-
-        const onPress = () => {
-          const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-          if (!isFocused && !event.defaultPrevented) navigation.navigate(route.name);
-        };
-
-        if (isCreate) {
-          return (
-            <TouchableOpacity key={route.key} style={styles.createBtn} onPress={onPress} activeOpacity={0.85}>
-              <View style={styles.createInner}>
-                <IcCreate size={22} color={COLORS.white} strokeWidth={2.5} />
+    <>
+      {/* Create bottom sheet */}
+      <Modal visible={showCreateSheet} transparent animationType="slide" onRequestClose={() => setShowCreateSheet(false)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setShowCreateSheet(false)}>
+          <Pressable style={[styles.sheetContainer, { paddingBottom: insets.bottom + 16, backgroundColor: theme.surface }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: theme.border }]} />
+            <Text style={[styles.sheetTitle, { color: theme.text }]}>Créer</Text>
+            <TouchableOpacity style={[styles.sheetOption, { backgroundColor: theme.bg }]} activeOpacity={0.8}
+              onPress={() => { setShowCreateSheet(false); navigation.navigate('Create'); }}>
+              <View style={[styles.sheetOptionIcon, { backgroundColor: theme.primaryBg }]}>
+                <IcCreate size={24} color={COLORS.primary} />
+              </View>
+              <View style={styles.sheetOptionText}>
+                <Text style={[styles.sheetOptionTitle, { color: theme.text }]}>Publier une vidéo</Text>
+                <Text style={[styles.sheetOptionSub, { color: theme.textMuted }]}>Partage une vidéo avec la communauté</Text>
               </View>
             </TouchableOpacity>
-          );
-        }
+            <TouchableOpacity style={[styles.sheetOption, { backgroundColor: theme.bg }]} activeOpacity={0.8}
+              onPress={() => { setShowCreateSheet(false); navigation.navigate('ThreadComposer'); }}>
+              <View style={[styles.sheetOptionIcon, { backgroundColor: theme.primaryBg }]}>
+                <IcBrand size={24} color={COLORS.primary} />
+              </View>
+              <View style={styles.sheetOptionText}>
+                <Text style={[styles.sheetOptionTitle, { color: theme.text }]}>Nouveau fil</Text>
+                <Text style={[styles.sheetOptionSub, { color: theme.textMuted }]}>Texte, image ou vidéo courte</Text>
+              </View>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
-        return (
-          <TouchableOpacity
-            key={route.key}
-            style={styles.tabItem}
-            onPress={onPress}
-            activeOpacity={0.7}
-          >
-            <TabIcon name={route.name} focused={isFocused} />
-            <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]}>
-              {TAB_LABELS[route.name]}
-            </Text>
-            {isFocused && <View style={styles.tabDot} />}
-          </TouchableOpacity>
-        );
-      })}
-    </View>
+      <View style={[
+        styles.tabBar,
+        { paddingBottom: insets.bottom + 2, backgroundColor: theme.tabBg, borderTopColor: theme.navBorder },
+      ]}>
+        {state.routes.map((route: any, index: number) => {
+          const isFocused = state.index === index;
+          const isCreate = route.name === 'Create';
+
+          const onPress = () => {
+            if (isCreate) { setShowCreateSheet(true); return; }
+            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+            if (!isFocused && !event.defaultPrevented) navigation.navigate(route.name);
+          };
+
+          if (isCreate) {
+            return (
+              <TouchableOpacity key={route.key} style={styles.createBtn} onPress={onPress} activeOpacity={0.85}>
+                <View style={styles.createInner}>
+                  <IcCreate size={22} color={COLORS.white} strokeWidth={2.5} />
+                </View>
+              </TouchableOpacity>
+            );
+          }
+
+          return (
+            <TouchableOpacity key={route.key} style={styles.tabItem} onPress={onPress} activeOpacity={0.7}>
+              <TabIcon name={route.name} focused={isFocused} theme={theme} />
+              <Text style={[styles.tabLabel, { color: isFocused ? theme.tabActive : theme.tabInactive }, isFocused && styles.tabLabelActive]}>
+                {TAB_LABELS[route.name]}
+              </Text>
+              {isFocused && <View style={[styles.tabDot, { backgroundColor: theme.tabActive }]} />}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </>
   );
 }
 
@@ -125,11 +165,11 @@ function MainTabs() {
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{ headerShown: false }}
     >
-      <Tab.Screen name="Home" component={FeedScreen} />
-      <Tab.Screen name="Explore" component={ExploreScreen} />
-      <Tab.Screen name="Create" component={CreateScreen} />
-      <Tab.Screen name="Threads" component={ThreadsScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="Home"     component={FeedScreen} />
+      <Tab.Screen name="Explore"  component={ExploreScreen} />
+      <Tab.Screen name="Create"   component={CreateScreen} />
+      <Tab.Screen name="Messages" component={MessagesScreen} />
+      <Tab.Screen name="Profile"  component={ProfileScreen} />
     </Tab.Navigator>
   );
 }
@@ -137,7 +177,7 @@ function MainTabs() {
 function AuthNavigator() {
   return (
     <AuthStack.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
-      <AuthStack.Screen name="Login" component={LoginScreen} />
+      <AuthStack.Screen name="Login"    component={LoginScreen} />
       <AuthStack.Screen name="Register" component={RegisterScreen} />
     </AuthStack.Navigator>
   );
@@ -163,20 +203,30 @@ export function AppNavigator() {
         {user ? (
           <>
             <RootStack.Screen name="Main" component={MainTabs} />
-            <RootStack.Screen
-              name="PostDetail"
-              component={PostDetailScreen}
-              options={{ animation: 'slide_from_bottom', headerShown: false }}
-            />
-            <RootStack.Screen name="UserProfile" component={UserProfileScreen} options={{ animation: 'slide_from_right' }} />
-            <RootStack.Screen
-              name="Conversation"
-              component={ConversationScreen}
-              options={{ headerShown: true, headerStyle: { backgroundColor: COLORS.surface }, headerTintColor: COLORS.primary, headerTitle: '', headerShadowVisible: false }}
-            />
-            <RootStack.Screen name="Messages" component={MessagesScreen} options={{ animation: 'slide_from_right' }} />
-            <RootStack.Screen name="Notifications" component={NotificationsScreen} options={{ animation: 'slide_from_right' }} />
-            <RootStack.Screen name="Settings" component={SettingsScreen} options={{ animation: 'slide_from_right' }} />
+            <RootStack.Screen name="PostDetail" component={PostDetailScreen}
+              options={{ animation: 'slide_from_bottom' }} />
+            <RootStack.Screen name="UserProfile" component={UserProfileScreen}
+              options={{ animation: 'slide_from_right' }} />
+            <RootStack.Screen name="Conversation" component={ConversationScreen}
+              options={{
+                headerShown: true,
+                headerStyle: { backgroundColor: COLORS.white },
+                headerTintColor: COLORS.primary,
+                headerTitle: '',
+                headerShadowVisible: false,
+              }} />
+            <RootStack.Screen name="Messages" component={MessagesScreen}
+              options={{ animation: 'slide_from_right' }} />
+            <RootStack.Screen name="Notifications" component={NotificationsScreen}
+              options={{ animation: 'slide_from_right' }} />
+            <RootStack.Screen name="Settings" component={SettingsScreen}
+              options={{ animation: 'slide_from_right' }} />
+            <RootStack.Screen name="ThreadComposer" component={ThreadComposerScreen}
+              options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
+            <RootStack.Screen name="Sound" component={SoundScreen}
+              options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
+            <RootStack.Screen name="VideoPlayer" component={VideoPlayerScreen}
+              options={{ animation: 'slide_from_bottom' }} />
           </>
         ) : (
           <RootStack.Screen name="Auth" component={AuthNavigator} />
@@ -196,37 +246,43 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 2, borderColor: COLORS.primaryLight,
   },
-  loadingEmoji: { fontSize: 32, fontWeight: '700', color: COLORS.primary },
-
-  // Tab bar
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: COLORS.white,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.borderLight,
-    paddingTop: 10,
-    paddingHorizontal: SPACING.sm,
+    borderTopWidth: 0.5,
+    paddingTop: 8, paddingHorizontal: SPACING.sm,
   },
-  tabItem: {
-    flex: 1, alignItems: 'center', gap: 3, position: 'relative',
-  },
-  tabIcon: { fontSize: 20, color: COLORS.tabInactive },
-  tabIconActive: { color: COLORS.tabActive },
-  tabLabel: { fontSize: 10, fontWeight: FONT.weight.medium, color: COLORS.tabInactive },
-  tabLabelActive: { color: COLORS.tabActive, fontWeight: FONT.weight.semibold },
+  tabItem: { flex: 1, alignItems: 'center', gap: 2, position: 'relative', paddingVertical: 4 },
+  tabLabel: { fontSize: 10, fontWeight: FONT.weight.medium },
+  tabLabelActive: { fontWeight: FONT.weight.semibold },
   tabDot: {
-    position: 'absolute', bottom: -6, width: 4, height: 4,
-    borderRadius: 2, backgroundColor: COLORS.primary,
+    position: 'absolute', bottom: -2, width: 4, height: 4,
+    borderRadius: 2,
   },
-  createBtn: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-  },
+  createBtn: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   createInner: {
-    width: 48, height: 48, borderRadius: 16,
+    width: 48, height: 48, borderRadius: 14,
     backgroundColor: COLORS.primary,
     alignItems: 'center', justifyContent: 'center',
-    marginTop: -12,
-    ...SHADOW.green,
+    marginTop: -12, ...SHADOW.green,
   },
-  createIcon: { fontSize: 24, color: COLORS.white, fontWeight: FONT.weight.bold, marginTop: -2 },
+
+  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  sheetContainer: {
+    backgroundColor: COLORS.white, borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    padding: SPACING.md, gap: 4,
+  },
+  sheetHandle: {
+    width: 36, height: 4, borderRadius: 2, backgroundColor: COLORS.border,
+    alignSelf: 'center', marginBottom: 12,
+  },
+  sheetTitle: { fontSize: FONT.size.lg, fontWeight: FONT.weight.bold, color: COLORS.text, marginBottom: 8, paddingHorizontal: 4 },
+  sheetOption: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    padding: SPACING.md, borderRadius: 12,
+    backgroundColor: COLORS.bg, marginBottom: 6,
+  },
+  sheetOptionIcon: { width: 48, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  sheetOptionText: { flex: 1, gap: 2 },
+  sheetOptionTitle: { fontSize: FONT.size.base, fontWeight: FONT.weight.semibold, color: COLORS.text },
+  sheetOptionSub: { fontSize: FONT.size.xs, color: COLORS.textMuted },
 });

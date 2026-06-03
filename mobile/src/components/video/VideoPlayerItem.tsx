@@ -1,0 +1,419 @@
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import {
+  View, Text, StyleSheet, TouchableOpacity, Dimensions,
+  Image, ActivityIndicator, Animated, Share, Pressable, PanResponder,
+} from 'react-native';
+import Video, { VideoRef } from 'react-native-video';
+import { useMutation } from '@tanstack/react-query';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { LinearGradient } from 'react-native-linear-gradient';
+import { api } from '../../api/client';
+import { RootStackParamList } from '../../navigation';
+import { COLORS, FONT, RADIUS } from '../../constants/theme';
+import {
+  IcHeartFill, IcHeart, IcComment, IcShare, IcSave, IcSaveFill,
+  IcMusic, IcPlay, IcVolume, IcMute, IcCheck,
+} from '../ui/Icons';
+
+const { width: W, height: H } = Dimensions.get('window');
+
+export interface FeedPost {
+  id: string;
+  video_url: string;
+  thumbnail_url: string | null;
+  caption: string | null;
+  duration: number;
+  view_count: number;
+  like_count: number;
+  comment_count: number;
+  share_count: number;
+  is_liked: boolean;
+  is_saved?: boolean;
+  user: {
+    id: string; username: string; display_name: string;
+    avatar_url: string | null; is_verified: boolean;
+  };
+  sound: { id: string; title: string; artist: string | null } | null;
+}
+
+interface Props {
+  post: FeedPost;
+  isVisible: boolean;
+  onComment: () => void;
+}
+
+function fmt(n: number) {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return String(n);
+}
+
+export function VideoPlayerItem({ post, isVisible, onComment }: Props) {
+  const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const videoRef = useRef<VideoRef>(null);
+
+  // Playback state
+  const [liked, setLiked] = useState(post.is_liked);
+  const [likeCount, setLikeCount] = useState(post.like_count);
+  const [saved, setSaved] = useState(post.is_saved ?? false);
+  const [muted, setMuted] = useState(false);
+  const [paused, setPaused] = useState(!isVisible);
+  const [buffering, setBuffering] = useState(true);
+  const [captionExpanded, setCaptionExpanded] = useState(false);
+
+  // Double-tap like
+  const tapCountRef = useRef(0);
+  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heartAnim = useRef(new Animated.Value(0)).current;
+  const heartScale = useRef(new Animated.Value(0.3)).current;
+  const [heartPos, setHeartPos] = useState({ x: W / 2 - 50, y: H / 2 - 80 });
+
+  // Pause indicator
+  const pauseAnim = useRef(new Animated.Value(0)).current;
+
+  // Horizontal swipe → profile
+  const swipeX = useRef(new Animated.Value(0)).current;
+  const profilePanResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 15 && Math.abs(g.dx) > Math.abs(g.dy),
+    onPanResponderMove: (_, g) => {
+      if (g.dx < 0) swipeX.setValue(g.dx); // only left swipe
+    },
+    onPanResponderRelease: (_, g) => {
+      if (g.dx < -80 || g.vx < -0.5) {
+        // Animate out then navigate to profile
+        Animated.timing(swipeX, { toValue: -W, duration: 200, useNativeDriver: true }).start(() => {
+          swipeX.setValue(0);
+        });
+        setTimeout(() => {
+          nav.navigate('UserProfile', { userId: post.user.id, username: post.user.username });
+        }, 150);
+      } else {
+        Animated.spring(swipeX, { toValue: 0, useNativeDriver: true, tension: 80, friction: 10 }).start();
+      }
+    },
+  })).current;
+
+  // Watch time tracking
+  const watchStartRef = useRef<number | null>(null);
+  const watchAccumRef = useRef(0);
+
+  useEffect(() => {
+    setPaused(!isVisible);
+    if (isVisible) {
+      watchStartRef.current = Date.now();
+    } else {
+      if (watchStartRef.current) {
+        watchAccumRef.current += (Date.now() - watchStartRef.current) / 1000;
+        watchStartRef.current = null;
+        // Send watch time when leaving video (fire & forget)
+        if (watchAccumRef.current > 0.5) {
+          api.post(`/posts/${post.id}/view`, {
+            watch_time: Math.round(watchAccumRef.current),
+            completed: watchAccumRef.current >= (post.duration ?? 15) * 0.8,
+          }).catch(() => {});
+          watchAccumRef.current = 0;
+        }
+      }
+    }
+  }, [isVisible]);
+
+  const likeMutation = useMutation({
+    mutationFn: () => api.post(`/posts/${post.id}/like`),
+    onMutate: () => {
+      const was = liked;
+      setLiked(l => !l);
+      setLikeCount(c => was ? c - 1 : c + 1);
+    },
+    onError: () => { setLiked(post.is_liked); setLikeCount(post.like_count); },
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: () => api.post(`/favorites/posts/${post.id}`),
+    onMutate: () => setSaved(s => !s),
+    onError: () => setSaved(post.is_saved ?? false),
+  });
+
+  const triggerLike = useCallback((x: number, y: number) => {
+    if (!liked) {
+      setLiked(true);
+      setLikeCount(c => c + 1);
+      likeMutation.mutate();
+    }
+    setHeartPos({ x: x - 50, y: y - 80 });
+    heartAnim.setValue(1);
+    heartScale.setValue(0.3);
+    Animated.parallel([
+      Animated.spring(heartScale, { toValue: 1, useNativeDriver: true, tension: 60, friction: 5 }),
+      Animated.sequence([
+        Animated.delay(600),
+        Animated.timing(heartAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
+      ]),
+    ]).start();
+  }, [liked, likeMutation, heartAnim, heartScale]);
+
+  const showPauseIndicator = useCallback(() => {
+    pauseAnim.setValue(1);
+    Animated.timing(pauseAnim, { toValue: 0, duration: 700, delay: 300, useNativeDriver: true }).start();
+  }, [pauseAnim]);
+
+  const handleVideoTap = useCallback((evt: any) => {
+    const { locationX, locationY } = evt.nativeEvent;
+    tapCountRef.current += 1;
+    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+    tapTimerRef.current = setTimeout(() => {
+      if (tapCountRef.current >= 2) {
+        triggerLike(locationX, locationY);
+      } else {
+        setPaused(p => { showPauseIndicator(); return !p; });
+      }
+      tapCountRef.current = 0;
+    }, 250);
+  }, [triggerLike, showPauseIndicator]);
+
+  const goToProfile = () => nav.navigate('UserProfile', { userId: post.user.id, username: post.user.username });
+
+  const isVideo = post.video_url && post.video_url !== '' &&
+    (post.video_url.startsWith('http') || post.video_url.startsWith('file'));
+
+  return (
+    <Animated.View style={[styles.container, { transform: [{ translateX: swipeX }] }]} {...profilePanResponder.panHandlers}>
+    <Pressable style={styles.container} onPress={handleVideoTap}>
+      {/* LAYER 1 — Thumbnail background (prevents black flash) */}
+      {post.thumbnail_url
+        ? <Image source={{ uri: post.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        : <View style={[StyleSheet.absoluteFill, styles.fallback]} />
+      }
+
+      {/* LAYER 2 — Video (direct child, no wrapper) */}
+      {isVideo && (
+        <Video
+          ref={videoRef}
+          source={{ uri: post.video_url }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+          repeat
+          paused={paused}
+          muted={muted}
+          onBuffer={({ isBuffering }) => setBuffering(isBuffering)}
+          onLoad={() => { setBuffering(false); }}
+          onError={() => { setBuffering(false); setPaused(false); }}
+          ignoreSilentSwitch="ignore"
+          playInBackground={false}
+          playWhenInactive={false}
+          bufferConfig={{
+            minBufferMs: 2500,
+            maxBufferMs: 15000,
+            bufferForPlaybackMs: 1000,
+            bufferForPlaybackAfterRebufferMs: 2000,
+          }}
+        />
+      )}
+
+      {/* Buffering spinner */}
+      {buffering && isVideo && (
+        <View style={styles.bufferWrap} pointerEvents="none">
+          <ActivityIndicator color={COLORS.white} size="large" />
+        </View>
+      )}
+
+      {/* Pause/play flash indicator */}
+      <Animated.View style={[styles.pauseIndicator, { opacity: pauseAnim }]} pointerEvents="none">
+        <View style={styles.pauseCircle}>
+          {paused
+            ? <IcPlay size={32} color={COLORS.white} fill={COLORS.white} />
+            : <View style={styles.pauseBars}><View style={styles.pauseBar} /><View style={styles.pauseBar} /></View>
+          }
+        </View>
+      </Animated.View>
+
+      {/* Floating heart on double-tap */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.floatingHeart, { left: heartPos.x, top: heartPos.y, opacity: heartAnim, transform: [{ scale: heartScale }] }]}
+      >
+        <IcHeartFill size={100} color="#FF3B5C" />
+      </Animated.View>
+
+      {/* Mute button (top right) */}
+      <TouchableOpacity style={styles.muteBtn} onPress={() => setMuted(m => !m)} activeOpacity={0.8}>
+        {muted ? <IcMute size={18} color={COLORS.white} /> : <IcVolume size={18} color={COLORS.white} />}
+      </TouchableOpacity>
+
+      {/* Bottom gradient */}
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.7)']}
+        style={styles.gradient}
+        pointerEvents="none"
+      />
+
+      {/* ── Bottom left — username + caption ── */}
+      <View style={styles.bottomLeft}>
+        <TouchableOpacity onPress={goToProfile} activeOpacity={0.8}>
+          <Text style={styles.username}>@{post.user.username}</Text>
+        </TouchableOpacity>
+        {post.caption ? (
+          <TouchableOpacity onPress={() => setCaptionExpanded(e => !e)} activeOpacity={0.9}>
+            <Text style={styles.caption} numberOfLines={captionExpanded ? undefined : 2}>
+              {post.caption}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
+      {/* ── Bottom right — sound (clickable) ── */}
+      {post.sound && (
+        <TouchableOpacity
+          style={styles.bottomRight}
+          onPress={() => nav.navigate('Sound', { soundId: post.sound!.id, title: post.sound!.title, artist: post.sound!.artist })}
+          activeOpacity={0.8}
+        >
+          <IcMusic size={12} color={COLORS.white} />
+          <Text style={styles.soundText} numberOfLines={1}>
+            {post.sound.title}{post.sound.artist ? ` · ${post.sound.artist}` : ''}
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {/* ── Right actions ── */}
+      <View style={styles.rightActions}>
+        {/* Avatar + follow */}
+        <TouchableOpacity style={styles.avatarWrap} onPress={goToProfile} activeOpacity={0.85}>
+          {post.user.avatar_url ? (
+            <Image source={{ uri: post.user.avatar_url }} style={styles.avatar} />
+          ) : (
+            <View style={styles.avatarFallback}>
+              <Text style={styles.avatarInitial}>{post.user.display_name[0]?.toUpperCase()}</Text>
+            </View>
+          )}
+          <View style={styles.followDot}>
+            <Text style={styles.followDotText}>+</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Like */}
+        <ActionBtn
+          icon={liked ? <IcHeartFill size={30} color="#FF3B5C" /> : <IcHeart size={30} color={COLORS.white} />}
+          count={fmt(likeCount)}
+          onPress={() => likeMutation.mutate()}
+          countColor={liked ? '#FF3B5C' : COLORS.white}
+        />
+
+        {/* Comment */}
+        <ActionBtn
+          icon={<IcComment size={28} color={COLORS.white} />}
+          count={fmt(post.comment_count)}
+          onPress={onComment}
+        />
+
+        {/* Save / Favoris */}
+        <ActionBtn
+          icon={saved ? <IcSaveFill size={26} color={COLORS.primary} /> : <IcSave size={26} color={COLORS.white} />}
+          onPress={() => saveMutation.mutate()}
+        />
+
+        {/* Share */}
+        <ActionBtn
+          icon={<IcShare size={26} color={COLORS.white} />}
+          count={fmt(post.share_count || 0)}
+          onPress={() => {
+            Share.share({
+              message: `Regarde cette vidéo sur Nour 🌙\nhttps://nour.app/post/${post.id}`,
+              url: `https://nour.app/post/${post.id}`,
+            });
+            api.post(`/posts/${post.id}/view`, {}).catch(() => {});
+          }}
+        />
+      </View>
+    </Pressable>
+    </Animated.View>
+  );
+}
+
+function ActionBtn({
+  icon, count, onPress, countColor = COLORS.white,
+}: { icon: React.ReactNode; count?: string; onPress: () => void; countColor?: string }) {
+  return (
+    <TouchableOpacity style={styles.actionBtn} onPress={onPress} activeOpacity={0.8}>
+      {icon}
+      {count !== undefined && <Text style={[styles.actionCount, { color: countColor }]}>{count}</Text>}
+    </TouchableOpacity>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { width: W, height: H, backgroundColor: '#000', overflow: 'hidden' },
+  video: { width: W, height: H },
+  fallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#111' },
+
+  bufferWrap: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+
+  pauseIndicator: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  pauseCircle: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  pauseBars: { flexDirection: 'row', gap: 6 },
+  pauseBar: { width: 6, height: 26, backgroundColor: COLORS.white, borderRadius: 3 },
+
+  floatingHeart: { position: 'absolute', width: 100, height: 100 },
+
+  muteBtn: {
+    position: 'absolute', top: 54, right: 14,
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+
+  gradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: H * 0.5 },
+
+  // Bottom left: username + caption
+  bottomLeft: {
+    position: 'absolute', bottom: 104, left: 14, right: 90,
+    gap: 5,
+  },
+  username: { fontSize: FONT.size.base, fontWeight: FONT.weight.bold, color: COLORS.white },
+  caption: { fontSize: FONT.size.sm, color: 'rgba(255,255,255,0.9)', lineHeight: 19 },
+
+  // Bottom right: sound
+  bottomRight: {
+    position: 'absolute', bottom: 78, right: 14, left: '35%',
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    justifyContent: 'flex-end',
+  },
+  soundText: { fontSize: FONT.size.xs, color: 'rgba(255,255,255,0.85)', flexShrink: 1 },
+
+  // Right side actions
+  rightActions: {
+    position: 'absolute', right: 10, bottom: 96,
+    alignItems: 'center', gap: 22,
+  },
+  avatarWrap: { position: 'relative', marginBottom: 2 },
+  avatar: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: COLORS.white },
+  avatarFallback: {
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: COLORS.primaryBg, borderWidth: 2, borderColor: COLORS.white,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  avatarInitial: { fontSize: 18, fontWeight: FONT.weight.bold, color: COLORS.primary },
+  followDot: {
+    position: 'absolute', bottom: -8, left: '50%',
+    transform: [{ translateX: -10 }],
+    width: 20, height: 20, borderRadius: 10,
+    backgroundColor: '#FF3B5C', alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: COLORS.white,
+  },
+  followDotText: { color: COLORS.white, fontSize: 13, fontWeight: FONT.weight.bold, lineHeight: 18 },
+
+  actionBtn: { alignItems: 'center', gap: 3 },
+  actionCount: { fontSize: 12, fontWeight: FONT.weight.semibold, color: COLORS.white },
+});

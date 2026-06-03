@@ -42,6 +42,7 @@ const app = Fastify({
   logger: env.NODE_ENV === 'development'
     ? { transport: { target: 'pino-pretty' } }
     : true,
+  ignoreTrailingSlash: true,
 });
 
 async function bootstrap() {

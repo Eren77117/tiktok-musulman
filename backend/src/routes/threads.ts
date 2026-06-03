@@ -4,8 +4,10 @@ import { authenticate } from '../middleware/auth';
 import { z } from 'zod';
 
 const createThreadSchema = z.object({
-  content: z.string().min(1).max(280),
+  content: z.string().min(1).max(500),
   reply_to_id: z.string().uuid().optional(),
+  media_url: z.string().url().optional(),
+  media_type: z.enum(['image', 'video']).optional(),
 });
 
 export async function threadRoutes(app: FastifyInstance) {
@@ -64,7 +66,8 @@ export async function threadRoutes(app: FastifyInstance) {
       const t = await tx.post.create({
         data: {
           user_id: req.currentUser!.id,
-          video_url: '',
+          video_url: parsed.data.media_type === 'video' ? (parsed.data.media_url ?? '') : '',
+          thumbnail_url: parsed.data.media_type === 'image' ? parsed.data.media_url : null,
           caption: parsed.data.content,
           duration: 0,
           is_public: true,

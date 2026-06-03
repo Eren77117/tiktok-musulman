@@ -1,36 +1,50 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Appearance } from 'react-native';
 
-type Theme = 'light' | 'dark';
+export type ThemeMode = 'light' | 'dark' | 'system';
 
 interface ThemeStore {
-  theme: Theme;
+  mode: ThemeMode;
   isDark: boolean;
-  setTheme: (t: Theme) => void;
+  setMode: (m: ThemeMode) => void;
   toggleTheme: () => void;
+  syncSystem: () => void;
   loadTheme: () => Promise<void>;
 }
 
-const THEME_KEY = 'nour_theme';
+const THEME_KEY = 'nour_theme_mode';
+
+function resolveIsDark(mode: ThemeMode): boolean {
+  if (mode === 'system') return Appearance.getColorScheme() === 'dark';
+  return mode === 'dark';
+}
 
 export const useThemeStore = create<ThemeStore>((set, get) => ({
-  theme: 'light',
-  isDark: false,
+  mode: 'system',
+  isDark: Appearance.getColorScheme() === 'dark',
 
-  setTheme: async (t: Theme) => {
-    set({ theme: t, isDark: t === 'dark' });
-    await AsyncStorage.setItem(THEME_KEY, t);
+  setMode: async (m: ThemeMode) => {
+    set({ mode: m, isDark: resolveIsDark(m) });
+    await AsyncStorage.setItem(THEME_KEY, m);
   },
 
   toggleTheme: () => {
-    const next = get().theme === 'light' ? 'dark' : 'light';
-    get().setTheme(next);
+    const { mode } = get();
+    get().setMode(mode === 'dark' ? 'light' : 'dark');
+  },
+
+  syncSystem: () => {
+    if (get().mode === 'system') {
+      set({ isDark: Appearance.getColorScheme() === 'dark' });
+    }
   },
 
   loadTheme: async () => {
     try {
-      const saved = await AsyncStorage.getItem(THEME_KEY) as Theme | null;
-      if (saved) set({ theme: saved, isDark: saved === 'dark' });
+      const saved = await AsyncStorage.getItem(THEME_KEY) as ThemeMode | null;
+      const m: ThemeMode = (saved === 'light' || saved === 'dark' || saved === 'system') ? saved : 'system';
+      set({ mode: m, isDark: resolveIsDark(m) });
     } catch {}
   },
 }));
