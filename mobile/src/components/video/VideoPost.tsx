@@ -119,13 +119,13 @@ export function VideoPost({ post, isActive }: Props) {
           onPress={() => navigation.navigate('PostDetail', { postId: post.id })}
           activeOpacity={0.8}
         >
-          <Text style={styles.actionIcon}>💬</Text>
+          <Text style={styles.actionIcon}>◻</Text>
           <Text style={styles.actionCount}>{formatCount(post.comment_count)}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.actionBtn} activeOpacity={0.8}>
-          <Text style={styles.actionIcon}>➦</Text>
-          <Text style={styles.actionCount}>Share</Text>
+          <Text style={styles.actionIcon}>⤴</Text>
+          <Text style={styles.actionCount}>Partager</Text>
         </TouchableOpacity>
       </View>
 

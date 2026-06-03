@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>TiktokMusulman</string>
+	<string>Nour</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -35,6 +35,14 @@
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Nour a besoin d'accéder à vos photos pour publier des vidéos.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Nour a besoin d'accéder à vos photos pour sauvegarder du contenu.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Nour a besoin du microphone pour enregistrer des vidéos.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Nour a besoin de la caméra pour filmer du contenu.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

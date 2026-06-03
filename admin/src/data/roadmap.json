@@ -1,0 +1,203 @@
+{
+  "lastUpdated": "2026-06-03",
+  "items": [
+    {
+      "id": "1",
+      "title": "Upload vidéo end-to-end",
+      "description": "Mobile → backend → URL absolue → post créé avec durée réelle",
+      "status": "done",
+      "priority": "critical",
+      "category": "feature",
+      "tags": ["mobile", "backend", "upload"]
+    },
+    {
+      "id": "2",
+      "title": "Algorithme feed TikTok-style",
+      "description": "Score = likes×10 + comments×15 + shares×8 + views×0.5 + time decay + category boost",
+      "status": "done",
+      "priority": "critical",
+      "category": "feature",
+      "tags": ["backend", "algorithm", "feed"]
+    },
+    {
+      "id": "3",
+      "title": "Icônes premium Lucide React Native",
+      "description": "Remplacement total emoji/unicode par lucide-react-native + react-native-svg",
+      "status": "done",
+      "priority": "high",
+      "category": "design",
+      "tags": ["mobile", "design", "icons"]
+    },
+    {
+      "id": "4",
+      "title": "Suppression popups développeur",
+      "description": "LogBox.ignoreAllLogs() — aucun popup dev visible par les utilisateurs",
+      "status": "done",
+      "priority": "high",
+      "category": "bug",
+      "tags": ["mobile"]
+    },
+    {
+      "id": "5",
+      "title": "Routing complet — 3 écrans manquants",
+      "description": "ExploreScreen, ThreadsScreen, SettingsScreen créés et routés",
+      "status": "done",
+      "priority": "critical",
+      "category": "bug",
+      "tags": ["mobile", "navigation"]
+    },
+    {
+      "id": "6",
+      "title": "Route /api/threads backend",
+      "description": "GET/POST /threads avec like, reply_count, pagination cursor",
+      "status": "done",
+      "priority": "high",
+      "category": "feature",
+      "tags": ["backend"]
+    },
+    {
+      "id": "7",
+      "title": "Tracking vues vidéo",
+      "description": "POST /posts/:id/view — incrémente view_count, base pour algo",
+      "status": "done",
+      "priority": "high",
+      "category": "feature",
+      "tags": ["backend", "algorithm"]
+    },
+    {
+      "id": "8",
+      "title": "5 vidéos seed de test",
+      "description": "prisma/seed.ts avec 5 posts MP4 public CDN + comptes test homme/femme",
+      "status": "done",
+      "priority": "medium",
+      "category": "feature",
+      "tags": ["backend", "test"]
+    },
+    {
+      "id": "9",
+      "title": "Cloudinary — upload production",
+      "description": "Configurer CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET sur Railway pour stockage permanent",
+      "status": "todo",
+      "priority": "critical",
+      "category": "infra",
+      "tags": ["backend", "infra", "upload"]
+    },
+    {
+      "id": "10",
+      "title": "Seed données Railway",
+      "description": "Exécuter DATABASE_URL=<railway_url> npx prisma db seed depuis backend/",
+      "status": "todo",
+      "priority": "critical",
+      "category": "infra",
+      "tags": ["backend", "infra"]
+    },
+    {
+      "id": "11",
+      "title": "Lecteur vidéo inline (swipe vertical)",
+      "description": "Lecteur vidéo fullscreen swipeable type TikTok avec react-native-video — autoplay au scroll",
+      "status": "in_progress",
+      "priority": "high",
+      "category": "feature",
+      "tags": ["mobile", "video"]
+    },
+    {
+      "id": "12",
+      "title": "Système de following — restriction messages H/F",
+      "description": "Un homme ne peut pas initier un DM à une femme (et vice versa). Déjà dans backend mais à affiner côté mobile",
+      "status": "in_progress",
+      "priority": "critical",
+      "category": "feature",
+      "tags": ["mobile", "backend", "rules"]
+    },
+    {
+      "id": "13",
+      "title": "Profil — édition photo + bio",
+      "description": "Formulaire d'édition du profil : photo de profil, bio, nom affiché",
+      "status": "todo",
+      "priority": "high",
+      "category": "feature",
+      "tags": ["mobile", "profile"]
+    },
+    {
+      "id": "14",
+      "title": "Push notifications",
+      "description": "Intégration FCM/APNs pour notifications likes, messages, abonnés",
+      "status": "todo",
+      "priority": "medium",
+      "category": "feature",
+      "tags": ["mobile", "backend"]
+    },
+    {
+      "id": "15",
+      "title": "Mode sombre complet",
+      "description": "Dark mode sur tous les écrans avec COLORS dark tokens déjà définis dans theme.ts",
+      "status": "todo",
+      "priority": "medium",
+      "category": "design",
+      "tags": ["mobile", "design"]
+    },
+    {
+      "id": "16",
+      "title": "Onboarding / tutoriel",
+      "description": "3 écrans d'onboarding au premier lancement avec valeurs et règles de l'app",
+      "status": "todo",
+      "priority": "medium",
+      "category": "feature",
+      "tags": ["mobile", "ux"]
+    },
+    {
+      "id": "17",
+      "title": "Recherche vidéos + utilisateurs améliorée",
+      "description": "Recherche plein texte sur captions et usernames, résultats vidéos dans explore",
+      "status": "todo",
+      "priority": "medium",
+      "category": "feature",
+      "tags": ["mobile", "backend", "search"]
+    },
+    {
+      "id": "18",
+      "title": "Compression vidéo avant upload",
+      "description": "Réduire taille vidéo côté mobile avant envoi (ffmpeg ou react-native-compressor)",
+      "status": "todo",
+      "priority": "medium",
+      "category": "feature",
+      "tags": ["mobile", "upload"]
+    },
+    {
+      "id": "19",
+      "title": "Analytics admin — métriques d'engagement",
+      "description": "Dashboard admin avec graphiques: vues/jour, uploads/jour, rétention, top catégories",
+      "status": "todo",
+      "priority": "low",
+      "category": "admin",
+      "tags": ["admin", "analytics"]
+    },
+    {
+      "id": "20",
+      "title": "Modération contenu — signalements",
+      "description": "Workflow admin pour traiter les reports, bans, suppression contenu inapproprié",
+      "status": "todo",
+      "priority": "high",
+      "category": "admin",
+      "tags": ["admin", "moderation"]
+    },
+    {
+      "id": "21",
+      "title": "Tests unitaires — auth + algo feed",
+      "description": "Jest tests sur: login/register, scoring algorithm, gender messaging rule",
+      "status": "todo",
+      "priority": "low",
+      "category": "test",
+      "tags": ["backend", "test"]
+    },
+    {
+      "id": "22",
+      "title": "Build production iOS — App Store",
+      "description": "Archive Xcode, certificats distribution, soumission TestFlight puis App Store",
+      "status": "todo",
+      "priority": "high",
+      "category": "infra",
+      "tags": ["mobile", "infra", "release"]
+    }
+  ]
+}

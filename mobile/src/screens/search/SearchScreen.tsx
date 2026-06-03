@@ -53,7 +53,7 @@ export default function SearchScreen() {
           style={styles.input}
           value={query}
           onChangeText={handleChange}
-          placeholder="Search users, videos..."
+          placeholder="Chercher utilisateurs, vidéos..."
           placeholderTextColor={COLORS.textSubtle}
           autoCapitalize="none"
           clearButtonMode="while-editing"
@@ -86,17 +86,17 @@ export default function SearchScreen() {
               </View>
               <View style={styles.userInfo}>
                 <Text style={styles.displayName}>{u.display_name}</Text>
-                <Text style={styles.username}>@{u.username} · {u.follower_count.toLocaleString()} followers</Text>
+                <Text style={styles.username}>@{u.username} · {u.follower_count.toLocaleString()} abonnés</Text>
               </View>
             </TouchableOpacity>
           )}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>No results for "{debouncedQ}"</Text>
+            <Text style={styles.emptyText}>Aucun résultat pour "{debouncedQ}"</Text>
           }
         />
       ) : (
         <View style={styles.trendingSection}>
-          <Text style={styles.sectionTitle}>Trending categories</Text>
+          <Text style={styles.sectionTitle}>Tendances</Text>
           <View style={styles.categories}>
             {(trending?.categories ?? []).map((c: { id: string; name: string }) => (
               <TouchableOpacity key={c.id} style={styles.categoryTag}>
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.bgInput,
+    backgroundColor: COLORS.inputBg,
     margin: SPACING.md,
     borderRadius: 12,
     paddingHorizontal: SPACING.md,
@@ -138,6 +138,6 @@ const styles = StyleSheet.create({
   trendingSection: { padding: SPACING.md },
   sectionTitle: { fontSize: 14, fontWeight: '600', color: COLORS.textMuted, marginBottom: 12 },
   categories: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  categoryTag: { backgroundColor: COLORS.bgCard, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: COLORS.border },
+  categoryTag: { backgroundColor: COLORS.card, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: COLORS.border },
   categoryText: { fontSize: 13, color: COLORS.text },
 });

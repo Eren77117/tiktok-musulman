@@ -1,24 +1,36 @@
 import React from 'react';
+import {
+  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
+} from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../stores/authStore';
-import { COLORS } from '../constants';
+import { COLORS, FONT, SPACING, RADIUS, SHADOW } from '../constants/theme';
+import {
+  IcHome, IcExplore, IcCreate, IcThreads,
+  IcProfile, IcBrand,
+} from '../components/ui/Icons';
 
+// Auth screens
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
+
+// Main screens
 import FeedScreen from '../screens/feed/FeedScreen';
-import SearchScreen from '../screens/search/SearchScreen';
-import UploadScreen from '../screens/upload/UploadScreen';
-import NotificationsScreen from '../screens/notifications/NotificationsScreen';
+import ExploreScreen from '../screens/explore/ExploreScreen';
+import CreateScreen from '../screens/upload/UploadScreen';
+import ThreadsScreen from '../screens/threads/ThreadsScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
-import MessagesScreen from '../screens/messages/MessagesScreen';
-import ConversationScreen from '../screens/messages/ConversationScreen';
+
+// Detail screens
 import PostDetailScreen from '../screens/feed/PostDetailScreen';
 import UserProfileScreen from '../screens/profile/UserProfileScreen';
-import LiveScreen from '../screens/live/LiveScreen';
-import StoriesScreen from '../screens/feed/StoriesScreen';
+import MessagesScreen from '../screens/messages/MessagesScreen';
+import ConversationScreen from '../screens/messages/ConversationScreen';
+import NotificationsScreen from '../screens/notifications/NotificationsScreen';
+import SettingsScreen from '../screens/settings/SettingsScreen';
 
 export type RootStackParamList = {
   Auth: undefined;
@@ -26,8 +38,9 @@ export type RootStackParamList = {
   PostDetail: { postId: string };
   UserProfile: { userId: string; username: string };
   Conversation: { conversationId: string; otherUser: { id: string; display_name: string } };
-  Live: { sessionId: string };
-  Stories: { userId: string };
+  Messages: undefined;
+  Notifications: undefined;
+  Settings: undefined;
 };
 
 export type AuthStackParamList = {
@@ -36,68 +49,94 @@ export type AuthStackParamList = {
 };
 
 export type TabParamList = {
-  Feed: undefined;
-  Search: undefined;
-  Upload: undefined;
-  Notifications: undefined;
+  Home: undefined;
+  Explore: undefined;
+  Create: undefined;
+  Threads: undefined;
   Profile: undefined;
 };
 
-const Stack = createNativeStackNavigator<RootStackParamList>();
+const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
 
+const TAB_LABELS: Record<string, string> = {
+  Home: 'Accueil', Explore: 'Explorer', Create: '', Threads: 'Fils', Profile: 'Profil',
+};
+
 function TabIcon({ name, focused }: { name: string; focused: boolean }) {
-  const icons: Record<string, string> = {
-    Feed: '⊞',
-    Search: '⌕',
-    Upload: '＋',
-    Notifications: '◯',
-    Profile: '◉',
-  };
+  const color = focused ? COLORS.tabActive : COLORS.tabInactive;
+  const size = 22;
+  switch (name) {
+    case 'Home':    return <IcHome    size={size} color={color} />;
+    case 'Explore': return <IcExplore size={size} color={color} />;
+    case 'Threads': return <IcThreads size={size} color={color} />;
+    case 'Profile': return <IcProfile size={size} color={color} />;
+    default:        return null;
+  }
+}
+
+function CustomTabBar({ state, descriptors, navigation }: any) {
+  const insets = useSafeAreaInsets();
+
   return (
-    <Text style={{ fontSize: 18, color: focused ? COLORS.text : COLORS.textMuted }}>
-      {icons[name]}
-    </Text>
+    <View style={[styles.tabBar, { paddingBottom: insets.bottom + 8 }, SHADOW.md]}>
+      {state.routes.map((route: any, index: number) => {
+        const isFocused = state.index === index;
+        const isCreate = route.name === 'Create';
+
+        const onPress = () => {
+          const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+          if (!isFocused && !event.defaultPrevented) navigation.navigate(route.name);
+        };
+
+        if (isCreate) {
+          return (
+            <TouchableOpacity key={route.key} style={styles.createBtn} onPress={onPress} activeOpacity={0.85}>
+              <View style={styles.createInner}>
+                <IcCreate size={22} color={COLORS.white} strokeWidth={2.5} />
+              </View>
+            </TouchableOpacity>
+          );
+        }
+
+        return (
+          <TouchableOpacity
+            key={route.key}
+            style={styles.tabItem}
+            onPress={onPress}
+            activeOpacity={0.7}
+          >
+            <TabIcon name={route.name} focused={isFocused} />
+            <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]}>
+              {TAB_LABELS[route.name]}
+            </Text>
+            {isFocused && <View style={styles.tabDot} />}
+          </TouchableOpacity>
+        );
+      })}
+    </View>
   );
 }
 
 function MainTabs() {
   return (
     <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: '#000',
-          borderTopColor: COLORS.border,
-          height: 80,
-          paddingBottom: 20,
-        },
-        tabBarShowLabel: false,
-      }}
+      tabBar={(props) => <CustomTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
     >
-      <Tab.Screen name="Feed" component={FeedScreen} options={{ tabBarIcon: ({ focused }) => <TabIcon name="Feed" focused={focused} /> }} />
-      <Tab.Screen name="Search" component={SearchScreen} options={{ tabBarIcon: ({ focused }) => <TabIcon name="Search" focused={focused} /> }} />
-      <Tab.Screen
-        name="Upload"
-        component={UploadScreen}
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <View style={styles.uploadBtn}>
-              <Text style={{ color: '#fff', fontSize: 22, fontWeight: '300' }}>+</Text>
-            </View>
-          ),
-        }}
-      />
-      <Tab.Screen name="Notifications" component={NotificationsScreen} options={{ tabBarIcon: ({ focused }) => <TabIcon name="Notifications" focused={focused} /> }} />
-      <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarIcon: ({ focused }) => <TabIcon name="Profile" focused={focused} /> }} />
+      <Tab.Screen name="Home" component={FeedScreen} />
+      <Tab.Screen name="Explore" component={ExploreScreen} />
+      <Tab.Screen name="Create" component={CreateScreen} />
+      <Tab.Screen name="Threads" component={ThreadsScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 }
 
 function AuthNavigator() {
   return (
-    <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+    <AuthStack.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
       <AuthStack.Screen name="Login" component={LoginScreen} />
       <AuthStack.Screen name="Register" component={RegisterScreen} />
     </AuthStack.Navigator>
@@ -109,44 +148,85 @@ export function AppNavigator() {
 
   if (loading) {
     return (
-      <View style={styles.loading}>
-        <ActivityIndicator color={COLORS.primary} size="large" />
+      <View style={styles.loadingContainer}>
+        <View style={styles.loadingLogo}>
+          <IcBrand size={32} color={COLORS.primary} />
+        </View>
+        <ActivityIndicator color={COLORS.primary} size="large" style={{ marginTop: 32 }} />
       </View>
     );
   }
 
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <RootStack.Navigator screenOptions={{ headerShown: false }}>
         {user ? (
           <>
-            <Stack.Screen name="Main" component={MainTabs} />
-            <Stack.Screen name="PostDetail" component={PostDetailScreen} />
-            <Stack.Screen name="UserProfile" component={UserProfileScreen} />
-            <Stack.Screen
+            <RootStack.Screen name="Main" component={MainTabs} />
+            <RootStack.Screen
+              name="PostDetail"
+              component={PostDetailScreen}
+              options={{ animation: 'slide_from_bottom', headerShown: false }}
+            />
+            <RootStack.Screen name="UserProfile" component={UserProfileScreen} options={{ animation: 'slide_from_right' }} />
+            <RootStack.Screen
               name="Conversation"
               component={ConversationScreen}
-              options={{ headerShown: true, headerStyle: { backgroundColor: '#000' }, headerTintColor: '#fff', headerTitle: '' }}
+              options={{ headerShown: true, headerStyle: { backgroundColor: COLORS.surface }, headerTintColor: COLORS.primary, headerTitle: '', headerShadowVisible: false }}
             />
-            <Stack.Screen name="Live" component={LiveScreen} />
-            <Stack.Screen name="Stories" component={StoriesScreen} />
+            <RootStack.Screen name="Messages" component={MessagesScreen} options={{ animation: 'slide_from_right' }} />
+            <RootStack.Screen name="Notifications" component={NotificationsScreen} options={{ animation: 'slide_from_right' }} />
+            <RootStack.Screen name="Settings" component={SettingsScreen} options={{ animation: 'slide_from_right' }} />
           </>
         ) : (
-          <Stack.Screen name="Auth" component={AuthNavigator} />
+          <RootStack.Screen name="Auth" component={AuthNavigator} />
         )}
-      </Stack.Navigator>
+      </RootStack.Navigator>
     </NavigationContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  loading: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
-  uploadBtn: {
-    width: 44,
-    height: 30,
-    backgroundColor: COLORS.primary,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+  loadingContainer: {
+    flex: 1, backgroundColor: COLORS.bg, alignItems: 'center', justifyContent: 'center',
   },
+  loadingLogo: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: COLORS.primaryBg,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: COLORS.primaryLight,
+  },
+  loadingEmoji: { fontSize: 32, fontWeight: '700', color: COLORS.primary },
+
+  // Tab bar
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.white,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderLight,
+    paddingTop: 10,
+    paddingHorizontal: SPACING.sm,
+  },
+  tabItem: {
+    flex: 1, alignItems: 'center', gap: 3, position: 'relative',
+  },
+  tabIcon: { fontSize: 20, color: COLORS.tabInactive },
+  tabIconActive: { color: COLORS.tabActive },
+  tabLabel: { fontSize: 10, fontWeight: FONT.weight.medium, color: COLORS.tabInactive },
+  tabLabelActive: { color: COLORS.tabActive, fontWeight: FONT.weight.semibold },
+  tabDot: {
+    position: 'absolute', bottom: -6, width: 4, height: 4,
+    borderRadius: 2, backgroundColor: COLORS.primary,
+  },
+  createBtn: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+  },
+  createInner: {
+    width: 48, height: 48, borderRadius: 16,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center', justifyContent: 'center',
+    marginTop: -12,
+    ...SHADOW.green,
+  },
+  createIcon: { fontSize: 24, color: COLORS.white, fontWeight: FONT.weight.bold, marginTop: -2 },
 });

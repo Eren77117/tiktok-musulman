@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { createElement } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { COLORS, SPACING } from '../../constants';
+import { Heart, MessageCircle, UserPlus, AtSign, Mail, Check, Bell } from 'lucide-react-native';
 
 interface Notification {
   id: string;
@@ -15,14 +16,14 @@ interface Notification {
   created_at: string;
 }
 
-const TYPE_ICONS: Record<string, string> = {
-  LIKE: '♥',
-  COMMENT: '💬',
-  FOLLOW: '◉',
-  MENTION: '@',
-  MESSAGE_REQUEST: '✉',
-  MESSAGE_REQUEST_ACCEPTED: '✓',
-  SYSTEM: '⊕',
+const TYPE_ICON_COMPONENTS: Record<string, React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>> = {
+  LIKE: Heart,
+  COMMENT: MessageCircle,
+  FOLLOW: UserPlus,
+  MENTION: AtSign,
+  MESSAGE_REQUEST: Mail,
+  MESSAGE_REQUEST_ACCEPTED: Check,
+  SYSTEM: Bell,
 };
 
 export default function NotificationsScreen() {
@@ -47,7 +48,7 @@ export default function NotificationsScreen() {
         <Text style={styles.title}>Notifications</Text>
         {unreadCount > 0 && (
           <TouchableOpacity onPress={() => readAllMutation.mutate()}>
-            <Text style={styles.markAll}>Mark all read</Text>
+            <Text style={styles.markAll}>Tout marquer comme lu</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -63,7 +64,7 @@ export default function NotificationsScreen() {
           renderItem={({ item: n }) => (
             <View style={[styles.row, !n.is_read && styles.rowUnread]}>
               <View style={styles.iconWrap}>
-                <Text style={styles.icon}>{TYPE_ICONS[n.type] ?? '⊕'}</Text>
+                {React.createElement(TYPE_ICON_COMPONENTS[n.type] ?? Bell, { size: 18, color: COLORS.primary, strokeWidth: 1.8 })}
               </View>
               <View style={styles.rowInfo}>
                 <Text style={styles.rowTitle}>{n.title}</Text>
@@ -74,7 +75,7 @@ export default function NotificationsScreen() {
             </View>
           )}
           ListEmptyComponent={
-            <Text style={styles.empty}>No notifications</Text>
+            <Text style={styles.empty}>Aucune notification</Text>
           }
         />
       )}
@@ -85,9 +86,9 @@ export default function NotificationsScreen() {
 function formatTime(iso: string) {
   const d = new Date(iso);
   const diff = Date.now() - d.getTime();
-  if (diff < 60_000) return 'just now';
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+  if (diff < 60_000) return "à l'instant";
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}min`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h`;
   return d.toLocaleDateString();
 }
 
@@ -98,8 +99,8 @@ const styles = StyleSheet.create({
   markAll: { fontSize: 13, color: COLORS.primary },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: SPACING.md, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  rowUnread: { backgroundColor: COLORS.bgCard },
-  iconWrap: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.bgInput, alignItems: 'center', justifyContent: 'center' },
+  rowUnread: { backgroundColor: COLORS.primaryBg },
+  iconWrap: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.inputBg, alignItems: 'center', justifyContent: 'center' },
   icon: { fontSize: 18 },
   rowInfo: { flex: 1, gap: 2 },
   rowTitle: { fontSize: 14, fontWeight: '600', color: COLORS.text },

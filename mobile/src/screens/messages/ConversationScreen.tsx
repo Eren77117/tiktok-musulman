@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
   list: { padding: SPACING.md, gap: 8 },
   bubble: { maxWidth: '75%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
   bubbleMe: { backgroundColor: COLORS.primary, alignSelf: 'flex-end' },
-  bubbleThem: { backgroundColor: COLORS.bgCard, alignSelf: 'flex-start' },
+  bubbleThem: { backgroundColor: COLORS.inputBg, alignSelf: 'flex-start' },
   bubbleText: { fontSize: 15, lineHeight: 22 },
   bubbleTextMe: { color: '#fff' },
   bubbleTextThem: { color: COLORS.text },
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    backgroundColor: COLORS.bgInput,
+    backgroundColor: COLORS.inputBg,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 10,

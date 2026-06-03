@@ -62,7 +62,7 @@ export default function MessagesScreen() {
               <View style={styles.rowInfo}>
                 <Text style={styles.rowName}>{c.other_user.display_name}</Text>
                 <Text style={styles.rowLast} numberOfLines={1}>
-                  {c.last_message?.content ?? 'No messages yet'}
+                  {c.last_message?.content ?? 'Aucun message encore'}
                 </Text>
               </View>
               <Text style={styles.rowTime}>
@@ -71,7 +71,7 @@ export default function MessagesScreen() {
             </TouchableOpacity>
           )}
           ListEmptyComponent={
-            <Text style={styles.empty}>No conversations yet</Text>
+            <Text style={styles.empty}>Aucune conversation pour l'instant</Text>
           }
         />
       )}
