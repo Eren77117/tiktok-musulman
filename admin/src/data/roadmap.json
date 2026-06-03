@@ -8,7 +8,11 @@
       "status": "done",
       "priority": "critical",
       "category": "feature",
-      "tags": ["mobile", "backend", "upload"]
+      "tags": [
+        "mobile",
+        "backend",
+        "upload"
+      ]
     },
     {
       "id": "2",
@@ -17,7 +21,11 @@
       "status": "done",
       "priority": "critical",
       "category": "feature",
-      "tags": ["backend", "algorithm", "feed"]
+      "tags": [
+        "backend",
+        "algorithm",
+        "feed"
+      ]
     },
     {
       "id": "3",
@@ -26,7 +34,11 @@
       "status": "done",
       "priority": "high",
       "category": "design",
-      "tags": ["mobile", "design", "icons"]
+      "tags": [
+        "mobile",
+        "design",
+        "icons"
+      ]
     },
     {
       "id": "4",
@@ -35,7 +47,9 @@
       "status": "done",
       "priority": "high",
       "category": "bug",
-      "tags": ["mobile"]
+      "tags": [
+        "mobile"
+      ]
     },
     {
       "id": "5",
@@ -44,7 +58,10 @@
       "status": "done",
       "priority": "critical",
       "category": "bug",
-      "tags": ["mobile", "navigation"]
+      "tags": [
+        "mobile",
+        "navigation"
+      ]
     },
     {
       "id": "6",
@@ -53,7 +70,9 @@
       "status": "done",
       "priority": "high",
       "category": "feature",
-      "tags": ["backend"]
+      "tags": [
+        "backend"
+      ]
     },
     {
       "id": "7",
@@ -62,7 +81,10 @@
       "status": "done",
       "priority": "high",
       "category": "feature",
-      "tags": ["backend", "algorithm"]
+      "tags": [
+        "backend",
+        "algorithm"
+      ]
     },
     {
       "id": "8",
@@ -71,34 +93,47 @@
       "status": "done",
       "priority": "medium",
       "category": "feature",
-      "tags": ["backend", "test"]
+      "tags": [
+        "backend",
+        "test"
+      ]
     },
     {
       "id": "9",
       "title": "Cloudinary — upload production",
       "description": "Configurer CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET sur Railway pour stockage permanent",
-      "status": "todo",
+      "status": "in_progress",
       "priority": "critical",
       "category": "infra",
-      "tags": ["backend", "infra", "upload"]
+      "tags": [
+        "backend",
+        "infra",
+        "upload"
+      ]
     },
     {
       "id": "10",
       "title": "Seed données Railway",
       "description": "Exécuter DATABASE_URL=<railway_url> npx prisma db seed depuis backend/",
-      "status": "todo",
+      "status": "done",
       "priority": "critical",
       "category": "infra",
-      "tags": ["backend", "infra"]
+      "tags": [
+        "backend",
+        "infra"
+      ]
     },
     {
       "id": "11",
       "title": "Lecteur vidéo inline (swipe vertical)",
       "description": "Lecteur vidéo fullscreen swipeable type TikTok avec react-native-video — autoplay au scroll",
-      "status": "in_progress",
+      "status": "done",
       "priority": "high",
       "category": "feature",
-      "tags": ["mobile", "video"]
+      "tags": [
+        "mobile",
+        "video"
+      ]
     },
     {
       "id": "12",
@@ -107,7 +142,11 @@
       "status": "in_progress",
       "priority": "critical",
       "category": "feature",
-      "tags": ["mobile", "backend", "rules"]
+      "tags": [
+        "mobile",
+        "backend",
+        "rules"
+      ]
     },
     {
       "id": "13",
@@ -116,7 +155,10 @@
       "status": "todo",
       "priority": "high",
       "category": "feature",
-      "tags": ["mobile", "profile"]
+      "tags": [
+        "mobile",
+        "profile"
+      ]
     },
     {
       "id": "14",
@@ -125,7 +167,10 @@
       "status": "todo",
       "priority": "medium",
       "category": "feature",
-      "tags": ["mobile", "backend"]
+      "tags": [
+        "mobile",
+        "backend"
+      ]
     },
     {
       "id": "15",
@@ -134,7 +179,10 @@
       "status": "todo",
       "priority": "medium",
       "category": "design",
-      "tags": ["mobile", "design"]
+      "tags": [
+        "mobile",
+        "design"
+      ]
     },
     {
       "id": "16",
@@ -143,7 +191,10 @@
       "status": "todo",
       "priority": "medium",
       "category": "feature",
-      "tags": ["mobile", "ux"]
+      "tags": [
+        "mobile",
+        "ux"
+      ]
     },
     {
       "id": "17",
@@ -152,7 +203,11 @@
       "status": "todo",
       "priority": "medium",
       "category": "feature",
-      "tags": ["mobile", "backend", "search"]
+      "tags": [
+        "mobile",
+        "backend",
+        "search"
+      ]
     },
     {
       "id": "18",
@@ -161,7 +216,10 @@
       "status": "todo",
       "priority": "medium",
       "category": "feature",
-      "tags": ["mobile", "upload"]
+      "tags": [
+        "mobile",
+        "upload"
+      ]
     },
     {
       "id": "19",
@@ -170,7 +228,10 @@
       "status": "todo",
       "priority": "low",
       "category": "admin",
-      "tags": ["admin", "analytics"]
+      "tags": [
+        "admin",
+        "analytics"
+      ]
     },
     {
       "id": "20",
@@ -179,7 +240,10 @@
       "status": "todo",
       "priority": "high",
       "category": "admin",
-      "tags": ["admin", "moderation"]
+      "tags": [
+        "admin",
+        "moderation"
+      ]
     },
     {
       "id": "21",
@@ -188,7 +252,10 @@
       "status": "todo",
       "priority": "low",
       "category": "test",
-      "tags": ["backend", "test"]
+      "tags": [
+        "backend",
+        "test"
+      ]
     },
     {
       "id": "22",
@@ -197,7 +264,11 @@
       "status": "todo",
       "priority": "high",
       "category": "infra",
-      "tags": ["mobile", "infra", "release"]
+      "tags": [
+        "mobile",
+        "infra",
+        "release"
+      ]
     }
   ]
 }
