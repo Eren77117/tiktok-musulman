@@ -93,6 +93,9 @@ model User {
   received_requests ConversationRequest[] @relation("recipient")
   sent_messages     Message[]         @relation("sender")
   live_sessions     LiveSession[]
+  live_messages     LiveMessage[]
+  books             Book[]
+  book_likes        BookLike[]
   reports_filed     Report[]          @relation("reporter")
   reports_against   Report[]          @relation("reported_user")
   audit_logs        AuditLog[]
@@ -380,19 +383,75 @@ model Message {
 }
 
 model LiveSession {
-  id           String    @id @default(uuid())
-  user_id      String
-  title        String
-  stream_key   String    @unique @default(uuid())
-  viewer_count Int       @default(0)
-  is_active    Boolean   @default(true)
-  started_at   DateTime  @default(now())
-  ended_at     DateTime?
+  id             String    @id @default(uuid())
+  user_id        String
+  title          String
+  category       String    @default("general")
+  stream_key     String    @unique @default(uuid())
+  thumbnail_url  String?
+  viewer_count   Int       @default(0)
+  peak_viewers   Int       @default(0)
+  is_active      Boolean   @default(true)
+  chat_enabled   Boolean   @default(true)
+  is_public      Boolean   @default(true)
+  started_at     DateTime  @default(now())
+  ended_at       DateTime?
 
-  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user     User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  messages LiveMessage[]
 
   @@index([user_id])
   @@index([is_active])
+}
+
+model LiveMessage {
+  id         String   @id @default(uuid())
+  session_id String
+  user_id    String
+  content    String
+  is_deleted Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  session LiveSession @relation(fields: [session_id], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([session_id, created_at])
+}
+
+model Book {
+  id           String   @id @default(uuid())
+  user_id      String
+  title        String
+  author       String?
+  cover_url    String?
+  summary      String
+  content_url  String?
+  category     String   @default("general")
+  like_count   Int      @default(0)
+  save_count   Int      @default(0)
+  view_count   Int      @default(0)
+  is_public    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  user  User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  likes BookLike[]
+
+  @@index([user_id])
+  @@index([created_at])
+}
+
+model BookLike {
+  id         String   @id @default(uuid())
+  user_id    String
+  book_id    String
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  book Book @relation(fields: [book_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, book_id])
+  @@index([user_id])
 }
 
 model Report {

@@ -3,21 +3,12 @@ import { prisma } from '../config/database';
 import { authenticate } from '../middleware/auth';
 import { z } from 'zod';
 
+// Only fields that exist in the User DB model
 const updateProfileSchema = z.object({
   display_name: z.string().min(1).max(50).optional(),
-  bio: z.string().max(200).optional().nullable(),
-  avatar_url: z.string().url().optional().nullable(),
-  // settings fields
-  is_private: z.boolean().optional(),
-  notifPosts: z.boolean().optional(),
-  notifMessages: z.boolean().optional(),
-  notifFollowers: z.boolean().optional(),
-  notifLikes: z.boolean().optional(),
-  notifComments: z.boolean().optional(),
-  privateAccount: z.boolean().optional(),
-  showActivity: z.boolean().optional(),
-  allowDMRequests: z.boolean().optional(),
-});
+  bio: z.string().max(300).optional().nullable(),
+  avatar_url: z.string().optional().nullable(),
+}).passthrough(); // allow extra keys from mobile settings
 
 export async function userRoutes(app: FastifyInstance) {
   app.get('/search', { preHandler: authenticate }, async (req, reply) => {
@@ -74,13 +65,23 @@ export async function userRoutes(app: FastifyInstance) {
     const parsed = updateProfileSchema.safeParse(req.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
+    // Only update fields that exist in User model
+    const { display_name, bio, avatar_url } = parsed.data;
+    const updateData: Record<string, unknown> = {};
+    if (display_name !== undefined) updateData.display_name = display_name;
+    if (bio !== undefined) updateData.bio = bio;
+    if (avatar_url !== undefined) updateData.avatar_url = avatar_url;
+
+    if (Object.keys(updateData).length === 0) {
+      // Nothing to update in DB (e.g. settings-only patch)
+      const me = await prisma.user.findUnique({ where: { id: req.currentUser!.id }, select: { id: true, username: true, display_name: true, bio: true, avatar_url: true, is_verified: true } });
+      return reply.send(me);
+    }
+
     const user = await prisma.user.update({
       where: { id: req.currentUser!.id },
-      data: parsed.data,
-      select: {
-        id: true, username: true, display_name: true,
-        bio: true, avatar_url: true, is_verified: true,
-      },
+      data: updateData,
+      select: { id: true, username: true, display_name: true, bio: true, avatar_url: true, is_verified: true },
     });
     return reply.send(user);
   });

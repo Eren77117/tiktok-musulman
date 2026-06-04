@@ -25,6 +25,7 @@ import { uploadRoutes } from './routes/upload';
 import { adminRoutes } from './routes/admin';
 import { supportRoutes } from './routes/support';
 import { threadRoutes } from './routes/threads';
+import { bookRoutes } from './routes/books';
 
 process.stdout.write(`[STARTUP] Node ${process.version}\n`);
 
@@ -71,6 +72,7 @@ async function bootstrap() {
   await app.register(adminRoutes, { prefix: '/api/admin' });
   await app.register(supportRoutes, { prefix: '/api/support' });
   await app.register(threadRoutes, { prefix: '/api/threads' });
+  await app.register(bookRoutes, { prefix: '/api/books' });
 
   app.setErrorHandler((error, _req, reply) => {
     app.log.error(error);

@@ -179,39 +179,41 @@ export default function UploadScreen() {
       if (!uploadData?.url) throw new Error('URL manquante dans la réponse');
       const videoUrl = uploadData.url.startsWith('http') ? uploadData.url : `${API_BASE_URL.replace('/api', '')}${uploadData.url}`;
 
-      setUploadStep('Publication...');
-      animateProgress(85);
-
-      // Extract thumbnail
+      // ── Thumbnail extraction (BEFORE publishing) ─────────────────────────
       let thumbnailUrl: string | undefined;
       if (media.isImage) {
         thumbnailUrl = videoUrl;
       } else {
-        // Try Cloudinary transformation first
-        if (videoUrl.includes('cloudinary.com')) {
-          thumbnailUrl = videoUrl
-            .replace('/video/upload/', '/video/upload/so_0,w_600,h_1066,c_fill,q_auto/')
-            .replace(/\.(mp4|mov|avi|webm|mkv)$/i, '.jpg');
-        }
-        // Always extract first frame from local video and upload it
+        // Step 1: Extract first frame from local file
         try {
           setUploadStep('Extraction de la couverture...');
-          const thumb = await createThumbnail({ url: media.uri, timeStamp: 0 });
+          animateProgress(75);
+          const localUri = media.uri.startsWith('file://') ? media.uri : `file://${media.uri}`;
+          const thumb = await createThumbnail({ url: localUri, timeStamp: 100, format: 'jpeg' });
+          const thumbPath = thumb.path.startsWith('file://') ? thumb.path : `file://${thumb.path}`;
           const thumbForm = new FormData();
-          thumbForm.append('file', { uri: thumb.path, type: 'image/jpeg', name: 'thumb.jpg' } as any);
+          thumbForm.append('file', { uri: thumbPath, type: 'image/jpeg', name: 'cover.jpg' } as any);
           const thumbRes = await fetch(`${API_BASE_URL}/upload/image`, {
             method: 'POST',
             headers: { Authorization: `Bearer ${tokens.access}` },
             body: thumbForm,
           });
           if (thumbRes.ok) {
-            const thumbData = await thumbRes.json();
-            thumbnailUrl = thumbData.url; // Override with actual first frame
+            const td = await thumbRes.json();
+            if (td?.url) thumbnailUrl = td.url;
           }
         } catch {
-          // Fallback to Cloudinary transform or undefined
+          // Step 2 fallback: Cloudinary auto-thumbnail
+          if (videoUrl.includes('cloudinary.com')) {
+            thumbnailUrl = videoUrl
+              .replace('/video/upload/', '/video/upload/so_0,w_600,h_1066,c_fill,q_auto/')
+              .replace(/\.(mp4|mov|avi|webm|mkv)$/i, '.jpg');
+          }
         }
       }
+
+      setUploadStep('Publication...');
+      animateProgress(85);
 
       await api.post('/posts', {
         video_url: videoUrl,

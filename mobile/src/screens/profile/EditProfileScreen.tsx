@@ -1,36 +1,96 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
+  TextInput, Alert, ActivityIndicator, KeyboardAvoidingView,
+  Platform, Image, ActionSheetIOS,
 } from 'react-native';
 import { useMutation } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { api } from '../../api/client';
+import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
+import { api, getTokens } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
-import { COLORS, FONT, SPACING, RADIUS, SHADOW } from '../../constants/theme';
-import { IcClose, IcCheck } from '../../components/ui/Icons';
+import { COLORS, FONT, SPACING, RADIUS, API_BASE_URL } from '../../constants/theme';
+import { IcClose, IcCheck, IcEdit } from '../../components/ui/Icons';
 
 interface Props { onClose: () => void }
 
 export function EditProfileScreen({ onClose }: Props) {
   const insets = useSafeAreaInsets();
-  const { user, updateUser } = useAuthStore();
+  const { user, updateUser, loadMe } = useAuthStore();
   const [displayName, setDisplayName] = useState(user?.display_name ?? '');
   const [bio, setBio] = useState(user?.bio ?? '');
+  const [avatarLoading, setAvatarLoading] = useState(false);
 
   const mutation = useMutation({
     mutationFn: () => api.patch('/users/me', {
       display_name: displayName.trim(),
       bio: bio.trim() || null,
     }),
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
       updateUser(res.data);
+      await loadMe();
       onClose();
     },
     onError: (e: any) => Alert.alert('Erreur', e?.response?.data?.error ?? 'Échec de la mise à jour'),
   });
 
   const isDirty = displayName !== user?.display_name || bio !== (user?.bio ?? '');
+
+  const handleAvatarPress = () => {
+    const options = ['Prendre une photo', 'Choisir depuis la galerie', 'Annuler'];
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options, cancelButtonIndex: 2 },
+        (i) => { if (i === 0) pickAvatar('camera'); else if (i === 1) pickAvatar('library'); },
+      );
+    } else {
+      Alert.alert('Photo de profil', '', [
+        { text: 'Prendre une photo', onPress: () => pickAvatar('camera') },
+        { text: 'Depuis la galerie', onPress: () => pickAvatar('library') },
+        { text: 'Annuler', style: 'cancel' },
+      ]);
+    }
+  };
+
+  const pickAvatar = async (src: 'camera' | 'library') => {
+    const fn = src === 'camera' ? launchCamera : launchImageLibrary;
+    const result = await fn({ mediaType: 'photo', quality: 0.9, maxWidth: 500, maxHeight: 500 });
+    if (result.didCancel || !result.assets?.[0]?.uri) return;
+
+    setAvatarLoading(true);
+    try {
+      const asset = result.assets[0];
+      const tokens = await getTokens();
+      if (!tokens) throw new Error('Non authentifié');
+
+      const formData = new FormData();
+      formData.append('file', { uri: asset.uri, type: 'image/jpeg', name: 'avatar.jpg' } as any);
+
+      const uploadRes = await fetch(`${API_BASE_URL}/upload/image`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokens.access}` },
+        body: formData,
+      });
+
+      if (!uploadRes.ok) {
+        const err = await uploadRes.json().catch(() => ({}));
+        throw new Error(err?.error ?? `Upload error ${uploadRes.status}`);
+      }
+
+      const { url: avatar_url } = await uploadRes.json();
+      if (!avatar_url) throw new Error('URL manquante dans la réponse');
+
+      await api.patch('/users/me', { avatar_url });
+      updateUser({ avatar_url });
+      await loadMe();
+    } catch (e: any) {
+      Alert.alert('Erreur', e?.message ?? 'Impossible de mettre à jour la photo.');
+    } finally {
+      setAvatarLoading(false);
+    }
+  };
+
+  const currentAvatar = user?.avatar_url;
 
   return (
     <KeyboardAvoidingView
@@ -57,14 +117,31 @@ export function EditProfileScreen({ onClose }: Props) {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        {/* Avatar placeholder */}
+        {/* Avatar */}
         <View style={styles.avatarSection}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarInitial}>
-              {displayName[0]?.toUpperCase() ?? user?.display_name?.[0]?.toUpperCase() ?? 'U'}
-            </Text>
-          </View>
-          <Text style={styles.changePhotoBtn}>Changer la photo (bientôt)</Text>
+          <TouchableOpacity onPress={handleAvatarPress} activeOpacity={0.85} style={styles.avatarWrap}>
+            {avatarLoading ? (
+              <View style={[styles.avatar, styles.avatarFallback]}>
+                <ActivityIndicator color={COLORS.primary} />
+              </View>
+            ) : currentAvatar ? (
+              <Image
+                key={currentAvatar}
+                source={{ uri: currentAvatar }}
+                style={styles.avatar}
+              />
+            ) : (
+              <View style={[styles.avatar, styles.avatarFallback]}>
+                <Text style={styles.avatarInitial}>
+                  {displayName[0]?.toUpperCase() ?? 'U'}
+                </Text>
+              </View>
+            )}
+            <View style={styles.cameraOverlay}>
+              <IcEdit size={12} color={COLORS.white} />
+            </View>
+          </TouchableOpacity>
+          <Text style={styles.changePhotoLabel}>Appuyer pour changer la photo</Text>
         </View>
 
         {/* Fields */}
@@ -131,14 +208,22 @@ const styles = StyleSheet.create({
   saveBtnText: { color: COLORS.white, fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold },
 
   content: { padding: SPACING.md, gap: SPACING.lg },
+
   avatarSection: { alignItems: 'center', gap: 10 },
-  avatar: {
-    width: 88, height: 88, borderRadius: 44,
+  avatarWrap: { position: 'relative' },
+  avatar: { width: 88, height: 88, borderRadius: 44 },
+  avatarFallback: {
     backgroundColor: COLORS.primaryBg, borderWidth: 2, borderColor: COLORS.primary,
     alignItems: 'center', justifyContent: 'center',
   },
   avatarInitial: { fontSize: 36, fontWeight: FONT.weight.bold, color: COLORS.primary },
-  changePhotoBtn: { fontSize: FONT.size.sm, color: COLORS.primary, fontWeight: FONT.weight.medium },
+  cameraOverlay: {
+    position: 'absolute', bottom: 0, right: 0,
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: COLORS.white,
+  },
+  changePhotoLabel: { fontSize: FONT.size.sm, color: COLORS.primary, fontWeight: FONT.weight.medium },
 
   fields: { gap: SPACING.md },
   field: { gap: 6 },

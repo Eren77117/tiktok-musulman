@@ -11,6 +11,7 @@ import { api } from '../../api/client';
 import { RootStackParamList } from '../../navigation';
 import { VideoPlayerItem, FeedPost } from '../../components/video/VideoPlayerItem';
 import { CommentsBottomSheet } from '../../components/video/CommentsBottomSheet';
+import { BookCard, BookItem } from '../../components/books/BookCard';
 import { COLORS, FONT } from '../../constants/theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -72,8 +73,28 @@ export default function FeedScreen() {
     getNextPageParam: last => last.next_cursor,
   });
 
-  const posts  = feedData?.pages.flatMap(p => p.items) ?? [];
-  const threads = threadsData?.pages.flatMap(p => p.items) ?? [];
+  const rawPosts = feedData?.pages.flatMap(p => p.items) ?? [];
+  const threads  = threadsData?.pages.flatMap(p => p.items) ?? [];
+
+  // Books feed (fetch once, inject every 3 videos)
+  const { data: booksData } = useInfiniteQuery({
+    queryKey: ['books-feed'],
+    queryFn: ({ pageParam }) => api.get('/books/feed', { params: { cursor: pageParam, limit: 10 } }).then(r => r.data as { items: BookItem[]; next_cursor: string | null }).catch(() => ({ items: [], next_cursor: null })),
+    initialPageParam: null as string | null,
+    getNextPageParam: last => last.next_cursor,
+  });
+  const books = booksData?.pages.flatMap(p => p.items) ?? [];
+
+  // Mix: inject 1 book every 3 videos
+  type FeedItem = { type: 'video'; data: FeedPost } | { type: 'book'; data: BookItem };
+  const posts: FeedItem[] = [];
+  let bookIdx = 0;
+  rawPosts.forEach((post, i) => {
+    posts.push({ type: 'video', data: post });
+    if ((i + 1) % 3 === 0 && bookIdx < books.length) {
+      posts.push({ type: 'book', data: books[bookIdx++] });
+    }
+  });
 
   // Auto-set first visible video when feed loads
   React.useEffect(() => {

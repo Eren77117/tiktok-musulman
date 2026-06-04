@@ -6,6 +6,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.5.0',
+    date: '2026-06-04 · 02h06',
+    changes: [
+      'Messagerie H→H et F→F : directe, sans restriction ni demande',
+      'Messagerie H↔F : restreinte (règle islamique)',
+      'Onboarding 3 écrans au premier lancement',
+      'Fils — clic sur un fil → ouvre le détail avec réponses',
+      'Fils — répondre à un fil depuis ThreadDetailScreen',
+      'Signalement utilisateur + contenu fonctionnel',
+      'Blocage utilisateur (block/unblock toggle)',
+      'Masquer un utilisateur du feed',
+      'Backend : routes /messages/direct, /block, /hide, /reports',
+    ],
+  },
+  {
     version: '1.4.0',
     date: '2026-06-04 · 02h00',
     changes: [

@@ -32,9 +32,21 @@ interface Profile {
 interface Post {
   id: string;
   thumbnail_url: string | null;
+  video_url?: string;
   view_count: number;
   like_count: number;
   caption: string | null;
+}
+
+function getThumbUrl(post: Pick<Post, 'thumbnail_url' | 'video_url'>): string | null {
+  if (post.thumbnail_url) return post.thumbnail_url;
+  const v = post.video_url;
+  if (v?.includes('cloudinary.com')) {
+    return v
+      .replace('/video/upload/', '/video/upload/so_0,w_600,h_1066,c_fill,q_auto,f_jpg/')
+      .replace(/\.(mp4|mov|avi|webm|mkv)$/i, '.jpg');
+  }
+  return null;
 }
 
 const { width: W } = Dimensions.get('window');
@@ -240,8 +252,8 @@ export default function UserProfileScreen({ route, navigation }: Props) {
             onPress={() => navigation.navigate('VideoPlayer', { postId: p.id })}
             activeOpacity={0.85}
           >
-            {p.thumbnail_url
-              ? <Image source={{ uri: p.thumbnail_url }} style={styles.cellImg} resizeMode="cover" />
+            {getThumbUrl(p)
+              ? <Image source={{ uri: getThumbUrl(p)! }} style={styles.cellImg} resizeMode="cover" />
               : <View style={[styles.cellImg, styles.cellFallback, { backgroundColor: theme.card }]}>
                   <IcPlay size={24} color={COLORS.primaryLight} />
                 </View>

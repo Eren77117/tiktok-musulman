@@ -96,11 +96,60 @@ export function createSocketServer(httpServer: HttpServer) {
     });
 
     socket.on('live:comment', async (data: { sessionId: string; text: string }) => {
+      if (!data.text?.trim()) return;
       const user = await prisma.user.findUnique({
         where: { id: userId },
         select: { id: true, username: true, display_name: true, avatar_url: true },
       });
-      io.to(`live:${data.sessionId}`).emit('live:comment', { user, text: data.text, timestamp: Date.now() });
+      // Save to DB
+      const msg = await prisma.liveMessage.create({
+        data: { session_id: data.sessionId, user_id: userId, content: data.text.trim() },
+      }).catch(() => null);
+      io.to(`live:${data.sessionId}`).emit('live:comment', {
+        id: msg?.id, user, text: data.text.trim(), timestamp: Date.now(),
+      });
+    });
+
+    socket.on('live:reaction', (data: { sessionId: string; emoji: string }) => {
+      io.to(`live:${data.sessionId}`).emit('live:reaction', { userId, emoji: data.emoji, timestamp: Date.now() });
+    });
+
+    // ── WebRTC Signaling ────────────────────────────────────────────────────
+    // Broadcaster sends offer to a specific viewer
+    socket.on('webrtc:offer', (data: { sessionId: string; viewerId: string; sdp: unknown }) => {
+      io.to(`user:${data.viewerId}`).emit('webrtc:offer', {
+        sessionId: data.sessionId, broadcasterId: userId, sdp: data.sdp,
+      });
+    });
+
+    // Viewer sends answer back to broadcaster
+    socket.on('webrtc:answer', (data: { sessionId: string; broadcasterId: string; sdp: unknown }) => {
+      io.to(`user:${data.broadcasterId}`).emit('webrtc:answer', {
+        sessionId: data.sessionId, viewerId: userId, sdp: data.sdp,
+      });
+    });
+
+    // ICE candidate exchange
+    socket.on('webrtc:ice', (data: { sessionId: string; targetId: string; candidate: unknown }) => {
+      io.to(`user:${data.targetId}`).emit('webrtc:ice', {
+        sessionId: data.sessionId, fromId: userId, candidate: data.candidate,
+      });
+    });
+
+    // Viewer requests stream from broadcaster
+    socket.on('live:viewer:join', (data: { sessionId: string; broadcasterId: string }) => {
+      io.to(`user:${data.broadcasterId}`).emit('live:viewer:joined', {
+        viewerId: userId, sessionId: data.sessionId,
+      });
+    });
+
+    // Broadcaster signals stream ended
+    socket.on('live:end', (sessionId: string) => {
+      io.to(`live:${sessionId}`).emit('live:ended', { sessionId });
+      prisma.liveSession.update({
+        where: { id: sessionId, user_id: userId },
+        data: { is_active: false, ended_at: new Date() },
+      }).catch(() => {});
     });
 
     socket.on('disconnect', () => {

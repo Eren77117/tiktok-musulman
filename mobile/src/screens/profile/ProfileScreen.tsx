@@ -21,8 +21,20 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 interface Post {
   id: string;
   thumbnail_url: string | null;
+  video_url?: string;
   view_count: number;
   like_count: number;
+}
+
+function getThumbUrl(post: Pick<Post, 'thumbnail_url' | 'video_url'>): string | null {
+  if (post.thumbnail_url) return post.thumbnail_url;
+  const v = post.video_url;
+  if (v?.includes('cloudinary.com')) {
+    return v
+      .replace('/video/upload/', '/video/upload/so_0,w_600,h_1066,c_fill,q_auto,f_jpg/')
+      .replace(/\.(mp4|mov|avi|webm|mkv)$/i, '.jpg');
+  }
+  return null;
 }
 
 interface Thread {
@@ -100,32 +112,47 @@ export default function ProfileScreen() {
 
   const pickAvatar = async (src: 'camera' | 'library') => {
     const fn = src === 'camera' ? launchCamera : launchImageLibrary;
-    const result = await fn({ mediaType: 'photo', quality: 0.8, maxWidth: 400, maxHeight: 400 });
+    const result = await fn({ mediaType: 'photo', quality: 0.9, maxWidth: 500, maxHeight: 500 });
     if (result.didCancel || !result.assets?.[0]?.uri) return;
 
     setAvatarLoading(true);
     try {
       const asset = result.assets[0];
+      const tokens = await import('../../api/client').then(m => m.getTokens());
+      if (!tokens) throw new Error('Non authentifié');
+
+      // Use native fetch (more reliable than axios for multipart on iOS)
       const formData = new FormData();
-      formData.append('file', { uri: asset.uri, type: asset.type ?? 'image/jpeg', name: 'avatar.jpg' } as any);
-      const uploadRes = await api.post('/upload/image', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      formData.append('file', { uri: asset.uri, type: 'image/jpeg', name: 'avatar.jpg' } as any);
+
+      const { API_BASE_URL } = await import('../../constants/theme');
+      const uploadRes = await fetch(`${API_BASE_URL}/upload/image`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokens.access}` },
+        body: formData,
       });
-      const avatar_url = uploadRes.data.url;
+
+      if (!uploadRes.ok) {
+        const err = await uploadRes.json().catch(() => ({}));
+        throw new Error(err?.error ?? `Upload error ${uploadRes.status}`);
+      }
+
+      const uploadData = await uploadRes.json();
+      const avatar_url: string = uploadData.url;
+
+      if (!avatar_url) throw new Error('URL manquante dans la réponse');
+
+      // Save to server
       await api.patch('/users/me', { avatar_url });
+
+      // Update local state immediately + re-sync store from DB
       updateUser({ avatar_url });
-      // Force reload everywhere — feed, threads, profile
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ['feed'] }),
-        qc.invalidateQueries({ queryKey: ['threads'] }),
-        qc.invalidateQueries({ queryKey: ['user-posts'] }),
-        qc.invalidateQueries({ queryKey: ['me-stats'] }),
-      ]);
-      // Re-patch to ensure it's saved server-side
-      await api.patch('/users/me', { avatar_url }).catch(() => {});
-      qc.invalidateQueries({ queryKey: ['user-posts', user.id] });
-    } catch {
-      Alert.alert('Erreur', "Impossible de mettre à jour la photo.");
+      await loadMe();
+
+      // Invalidate all caches so avatar propagates everywhere
+      qc.invalidateQueries();
+    } catch (e: any) {
+      Alert.alert('Erreur', e?.message ?? "Impossible de mettre à jour la photo.");
     } finally {
       setAvatarLoading(false);
     }
@@ -231,10 +258,11 @@ export default function ProfileScreen() {
 }
 
 function GridItem({ item, onPress }: { item: Post; onPress: () => void }) {
+  const thumb = getThumbUrl(item);
   return (
     <TouchableOpacity style={styles.gridItem} activeOpacity={0.8} onPress={onPress}>
-      {item.thumbnail_url ? (
-        <Image source={{ uri: item.thumbnail_url }} style={styles.gridThumb} resizeMode="cover" />
+      {thumb ? (
+        <Image source={{ uri: thumb }} style={styles.gridThumb} resizeMode="cover" />
       ) : (
         <View style={[styles.gridThumb, styles.gridThumbFallback]}>
           <IcGrid size={24} color={COLORS.primaryLight} />

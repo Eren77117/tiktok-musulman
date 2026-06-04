@@ -336,7 +336,7 @@ export async function postRoutes(app: FastifyInstance) {
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       orderBy: { created_at: 'desc' },
       select: {
-        id: true, thumbnail_url: true, view_count: true,
+        id: true, thumbnail_url: true, video_url: true, view_count: true,
         like_count: true, comment_count: true, created_at: true,
       },
     });

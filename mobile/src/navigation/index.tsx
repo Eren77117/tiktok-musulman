@@ -36,6 +36,8 @@ import ThreadComposerScreen from '../screens/threads/ThreadComposerScreen';
 import SoundScreen from '../screens/sound/SoundScreen';
 import VideoPlayerScreen from '../screens/feed/VideoPlayerScreen';
 import ThreadDetailScreen from '../screens/threads/ThreadDetailScreen';
+import GoLiveScreen from '../screens/live/GoLiveScreen';
+import LiveViewerScreen from '../screens/live/LiveViewerScreen';
 
 export type RootStackParamList = {
   Auth: undefined;
@@ -50,6 +52,8 @@ export type RootStackParamList = {
   Sound: { soundId: string; title: string; artist?: string | null };
   VideoPlayer: { postId: string };
   ThreadDetail: { threadId: string };
+  GoLive: undefined;
+  LiveViewer: { sessionId: string; broadcasterId: string };
 };
 
 export type AuthStackParamList = {
@@ -116,6 +120,16 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
               <View style={styles.sheetOptionText}>
                 <Text style={[styles.sheetOptionTitle, { color: theme.text }]}>Nouveau fil</Text>
                 <Text style={[styles.sheetOptionSub, { color: theme.textMuted }]}>Texte, image ou vidéo courte</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.sheetOption, { backgroundColor: theme.bg }]} activeOpacity={0.8}
+              onPress={() => { setShowCreateSheet(false); navigation.navigate('GoLive'); }}>
+              <View style={[styles.sheetOptionIcon, { backgroundColor: '#FEE2E2' }]}>
+                <Text style={{ fontSize: 22 }}>🔴</Text>
+              </View>
+              <View style={styles.sheetOptionText}>
+                <Text style={[styles.sheetOptionTitle, { color: theme.text }]}>Démarrer un live</Text>
+                <Text style={[styles.sheetOptionSub, { color: theme.textMuted }]}>Streaming en direct avec chat</Text>
               </View>
             </TouchableOpacity>
           </Pressable>
@@ -231,6 +245,10 @@ export function AppNavigator() {
               options={{ animation: 'slide_from_bottom' }} />
             <RootStack.Screen name="ThreadDetail" component={ThreadDetailScreen}
               options={{ animation: 'slide_from_right' }} />
+            <RootStack.Screen name="GoLive" component={GoLiveScreen}
+              options={{ animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
+            <RootStack.Screen name="LiveViewer" component={LiveViewerScreen}
+              options={{ animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
           </>
         ) : (
           <RootStack.Screen name="Auth" component={AuthNavigator} />
