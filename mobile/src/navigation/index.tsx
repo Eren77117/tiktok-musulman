@@ -35,6 +35,7 @@ import SettingsScreen from '../screens/settings/SettingsScreen';
 import ThreadComposerScreen from '../screens/threads/ThreadComposerScreen';
 import SoundScreen from '../screens/sound/SoundScreen';
 import VideoPlayerScreen from '../screens/feed/VideoPlayerScreen';
+import ThreadDetailScreen from '../screens/threads/ThreadDetailScreen';
 
 export type RootStackParamList = {
   Auth: undefined;
@@ -48,6 +49,7 @@ export type RootStackParamList = {
   ThreadComposer: undefined;
   Sound: { soundId: string; title: string; artist?: string | null };
   VideoPlayer: { postId: string };
+  ThreadDetail: { threadId: string };
 };
 
 export type AuthStackParamList = {
@@ -227,6 +229,8 @@ export function AppNavigator() {
               options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
             <RootStack.Screen name="VideoPlayer" component={VideoPlayerScreen}
               options={{ animation: 'slide_from_bottom' }} />
+            <RootStack.Screen name="ThreadDetail" component={ThreadDetailScreen}
+              options={{ animation: 'slide_from_right' }} />
           </>
         ) : (
           <RootStack.Screen name="Auth" component={AuthNavigator} />

@@ -10,46 +10,76 @@ const messageSchema = z.object({
 });
 
 export async function messageRoutes(app: FastifyInstance) {
-  // Gender cross-messaging rule enforced here
+  // ── Direct conversation (same gender = no restriction) ──────────────────────
+  app.post('/direct', { preHandler: authenticate }, async (req, reply) => {
+    const parsed = requestSchema.safeParse(req.body);
+    if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
+
+    const requesterId = req.currentUser!.id;
+    const { recipient_id } = parsed.data;
+    if (requesterId === recipient_id) return reply.status(400).send({ error: 'Cannot message yourself' });
+
+    const [requester, recipient] = await Promise.all([
+      prisma.user.findUnique({ where: { id: requesterId } }),
+      prisma.user.findUnique({ where: { id: recipient_id } }),
+    ]);
+    if (!requester || !recipient) return reply.status(404).send({ error: 'User not found' });
+
+    // Cross-gender: block (use request system)
+    if (requester.gender !== recipient.gender) {
+      return reply.status(403).send({ error: 'cross_gender', message: 'Messagerie entre hommes et femmes non mahrams non autorisée sur Nour.' });
+    }
+
+    // Same gender: find or create conversation directly (auto-accepted)
+    const existing = await prisma.conversationRequest.findFirst({
+      where: {
+        OR: [
+          { requester_id: requesterId, recipient_id },
+          { requester_id: recipient_id, recipient_id: requesterId },
+        ],
+        status: 'ACCEPTED',
+      },
+      include: { conversation: true },
+    });
+
+    if (existing?.conversation) {
+      return reply.send({ conversation_id: existing.conversation.id });
+    }
+
+    const conversation = await prisma.$transaction(async (tx) => {
+      const req2 = await tx.conversationRequest.create({
+        data: { requester_id: requesterId, recipient_id, status: 'ACCEPTED' },
+      });
+      return tx.conversation.create({ data: { request_id: req2.id } });
+    });
+
+    return reply.status(201).send({ conversation_id: conversation.id });
+  });
+
+  // ── Request system (cross-gender) ───────────────────────────────────────────
   app.post('/request', { preHandler: authenticate }, async (req, reply) => {
     const parsed = requestSchema.safeParse(req.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
     const requesterId = req.currentUser!.id;
     const { recipient_id } = parsed.data;
+    if (requesterId === recipient_id) return reply.status(400).send({ error: 'Cannot message yourself' });
 
-    if (requesterId === recipient_id) {
-      return reply.status(400).send({ error: 'Cannot message yourself' });
-    }
-
-    const requester = await prisma.user.findUnique({ where: { id: requesterId } });
-    const recipient = await prisma.user.findUnique({ where: { id: recipient_id } });
+    const [requester, recipient] = await Promise.all([
+      prisma.user.findUnique({ where: { id: requesterId } }),
+      prisma.user.findUnique({ where: { id: recipient_id } }),
+    ]);
     if (!requester || !recipient) return reply.status(404).send({ error: 'User not found' });
 
-    // Enforce gender messaging rule
-    if (requester.gender !== recipient.gender) {
-      return reply.status(403).send({
-        error: 'Cross-gender messaging requires the other party to send a request first',
-      });
+    // Same gender → use /direct instead
+    if (requester.gender === recipient.gender) {
+      return reply.status(400).send({ error: 'Use /messages/direct for same-gender messaging' });
     }
 
     const existing = await prisma.conversationRequest.findUnique({
-      where: {
-        requester_id_recipient_id: { requester_id: requesterId, recipient_id },
-      },
+      where: { requester_id_recipient_id: { requester_id: requesterId, recipient_id } },
     });
     if (existing) return reply.status(409).send({ error: 'Request already exists', request: existing });
-
-    // Check if reverse request exists and is accepted (cross-gender pre-approval path)
-    const reverseRequest = await prisma.conversationRequest.findUnique({
-      where: {
-        requester_id_recipient_id: { requester_id: recipient_id, recipient_id: requesterId },
-      },
-    });
-
-    if (requester.gender !== recipient.gender && !reverseRequest) {
-      return reply.status(403).send({ error: 'Cross-gender messaging not allowed' });
-    }
 
     const request = await prisma.conversationRequest.create({
       data: { requester_id: requesterId, recipient_id },
@@ -59,8 +89,8 @@ export async function messageRoutes(app: FastifyInstance) {
       data: {
         user_id: recipient_id,
         type: 'MESSAGE_REQUEST',
-        title: 'Message request',
-        body: `${requester.display_name} wants to message you`,
+        title: 'Demande de contact',
+        body: `${requester.display_name} souhaite vous envoyer un message`,
         data: { request_id: request.id, requester_id: requesterId },
       },
     });

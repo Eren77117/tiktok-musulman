@@ -167,9 +167,8 @@ export default function FeedScreen() {
           loading={loadingThreads}
           onLoadMore={() => hasNextThreads && !fetchingThreads && fetchNextThreads()}
           onRefresh={refetchThreads}
-          onUserPress={(userId, username) =>
-            nav.navigate('UserProfile', { userId, username })
-          }
+          onUserPress={(userId, username) => nav.navigate('UserProfile', { userId, username })}
+          onThreadPress={(id) => nav.navigate('ThreadDetail', { threadId: id })}
           insets={insets}
         />
       )}
@@ -196,13 +195,14 @@ function fmtTime(iso: string) {
 }
 
 function FilsFeed({
-  threads, loading, onLoadMore, onRefresh, onUserPress, insets,
+  threads, loading, onLoadMore, onRefresh, onUserPress, onThreadPress, insets,
 }: {
   threads: ThreadItem[];
   loading: boolean;
   onLoadMore: () => void;
   onRefresh: () => void;
   onUserPress: (id: string, username: string) => void;
+  onThreadPress: (id: string) => void;
   insets: { top: number; bottom: number };
 }) {
   const qc = useQueryClient();
@@ -288,7 +288,7 @@ function FilsFeed({
         onEndReached={onLoadMore}
         onEndReachedThreshold={0.4}
         renderItem={({ item: t }) => (
-          <ThreadCard item={t} onUserPress={() => onUserPress(t.user.id, t.user.username)} theme={theme} />
+          <ThreadCard item={t} onUserPress={() => onUserPress(t.user.id, t.user.username)} onPress={() => onThreadPress(t.id)} theme={theme} />
         )}
         ListEmptyComponent={
           !loading ? (
@@ -303,7 +303,7 @@ function FilsFeed({
   );
 }
 
-function ThreadCard({ item, onUserPress, theme }: { item: ThreadItem; onUserPress: () => void; theme: any }) {
+function ThreadCard({ item, onUserPress, onPress, theme }: { item: ThreadItem; onUserPress: () => void; onPress: () => void; theme: any }) {
   const [liked, setLiked] = useState(item.is_liked);
   const [likeCount, setLikeCount] = useState(item.like_count);
 
@@ -337,7 +337,9 @@ function ThreadCard({ item, onUserPress, theme }: { item: ThreadItem; onUserPres
           </TouchableOpacity>
           <Text style={{ fontSize: FONT.size.xs, color: theme.textSubtle }}>{fmtTime(item.created_at)}</Text>
         </View>
-        <Text style={{ fontSize: FONT.size.base, color: theme.text, lineHeight: 22 }}>{item.content}</Text>
+        <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
+          <Text style={{ fontSize: FONT.size.base, color: theme.text, lineHeight: 22 }}>{item.content}</Text>
+        </TouchableOpacity>
         <View style={{ flexDirection: 'row', gap: SPACING.md, marginTop: 8 }}>
           <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={() => likeMutation.mutate()} activeOpacity={0.7}>
             {liked ? <IcHeartFill size={18} color="#FF3B5C" /> : <IcHeart size={18} color={theme.textMuted} />}

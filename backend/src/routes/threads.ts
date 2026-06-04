@@ -92,6 +92,48 @@ export async function threadRoutes(app: FastifyInstance) {
     });
   });
 
+  // GET /threads/:id — single thread
+  app.get('/:id', { preHandler: authenticate }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const userId = req.currentUser!.id;
+    const thread = await prisma.post.findUnique({
+      where: { id },
+      include: {
+        user: { select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true } },
+        _count: { select: { likes: true, comments: true } },
+      },
+    });
+    if (!thread) return reply.status(404).send({ error: 'Not found' });
+    const isLiked = await prisma.like.findUnique({ where: { user_id_post_id: { user_id: userId, post_id: id } } });
+    return reply.send({
+      id: thread.id, content: thread.caption ?? '',
+      like_count: thread.like_count, reply_count: thread._count.comments,
+      is_liked: !!isLiked, created_at: thread.created_at, user: thread.user,
+    });
+  });
+
+  // GET /threads/:id/replies
+  app.get('/:id/replies', { preHandler: authenticate }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const userId = req.currentUser!.id;
+    const replies = await prisma.post.findMany({
+      where: { reply_to_id: id, status: 'ACTIVE' },
+      orderBy: { created_at: 'asc' },
+      take: 50,
+      include: {
+        user: { select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true } },
+      },
+    });
+    const likedIds = await prisma.like.findMany({ where: { user_id: userId, post_id: { in: replies.map(r => r.id) } }, select: { post_id: true } });
+    const likedSet = new Set(likedIds.map(l => l.post_id));
+    return reply.send({
+      items: replies.map(r => ({
+        id: r.id, content: r.caption ?? '', like_count: r.like_count,
+        reply_count: 0, is_liked: likedSet.has(r.id), created_at: r.created_at, user: r.user,
+      })),
+    });
+  });
+
   // POST /threads/:id/like
   app.post('/:id/like', { preHandler: authenticate }, async (req, reply) => {
     const { id } = req.params as { id: string };

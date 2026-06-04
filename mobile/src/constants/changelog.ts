@@ -6,6 +6,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.4.0',
+    date: '2026-06-04 · 02h00',
+    changes: [
+      'Thumbnail automatique : première image de la vidéo extraite à l\'upload',
+      'Création de fils corrigée (POST /threads erreur 404 résolue)',
+      'Swipe droite→gauche sur vidéo → profil utilisateur avec animation',
+      'Profil utilisateur : bouton options (signaler, bloquer, masquer du feed)',
+      'Avatar sauvegardé correctement sur le serveur (bug schema corrigé)',
+      'Avatar propagé partout : feed, fils, messages, profil',
+      'Commentaires : bottom sheet draggable ½ écran, vidéo continue derrière',
+      'VideoPlayerScreen : ouvrir une vidéo en plein écran depuis le profil',
+      'Notifications : bell avec badge dans Messages, historique cliquable',
+      'Stats profil : recalculées en temps réel depuis la DB',
+      'Vidéos se mettent en pause quand on quitte l\'onglet',
+    ],
+  },
+  {
     version: '1.3.0',
     date: '2026-06-04 · 01h18',
     changes: [

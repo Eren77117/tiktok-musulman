@@ -110,15 +110,25 @@ export default function UserProfileScreen({ route, navigation }: Props) {
     }
   };
 
-  const handleMessage = () => {
+  const handleMessage = async () => {
     if (!user || !profile) return;
     if (user.gender !== profile.gender) {
-      Alert.alert('Messagerie restreinte',
-        'Sur Nour, la messagerie entre hommes et femmes non mahrams n\'est pas autorisée.',
-        [{ text: 'Compris' }]);
+      Alert.alert(
+        'Messagerie restreinte',
+        'Sur Nour, la messagerie directe entre hommes et femmes non mahrams n\'est pas autorisée.',
+        [{ text: 'Compris' }],
+      );
       return;
     }
-    navigation.navigate('Messages');
+    try {
+      const { data } = await api.post('/messages/direct', { recipient_id: profile.id });
+      navigation.navigate('Conversation', {
+        conversationId: data.conversation_id,
+        otherUser: { id: profile.id, display_name: profile.display_name },
+      });
+    } catch (e: any) {
+      Alert.alert('Erreur', e?.response?.data?.message ?? 'Impossible d\'ouvrir la conversation.');
+    }
   };
 
   if (isLoading) {

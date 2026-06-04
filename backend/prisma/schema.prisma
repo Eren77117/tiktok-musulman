@@ -84,6 +84,10 @@ model User {
   follows_received  Follow[]          @relation("following")
   favorites         Favorite[]
   post_views        PostView[]
+  blocked_users     BlockedUser[] @relation("blocker")
+  blocked_by        BlockedUser[] @relation("blocked")
+  hidden_users      HiddenUser[]  @relation("hider")
+  hidden_by_users   HiddenUser[]  @relation("hidden_by")
   notifications     Notification[]
   sent_requests     ConversationRequest[] @relation("requester")
   received_requests ConversationRequest[] @relation("recipient")
@@ -133,6 +137,9 @@ model Post {
   sound     Sound?     @relation(fields: [sound_id], references: [id])
   comments  Comment[]
   likes     Like[]
+  reply_to_id   String?
+  reply_to      Post?    @relation("thread_replies", fields: [reply_to_id], references: [id])
+  replies       Post[]   @relation("thread_replies")
   favorites   Favorite[]
   reports     Report[]
   post_views  PostView[]
@@ -256,6 +263,32 @@ model Follow {
   @@unique([follower_id, following_id])
   @@index([follower_id])
   @@index([following_id])
+}
+
+model BlockedUser {
+  id         String   @id @default(uuid())
+  blocker_id String
+  blocked_id String
+  created_at DateTime @default(now())
+
+  blocker User @relation("blocker", fields: [blocker_id], references: [id], onDelete: Cascade)
+  blocked User @relation("blocked", fields: [blocked_id], references: [id], onDelete: Cascade)
+
+  @@unique([blocker_id, blocked_id])
+  @@index([blocker_id])
+}
+
+model HiddenUser {
+  id         String   @id @default(uuid())
+  user_id    String
+  hidden_id  String
+  created_at DateTime @default(now())
+
+  user   User @relation("hider", fields: [user_id], references: [id], onDelete: Cascade)
+  hidden User @relation("hidden_by", fields: [hidden_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, hidden_id])
+  @@index([user_id])
 }
 
 model Favorite {

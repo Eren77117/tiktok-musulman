@@ -152,6 +152,50 @@ export async function userRoutes(app: FastifyInstance) {
     });
   });
 
+  // ── BLOCK / UNBLOCK ─────────────────────────────────────────────────────────
+  app.post('/:id/block', { preHandler: authenticate }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const blockerId = req.currentUser!.id;
+    if (id === blockerId) return reply.status(400).send({ error: 'Cannot block yourself' });
+
+    const existing = await prisma.blockedUser.findUnique({
+      where: { blocker_id_blocked_id: { blocker_id: blockerId, blocked_id: id } },
+    });
+    if (existing) {
+      await prisma.blockedUser.delete({ where: { blocker_id_blocked_id: { blocker_id: blockerId, blocked_id: id } } });
+      return reply.send({ blocked: false });
+    }
+    await prisma.blockedUser.create({ data: { blocker_id: blockerId, blocked_id: id } });
+    return reply.send({ blocked: true });
+  });
+
+  // ── HIDE FROM FEED ───────────────────────────────────────────────────────────
+  app.post('/:id/hide', { preHandler: authenticate }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const userId = req.currentUser!.id;
+    await prisma.hiddenUser.upsert({
+      where: { user_id_hidden_id: { user_id: userId, hidden_id: id } },
+      create: { user_id: userId, hidden_id: id },
+      update: {},
+    });
+    return reply.send({ hidden: true });
+  });
+
+  // ── REPORTS ──────────────────────────────────────────────────────────────────
+  app.post('/reports', { preHandler: authenticate }, async (req, reply) => {
+    const { target_type, target_id, reason } = req.body as { target_type: string; target_id: string; reason: string };
+    if (!target_type || !target_id || !reason) return reply.status(400).send({ error: 'Champs manquants' });
+
+    await prisma.report.create({
+      data: {
+        reporter_id: req.currentUser!.id,
+        [target_type === 'user' ? 'reported_user_id' : 'post_id']: target_id,
+        reason,
+      },
+    }).catch(() => {});
+    return reply.send({ success: true });
+  });
+
   app.delete('/me/account', { preHandler: authenticate }, async (req, reply) => {
     await prisma.user.delete({ where: { id: req.currentUser!.id } });
     await prisma.auditLog.create({
