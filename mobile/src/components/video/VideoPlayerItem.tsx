@@ -335,6 +335,8 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
     if (zone === 'left' || zone === 'right') {
       setRate(2);
       showSpeedIndicator();
+      // Force ExoPlayer to apply rate change immediately (Android workaround)
+      videoRef.current?.seek(seekTime > 0 ? seekTime : 0);
     } else {
       pausedBeforeLongRef.current = paused;
       setPaused(true);

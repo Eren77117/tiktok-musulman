@@ -38,9 +38,9 @@
 - [x] Fix avatar propagation — loadMe() après upload
 - [x] Fix thumbnails vidéo — Cloudinary fallback always-on
 - [x] Fix message même genre — ConversationRequest unique constraint crash
-- [ ] Fix LiveViewerScreen — chat ne s'affiche pas en temps réel (WebSocket room)
-- [ ] Fix GoLiveScreen — afficher les messages viewers en live
-- [ ] Fix vitesse 2x — certains players ne supportent pas `rate` prop
+- [x] Fix LiveViewerScreen — chat ne s'affiche pas en temps réel (WebSocket room)
+- [x] Fix GoLiveScreen — afficher les messages viewers en live
+- [x] Fix vitesse 2x — certains players ne supportent pas `rate` prop
 
 ---
 

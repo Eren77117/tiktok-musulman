@@ -69,13 +69,21 @@ export default function LiveViewerScreen({ route, navigation }: Props) {
       const socket = io(SOCKET_URL, { auth: { token: tokens.access }, transports: ['websocket'] });
       socketRef.current = socket;
 
-      socket.on('connect', () => {
+      const joinRoom = () => {
         socket.emit('live:join', sessionId);
         socket.emit('live:viewer:join', { sessionId, broadcasterId });
+        // Merge history with any real-time messages already received (avoids overwrite race)
+        api.get(`/live/${sessionId}/messages`).then(r => {
+          setMessages(prev => {
+            const ids = new Set((r.data.items as ChatMsg[]).map(m => m.id));
+            const realtime = prev.filter(m => m.id && !ids.has(m.id));
+            return [...(r.data.items as ChatMsg[]), ...realtime];
+          });
+        }).catch(() => {});
+      };
 
-        // Load recent messages
-        api.get(`/live/${sessionId}/messages`).then(r => setMessages(r.data.items)).catch(() => {});
-      });
+      socket.on('connect', joinRoom);
+      socket.on('reconnect', joinRoom);
 
       socket.on('live:ended', () => setLiveEnded(true));
 

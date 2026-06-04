@@ -84,9 +84,11 @@ export default function GoLiveScreen({ navigation }: Props) {
     socketRef.current = socket;
     sessionRef.current = sId;
 
-    socket.on('connect', () => {
-      socket.emit('live:join', sId);
-    });
+    const joinRoom = () => socket.emit('live:join', sId);
+    socket.on('connect', joinRoom);
+    socket.on('reconnect', joinRoom);
+    // Join immediately if already connected
+    if (socket.connected) joinRoom();
 
     socket.on('connect_error', (err: any) => {
       console.warn('[GoLive] Socket error:', err.message);
@@ -275,7 +277,7 @@ export default function GoLiveScreen({ navigation }: Props) {
       {/* Chat */}
       <View style={[styles.chatArea, { paddingBottom: insets.bottom + 70 }]}>
         {messages.slice(-8).map((m, i) => (
-          <View key={i} style={styles.chatMsg}>
+          <View key={m.id ?? `${m.timestamp}-${i}`} style={styles.chatMsg}>
             <Text style={styles.chatUser}>{m.user.display_name} </Text>
             <Text style={styles.chatText}>{m.text}</Text>
           </View>
