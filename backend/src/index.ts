@@ -44,6 +44,7 @@ const app = Fastify({
     ? { transport: { target: 'pino-pretty' } }
     : true,
   ignoreTrailingSlash: true,
+  bodyLimit: 200 * 1024 * 1024, // 200MB — video uploads
 });
 
 async function bootstrap() {

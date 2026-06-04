@@ -208,6 +208,13 @@ function CommentRow({
 }) {
   const [liked, setLiked] = useState(c.is_liked ?? false);
   const [count, setCount] = useState(c.like_count);
+  const [showReplies, setShowReplies] = useState(false);
+  const qc = useQueryClient();
+  const { data: repliesData, isLoading: repliesLoading } = useQuery<{ items: Comment[] }>({
+    queryKey: ['comment-replies', c.id],
+    queryFn: () => api.get(`/comments/${c.id}/replies`).then(r => r.data),
+    enabled: showReplies,
+  });
   const isOwn = currentUserId === c.user.id;
 
   const handleLike = () => {
@@ -261,11 +268,36 @@ function CommentRow({
         <View style={styles.commentMeta}>
           <Text style={[styles.commentTime, { color: theme.textSubtle }]}>{fmtTime(c.created_at)}</Text>
           {c.reply_count > 0 && (
-            <Text style={[styles.commentTime, { color: theme.textMuted }]}>
-              {c.reply_count} réponse{c.reply_count > 1 ? 's' : ''}
-            </Text>
+            <TouchableOpacity onPress={() => setShowReplies(v => !v)}>
+              <Text style={[styles.commentTime, { color: COLORS.primary }]}>
+                {showReplies ? 'Masquer' : `Voir ${c.reply_count} réponse${c.reply_count > 1 ? 's' : ''}`}
+              </Text>
+            </TouchableOpacity>
           )}
         </View>
+        {/* Replies inline */}
+        {showReplies && (
+          <View style={styles.repliesWrap}>
+            {repliesLoading
+              ? <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: 6 }} />
+              : repliesData?.items.map(r => (
+                  <View key={r.id} style={styles.replyItem}>
+                    {r.user.avatar_url
+                      ? <Image source={{ uri: r.user.avatar_url }} style={styles.replyAvatar} />
+                      : <View style={[styles.replyAvatar, styles.avatarFallback, { backgroundColor: theme.primaryBg }]}>
+                          <Text style={[styles.avatarInitial, { fontSize: 10 }]}>{r.user.display_name[0]?.toUpperCase()}</Text>
+                        </View>
+                    }
+                    <View style={{ flex: 1, gap: 1 }}>
+                      <Text style={[styles.commentUser, { color: COLORS.primary, fontSize: 11 }]}>@{r.user.username}</Text>
+                      <Text style={[styles.commentText, { color: theme.text, fontSize: FONT.size.xs }]}>{r.content}</Text>
+                      <Text style={[styles.commentTime, { color: theme.textSubtle }]}>{fmtTime(r.created_at)}</Text>
+                    </View>
+                  </View>
+                ))
+            }
+          </View>
+        )}
       </View>
       <View style={styles.commentActions}>
         <TouchableOpacity style={styles.likeBtn} onPress={handleLike} activeOpacity={0.7}>
@@ -313,6 +345,10 @@ const styles = StyleSheet.create({
   commentActions: { alignItems: 'center', gap: 6 },
   likeBtn: { alignItems: 'center', gap: 2, paddingLeft: 4 },
   likeCount: { fontSize: 10 },
+
+  repliesWrap: { marginTop: 8, gap: 8, paddingLeft: 4 },
+  replyItem: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+  replyAvatar: { width: 26, height: 26, borderRadius: 13, flexShrink: 0 },
 
   inputRow: {
     flexDirection: 'column', padding: SPACING.sm,

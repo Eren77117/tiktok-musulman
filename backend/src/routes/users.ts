@@ -42,9 +42,9 @@ export async function userRoutes(app: FastifyInstance) {
       where: { username },
       select: {
         id: true, username: true, display_name: true, bio: true,
-        avatar_url: true, is_verified: true, follower_count: true,
-        following_count: true, post_count: true, like_count: true,
-        created_at: true,
+        avatar_url: true, is_verified: true, gender: true,
+        follower_count: true, following_count: true, post_count: true,
+        like_count: true, created_at: true,
       },
     });
     if (!user) return reply.status(404).send({ error: 'User not found' });

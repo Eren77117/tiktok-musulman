@@ -83,6 +83,30 @@ export async function commentRoutes(app: FastifyInstance) {
     return reply.status(201).send(comment);
   });
 
+  // GET replies for a comment
+  app.get('/:id/replies', { preHandler: authenticate }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const replies = await prisma.comment.findMany({
+      where: { parent_id: id },
+      orderBy: { created_at: 'asc' },
+      include: {
+        user: { select: { id: true, username: true, display_name: true, avatar_url: true } },
+        _count: { select: { likes: true } },
+      },
+    });
+    const likedIds = await prisma.like.findMany({
+      where: { user_id: req.currentUser!.id, comment_id: { in: replies.map(r => r.id) } },
+      select: { comment_id: true },
+    });
+    const likedSet = new Set(likedIds.map(l => l.comment_id));
+    return reply.send({
+      items: replies.map(r => ({
+        ...r, is_liked: likedSet.has(r.id),
+        like_count: r.like_count, reply_count: 0,
+      })),
+    });
+  });
+
   // Like / unlike a comment
   app.post('/:id/like', { preHandler: authenticate }, async (req, reply) => {
     const { id } = req.params as { id: string };

@@ -7,6 +7,7 @@ import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-quer
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { api } from '../../api/client';
 import { RootStackParamList } from '../../navigation';
 import { VideoPlayerItem, FeedPost } from '../../components/video/VideoPlayerItem';
@@ -47,6 +48,10 @@ export default function FeedScreen() {
   const [tab, setTab] = useState<FeedTab>('pourtoi');
   const [visibleId, setVisibleId] = useState<string | null>(null);
   const [commentsPostId, setCommentsPostId] = useState<string | null>(null);
+
+  // Height available for each video item (screen H minus tab bar)
+  const tabBarHeight = useBottomTabBarHeight();
+  const ITEM_H = H - tabBarHeight;
 
   // Pause all videos when leaving this screen
   const effectiveVisibleId = isFocused && (tab === 'pourtoi' || tab === 'suivis') ? visibleId : null;
@@ -206,17 +211,18 @@ export default function FeedScreen() {
               post={item}
               isVisible={effectiveVisibleId === item.id}
               onComment={() => setCommentsPostId(item.id)}
+              itemHeight={ITEM_H}
             />
           )}
           pagingEnabled
-          snapToInterval={H}
+          snapToInterval={ITEM_H}
           decelerationRate="fast"
           showsVerticalScrollIndicator={false}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig.current}
           onEndReached={() => hasNextSuivis && !fetchingSuivis && fetchNextSuivis()}
           onEndReachedThreshold={0.5}
-          getItemLayout={(_, i) => ({ length: H, offset: H * i, index: i })}
+          getItemLayout={(_, i) => ({ length: ITEM_H, offset: ITEM_H * i, index: i })}
           ListEmptyComponent={
             !loadingSuivis ? (
               <View style={styles.emptyWrap}>
@@ -250,11 +256,12 @@ export default function FeedScreen() {
                 post={item.data}
                 isVisible={effectiveVisibleId === item.data.id}
                 onComment={() => setCommentsPostId(item.data.id)}
+                itemHeight={ITEM_H}
               />
             );
           }}
           pagingEnabled
-          snapToInterval={H}
+          snapToInterval={ITEM_H}
           snapToAlignment="start"
           decelerationRate="fast"
           showsVerticalScrollIndicator={false}
@@ -262,7 +269,7 @@ export default function FeedScreen() {
           viewabilityConfig={viewabilityConfig.current}
           onEndReached={() => hasNextFeed && !fetchingFeed && fetchNextFeed()}
           onEndReachedThreshold={0.5}
-          getItemLayout={(_, index) => ({ length: H, offset: H * index, index })}
+          getItemLayout={(_, index) => ({ length: ITEM_H, offset: ITEM_H * index, index })}
           ListEmptyComponent={
             !loadingFeed ? (
               <View style={styles.emptyWrap}>

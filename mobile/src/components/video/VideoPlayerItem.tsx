@@ -41,6 +41,8 @@ interface Props {
   post: FeedPost;
   isVisible: boolean;
   onComment: () => void;
+  /** Height allocated for this item (screen H minus tab bar) */
+  itemHeight?: number;
 }
 
 function fmt(n: number) {
@@ -55,7 +57,8 @@ function fmtDuration(s: number) {
   return `${m}:${sec.toString().padStart(2, '0')}`;
 }
 
-export function VideoPlayerItem({ post, isVisible, onComment }: Props) {
+export function VideoPlayerItem({ post, isVisible, onComment, itemHeight }: Props) {
+  const ITEM_H = itemHeight ?? H;
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const videoRef = useRef<VideoRef>(null);
 
@@ -86,6 +89,34 @@ export function VideoPlayerItem({ post, isVisible, onComment }: Props) {
 
   // Speed indicator
   const speedAnim = useRef(new Animated.Value(0)).current;
+
+  // Seek state
+  const [seeking, setSeeking] = useState(false);
+  const [seekTime, setSeekTime] = useState(0);
+  const totalDurationRef = useRef(post.duration || 0);
+
+  const seekPanResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: (evt) => {
+      setSeeking(true);
+      const pct = Math.max(0, Math.min(1, evt.nativeEvent.locationX / W));
+      const time = pct * totalDurationRef.current;
+      setSeekTime(time);
+      setProgress(pct);
+      videoRef.current?.seek(time);
+    },
+    onPanResponderMove: (_, g) => {
+      const raw = g.moveX; // absolute X on screen
+      const pct = Math.max(0, Math.min(1, raw / W));
+      const time = pct * totalDurationRef.current;
+      setSeekTime(time);
+      setProgress(pct);
+      videoRef.current?.seek(time);
+    },
+    onPanResponderRelease: () => setSeeking(false),
+    onPanResponderTerminate: () => setSeeking(false),
+  })).current;
 
   // Horizontal swipe → profile
   const swipeX = useRef(new Animated.Value(0)).current;
@@ -269,10 +300,16 @@ export function VideoPlayerItem({ post, isVisible, onComment }: Props) {
           muted={muted}
           rate={rate}
           onBuffer={({ isBuffering }) => setBuffering(isBuffering)}
-          onLoad={() => setBuffering(false)}
+          onLoad={({ duration }) => {
+            setBuffering(false);
+            if (duration > 0) totalDurationRef.current = duration;
+          }}
           onError={() => { setBuffering(false); }}
           onProgress={({ currentTime, seekableDuration }) => {
-            if (seekableDuration > 0) setProgress(currentTime / seekableDuration);
+            if (!seeking && seekableDuration > 0) {
+              setProgress(currentTime / seekableDuration);
+              setSeekTime(currentTime);
+            }
           }}
           ignoreSilentSwitch="ignore"
           playInBackground={false}
@@ -341,15 +378,21 @@ export function VideoPlayerItem({ post, isVisible, onComment }: Props) {
         <IcHeartFill size={100} color="#FF3B5C" />
       </Animated.View>
 
-      {/* Progress bar — thin line at very bottom */}
-      <View style={styles.progressBg} pointerEvents="none">
-        <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
+      {/* Seekable progress bar — interactive, above tab bar */}
+      <View style={styles.seekBarHit} {...seekPanResponder.panHandlers}>
+        <View style={styles.progressBg}>
+          <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
+          {/* Thumb */}
+          <View style={[styles.progressThumb, { left: `${Math.round(progress * 100)}%` }]} />
+        </View>
       </View>
 
-      {/* Duration badge — top left */}
-      {post.duration > 0 && (
-        <View style={styles.durationBadge} pointerEvents="none">
-          <Text style={styles.durationText}>{fmtDuration(post.duration)}</Text>
+      {/* Time display while seeking */}
+      {seeking && (
+        <View style={styles.seekTimeBubble} pointerEvents="none">
+          <Text style={styles.seekTimeText}>
+            {fmtDuration(seekTime)} / {fmtDuration(totalDurationRef.current)}
+          </Text>
         </View>
       )}
 
@@ -445,7 +488,7 @@ function ActionBtn({
 
 const styles = StyleSheet.create({
   container: { width: W, height: H, backgroundColor: '#000', overflow: 'hidden' },
-  fallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#111' },
+  fallback: { backgroundColor: '#111' },
 
   // Gesture zones
   zonesRow: { flex: 1, flexDirection: 'row' },
@@ -521,16 +564,26 @@ const styles = StyleSheet.create({
   actionBtn: { alignItems: 'center', gap: 3 },
   actionCount: { fontSize: 12, fontWeight: FONT.weight.semibold, color: COLORS.white },
 
+  // Seek bar
+  seekBarHit: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    height: 28, justifyContent: 'flex-end', paddingBottom: 4,
+  },
   progressBg: {
-    position: 'absolute', bottom: 0, left: 0, right: 0, height: 2.5,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    height: 3, backgroundColor: 'rgba(255,255,255,0.25)',
+    marginHorizontal: 0, position: 'relative',
   },
-  progressFill: { height: '100%', backgroundColor: COLORS.primary },
-
-  durationBadge: {
-    position: 'absolute', top: 54, left: 14,
-    backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: RADIUS.full,
-    paddingHorizontal: 8, paddingVertical: 3,
+  progressFill: { position: 'absolute', top: 0, left: 0, height: '100%', backgroundColor: COLORS.primary },
+  progressThumb: {
+    position: 'absolute', top: -5, width: 12, height: 12,
+    borderRadius: 6, backgroundColor: COLORS.white,
+    marginLeft: -6, shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.4, shadowRadius: 2,
   },
-  durationText: { fontSize: 11, color: COLORS.white, fontWeight: FONT.weight.semibold },
+  seekTimeBubble: {
+    position: 'absolute', bottom: 36, alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.75)', borderRadius: 8,
+    paddingHorizontal: 12, paddingVertical: 5,
+  },
+  seekTimeText: { fontSize: 12, color: COLORS.white, fontWeight: FONT.weight.semibold },
 });
