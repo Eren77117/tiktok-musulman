@@ -13,7 +13,7 @@ import { VideoPlayerItem, FeedPost } from '../../components/video/VideoPlayerIte
 import { CommentsBottomSheet } from '../../components/video/CommentsBottomSheet';
 import { BookCard, BookItem } from '../../components/books/BookCard';
 import { COLORS, FONT } from '../../constants/theme';
-import { IcFilm, IcUsers } from '../../components/ui/Icons';
+import { IcFilm, IcUsers, IcSearch } from '../../components/ui/Icons';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 const { height: H } = Dimensions.get('window');
@@ -156,7 +156,12 @@ export default function FeedScreen() {
 
       {/* Header overlay */}
       <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
-        <View style={{ width: 40 }} />
+        {/* Live button — top LEFT */}
+        <TouchableOpacity style={styles.liveBtn} onPress={() => nav.navigate('LiveList')} activeOpacity={0.8}>
+          <View style={styles.liveDot} />
+          <IcFilm size={18} color={COLORS.white} />
+        </TouchableOpacity>
+
         <View style={styles.tabs}>
           <TouchableOpacity onPress={handlePourToiPress} style={styles.tabBtn} activeOpacity={0.8}>
             <Text style={[styles.tabText, tab === 'pourtoi' && styles.tabTextActive]}>Pour toi</Text>
@@ -167,14 +172,10 @@ export default function FeedScreen() {
             {tab === 'fils' && <View style={styles.tabUnderline} />}
           </TouchableOpacity>
         </View>
-        {/* Live button top right */}
-        <TouchableOpacity
-          style={styles.liveBtn}
-          onPress={() => nav.navigate('LiveList')}
-          activeOpacity={0.8}
-        >
-          <View style={styles.liveDot} />
-          <IcFilm size={18} color={COLORS.white} />
+
+        {/* Search icon — top right */}
+        <TouchableOpacity style={styles.searchBtn} onPress={() => nav.navigate('Explore' as any)} activeOpacity={0.8}>
+          <IcSearch size={22} color={COLORS.white} />
         </TouchableOpacity>
       </View>
 
@@ -491,6 +492,7 @@ const styles = StyleSheet.create({
     width: 7, height: 7, borderRadius: 4, backgroundColor: '#FF3B30',
     borderWidth: 1.5, borderColor: '#000',
   },
+  searchBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   emptyWrap: { height: H, alignItems: 'center', justifyContent: 'center' },
   emptyText: { color: COLORS.white, fontSize: FONT.size.base },
 });

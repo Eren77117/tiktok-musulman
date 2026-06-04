@@ -52,6 +52,9 @@ export default function GoLiveScreen({ navigation }: Props) {
   const sessionRef = useRef<string | null>(null);
 
   // ── Camera setup ────────────────────────────────────────────────────────────
+  // Use ref so socket callbacks always have fresh stream (avoids stale closure bug)
+  const localStreamRef = useRef<MediaStream | null>(null);
+
   useEffect(() => {
     let stream: MediaStream | null = null;
     (async () => {
@@ -61,11 +64,15 @@ export default function GoLiveScreen({ navigation }: Props) {
           audio: true,
         });
         setLocalStream(stream);
+        localStreamRef.current = stream;
       } catch {
         Alert.alert('Erreur', 'Impossible d\'accéder à la caméra. Vérifiez les permissions.');
       }
     })();
-    return () => { stream?.getTracks().forEach(t => t.stop()); };
+    return () => {
+      stream?.getTracks().forEach(t => t.stop());
+      localStreamRef.current = null;
+    };
   }, [cameraFront]);
 
   // ── Socket + WebRTC setup when live starts ──────────────────────────────────
@@ -78,46 +85,62 @@ export default function GoLiveScreen({ navigation }: Props) {
     sessionRef.current = sId;
 
     socket.on('connect', () => {
-      socket.emit('join:conversation', `live:${sId}`);
+      socket.emit('live:join', sId);
     });
 
-    // New viewer joined — send WebRTC offer
+    socket.on('connect_error', (err: any) => {
+      console.warn('[GoLive] Socket error:', err.message);
+    });
+
+    // New viewer joined — create WebRTC offer using ref (never stale)
     socket.on('live:viewer:joined', async ({ viewerId }: { viewerId: string }) => {
-      if (!localStream) return;
+      const stream = localStreamRef.current;
+      if (!stream) {
+        console.warn('[GoLive] localStream not ready for viewer', viewerId);
+        return;
+      }
       setViewers(prev => [...prev.filter(v => v.id !== viewerId), { id: viewerId, name: '' }]);
       setViewerCount(c => c + 1);
 
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
       peerRefs.current.set(viewerId, pc);
 
-      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+      stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
       (pc as any).onicecandidate = ({ candidate }: any) => {
         if (candidate) socket.emit('webrtc:ice', { sessionId: sId, targetId: viewerId, candidate });
       };
 
-      const offer = await pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: false });
-      await pc.setLocalDescription(offer);
-      socket.emit('webrtc:offer', { sessionId: sId, viewerId, sdp: offer });
+      try {
+        const offer = await pc.createOffer({});
+        await pc.setLocalDescription(offer);
+        socket.emit('webrtc:offer', { sessionId: sId, viewerId, sdp: offer });
+      } catch (err) {
+        console.warn('[GoLive] createOffer failed:', err);
+      }
     });
 
     // Viewer sent answer
     socket.on('webrtc:answer', async ({ viewerId, sdp }: any) => {
       const pc = peerRefs.current.get(viewerId);
-      if (pc) await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+      if (pc) {
+        try { await pc.setRemoteDescription(new RTCSessionDescription(sdp)); } catch {}
+      }
     });
 
     // ICE candidate from viewer
     socket.on('webrtc:ice', async ({ fromId, candidate }: any) => {
       const pc = peerRefs.current.get(fromId);
-      if (pc && candidate) await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      if (pc && candidate) {
+        try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
+      }
     });
 
     // Live chat
     socket.on('live:comment', (msg: ChatMsg) => {
       setMessages(prev => [...prev.slice(-99), msg]);
     });
-  }, [localStream]);
+  }, []);
 
   const startLive = async () => {
     if (!title.trim()) { Alert.alert('Titre requis', 'Donne un titre à ton live.'); return; }

@@ -76,7 +76,7 @@ const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
 
 const TAB_LABELS: Record<string, string> = {
-  Home: 'Accueil', Explore: 'Explorer', Create: '', Messages: 'Messages', Profile: 'Profil',
+  Home: 'Accueil', Explore: 'Explorer', Create: '', Messages: 'Boite', Profile: 'Profil',
 };
 
 function TabIcon({ name, focused, theme }: { name: string; focused: boolean; theme: any }) {

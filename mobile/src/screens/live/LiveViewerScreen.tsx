@@ -86,27 +86,36 @@ export default function LiveViewerScreen({ route, navigation }: Props) {
 
       // WebRTC: receive offer from broadcaster
       socket.on('webrtc:offer', async ({ sdp }: any) => {
-        pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-        pcRef.current = pc;
+        try {
+          pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+          pcRef.current = pc;
 
-        (pc as any).ontrack = (event: any) => {
-          const stream = event.streams?.[0];
-          if (stream) { setRemoteStream(stream); setConnected(true); }
-        };
+          // react-native-webrtc: use property callbacks (types don't expose addEventListener)
+          (pc as any).ontrack = (event: any) => {
+            const stream = event.streams?.[0];
+            if (stream) { setRemoteStream(stream); setConnected(true); }
+          };
 
-        (pc as any).onicecandidate = ({ candidate }: any) => {
-          if (candidate) socket.emit('webrtc:ice', { sessionId, targetId: broadcasterId, candidate });
-        };
+          (pc as any).onicecandidate = (event: any) => {
+            if (event.candidate) {
+              socket.emit('webrtc:ice', { sessionId, targetId: broadcasterId, candidate: event.candidate });
+            }
+          };
 
-        await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        socket.emit('webrtc:answer', { sessionId, broadcasterId, sdp: answer });
+          await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          socket.emit('webrtc:answer', { sessionId, broadcasterId, sdp: answer });
+        } catch (err) {
+          console.warn('[LiveViewer] webrtc:offer error:', err);
+        }
       });
 
       // ICE from broadcaster
       socket.on('webrtc:ice', async ({ candidate }: any) => {
-        if (pc && candidate) await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        if (pcRef.current && candidate) {
+          try { await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
+        }
       });
 
       // Viewer count updates

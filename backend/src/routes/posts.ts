@@ -307,13 +307,20 @@ export async function postRoutes(app: FastifyInstance) {
     const userId = req.currentUser!.id;
     const { cursor, limit = '12' } = req.query as { cursor?: string; limit?: string };
 
+    // Only real video posts (exclude threads: video_url != '')
     const likes = await prisma.like.findMany({
-      where: { user_id: userId, post_id: { not: null } },
+      where: {
+        user_id: userId,
+        post_id: { not: null },
+        post: { video_url: { not: '' }, status: 'ACTIVE' },
+      },
       take: parseInt(limit) + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       orderBy: { created_at: 'desc' },
       include: {
-        post: { select: { id: true, thumbnail_url: true, view_count: true, like_count: true } },
+        post: {
+          select: { id: true, thumbnail_url: true, video_url: true, view_count: true, like_count: true },
+        },
       },
     });
 
