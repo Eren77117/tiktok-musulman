@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, Image, TouchableOpacity,
   FlatList, ActivityIndicator, Alert, Dimensions, ActionSheetIOS, Platform,
+  Share, Linking,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -11,7 +12,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { useTheme } from '../../hooks/useTheme';
 import { api } from '../../api/client';
 import { COLORS, FONT, SPACING, RADIUS, SHADOW } from '../../constants/theme';
-import { IcBack, IcFollow, IcFollowing, IcMail, IcHeart, IcPlay, IcCheck, IcMore } from '../../components/ui/Icons';
+import { IcBack, IcFollow, IcFollowing, IcMail, IcHeart, IcPlay, IcCheck, IcMore, IcShare } from '../../components/ui/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
 
@@ -147,6 +148,14 @@ export default function UserProfileScreen({ route, navigation }: Props) {
     }
   };
 
+  const handleShare = () => {
+    if (!profile) return;
+    Share.share({
+      message: `Découvre @${profile.username} sur Nour !\nhttps://nour.app/u/${profile.username}`,
+      url: `https://nour.app/u/${profile.username}`,
+    });
+  };
+
   const handleLivePress = () => {
     if (!profile?.active_live_session_id) return;
     navigation.navigate('LiveViewer', { sessionId: profile.active_live_session_id, broadcasterId: profile.id });
@@ -172,12 +181,16 @@ export default function UserProfileScreen({ route, navigation }: Props) {
           <IcBack size={24} color={theme.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.text }]}>@{profile.username}</Text>
-        {!isOwnProfile && (
-          <TouchableOpacity onPress={handleOptions} style={styles.backBtn} activeOpacity={0.7}>
-            <IcMore size={22} color={theme.text} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <TouchableOpacity onPress={handleShare} style={styles.backBtn} activeOpacity={0.7}>
+            <IcShare size={20} color={theme.text} />
           </TouchableOpacity>
-        )}
-        {isOwnProfile && <View style={{ width: 40 }} />}
+          {!isOwnProfile && (
+            <TouchableOpacity onPress={handleOptions} style={styles.backBtn} activeOpacity={0.7}>
+              <IcMore size={22} color={theme.text} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <FlatList
@@ -215,10 +228,7 @@ export default function UserProfileScreen({ route, navigation }: Props) {
             </TouchableOpacity>
 
             <Text style={[styles.displayName, { color: theme.text }]}>{profile.display_name}</Text>
-            {profile.bio
-              ? <Text style={[styles.bio, { color: theme.textMuted }]}>{profile.bio}</Text>
-              : null
-            }
+            {profile.bio ? <BioText bio={profile.bio} theme={theme} /> : null}
 
             {/* Stats */}
             <View style={styles.statsRow}>
@@ -294,6 +304,32 @@ export default function UserProfileScreen({ route, navigation }: Props) {
         }
       />
     </View>
+  );
+}
+
+const URL_REGEX = /https?:\/\/[^\s]+/g;
+
+function BioText({ bio, theme }: { bio: string; theme: any }) {
+  const parts: { text: string; isLink: boolean }[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  const re = new RegExp(URL_REGEX.source, 'g');
+  while ((match = re.exec(bio)) !== null) {
+    if (match.index > lastIndex) parts.push({ text: bio.slice(lastIndex, match.index), isLink: false });
+    parts.push({ text: match[0], isLink: true });
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < bio.length) parts.push({ text: bio.slice(lastIndex), isLink: false });
+
+  return (
+    <Text style={[styles.bio, { color: theme.textMuted }]}>
+      {parts.map((p, i) =>
+        p.isLink
+          ? <Text key={i} style={{ color: COLORS.primary, textDecorationLine: 'underline' }}
+              onPress={() => Linking.openURL(p.text).catch(() => {})}>{p.text}</Text>
+          : <Text key={i}>{p.text}</Text>
+      )}
+    </Text>
   );
 }
 

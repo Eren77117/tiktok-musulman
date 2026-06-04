@@ -230,7 +230,7 @@ export function VideoPlayerItem({ post, isVisible, onComment, itemHeight }: Prop
         singleTapTimerRef.current = null;
         lastTapRef.current = 0;
         setPaused(p => { showPauseIndicator(); return !p; });
-      }, 300);
+      }, 200);
     }
   }, [triggerLike, showPauseIndicator]);
 
@@ -313,6 +313,12 @@ export function VideoPlayerItem({ post, isVisible, onComment, itemHeight }: Prop
               setProgress(currentTime / seekableDuration);
               setSeekTime(currentTime);
             }
+          }}
+          onEnd={() => {
+            // Auto-replay: seek back to start
+            videoRef.current?.seek(0);
+            setProgress(0);
+            setSeekTime(0);
           }}
           ignoreSilentSwitch="ignore"
           playInBackground={false}

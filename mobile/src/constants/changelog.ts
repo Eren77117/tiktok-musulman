@@ -6,6 +6,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.8.0',
+    date: '2026-06-04 · 09h30',
+    changes: [
+      'Notifications : 4 onglets (Tous / J\'aime / Commentaires / Abonnés)',
+      'Notifications : badges par onglet + navigation vers le contenu',
+      'Notifications : live -> ouvre directement le stream',
+      'Profil : bouton Partager (lien universel nour.app)',
+      'Bio : liens cliquables (http/https ouvrent le navigateur)',
+      'Video : single-tap pause plus rapide (200ms au lieu de 300ms)',
+      'Video : replay automatique en boucle (seek 0 a la fin)',
+      'Commentaires : "Voir plus" pour charger + de commentaires',
+    ],
+  },
+  {
     version: '1.7.0',
     date: '2026-06-04 · 08h00',
     changes: [

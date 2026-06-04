@@ -82,9 +82,10 @@ export function CommentsBottomSheet({ postId, onClose }: Props) {
     },
   })).current;
 
-  const { data, isLoading } = useQuery<{ items: Comment[] }>({
-    queryKey: ['comments', postId],
-    queryFn: () => api.get(`/comments/post/${postId}`).then(r => r.data),
+  const [limit, setLimit] = useState(20);
+  const { data, isLoading } = useQuery<{ items: Comment[]; next_cursor: string | null }>({
+    queryKey: ['comments', postId, limit],
+    queryFn: () => api.get(`/comments/post/${postId}`, { params: { limit } }).then(r => r.data),
     enabled: !!postId,
   });
 
@@ -156,6 +157,17 @@ export function CommentsBottomSheet({ postId, onClose }: Props) {
                 <View style={styles.empty}>
                   <Text style={[styles.emptyText, { color: theme.textMuted }]}>Soyez le premier à commenter</Text>
                 </View>
+              }
+              ListFooterComponent={
+                data?.next_cursor ? (
+                  <TouchableOpacity
+                    style={styles.loadMore}
+                    onPress={() => setLimit(l => l + 20)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.loadMoreText, { color: COLORS.primary }]}>Voir plus de commentaires</Text>
+                  </TouchableOpacity>
+                ) : null
               }
             />
           )}
@@ -332,6 +344,8 @@ const styles = StyleSheet.create({
   list: { padding: SPACING.md, gap: 14, paddingBottom: 10 },
   empty: { alignItems: 'center', paddingTop: 30 },
   emptyText: { fontSize: FONT.size.sm },
+  loadMore: { alignItems: 'center', paddingVertical: 14 },
+  loadMoreText: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold },
 
   comment: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
   avatar: { width: 34, height: 34, borderRadius: 17, flexShrink: 0 },
