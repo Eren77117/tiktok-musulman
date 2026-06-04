@@ -28,7 +28,20 @@ export async function commentRoutes(app: FastifyInstance) {
 
     const hasMore = comments.length > parseInt(limit);
     const items = hasMore ? comments.slice(0, -1) : comments;
-    return reply.send({ items, next_cursor: hasMore ? items[items.length - 1].id : null });
+
+    const likedIds = await prisma.like.findMany({
+      where: { user_id: req.currentUser!.id, comment_id: { in: items.map(c => c.id) } },
+      select: { comment_id: true },
+    });
+    const likedSet = new Set(likedIds.map(l => l.comment_id));
+
+    return reply.send({
+      items: items.map(c => ({
+        ...c, is_liked: likedSet.has(c.id),
+        like_count: c.like_count, reply_count: c._count.replies,
+      })),
+      next_cursor: hasMore ? items[items.length - 1].id : null,
+    });
   });
 
   app.post('/post/:postId', { preHandler: authenticate }, async (req, reply) => {
@@ -68,6 +81,27 @@ export async function commentRoutes(app: FastifyInstance) {
     }
 
     return reply.status(201).send(comment);
+  });
+
+  // Like / unlike a comment
+  app.post('/:id/like', { preHandler: authenticate }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const userId = req.currentUser!.id;
+    const existing = await prisma.like.findUnique({
+      where: { user_id_comment_id: { user_id: userId, comment_id: id } },
+    });
+    if (existing) {
+      await prisma.$transaction([
+        prisma.like.delete({ where: { user_id_comment_id: { user_id: userId, comment_id: id } } }),
+        prisma.comment.update({ where: { id }, data: { like_count: { decrement: 1 } } }),
+      ]);
+      return reply.send({ liked: false });
+    }
+    await prisma.$transaction([
+      prisma.like.create({ data: { user_id: userId, comment_id: id } }),
+      prisma.comment.update({ where: { id }, data: { like_count: { increment: 1 } } }),
+    ]);
+    return reply.send({ liked: true });
   });
 
   app.delete('/:id', { preHandler: authenticate }, async (req, reply) => {

@@ -2,13 +2,14 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity,
   Animated, PanResponder, Dimensions, KeyboardAvoidingView,
-  Platform, ActivityIndicator, Image, Modal,
+  Platform, ActivityIndicator, Image, Modal, Alert, ActionSheetIOS,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
+import { useAuthStore } from '../../stores/authStore';
 import { useTheme } from '../../hooks/useTheme';
 import { COLORS, FONT, SPACING, RADIUS } from '../../constants/theme';
-import { IcClose, IcSend, IcHeartFill, IcHeart } from '../ui/Icons';
+import { IcClose, IcSend, IcHeartFill, IcHeart, IcComment, IcMore } from '../ui/Icons';
 
 const { height: H } = Dimensions.get('window');
 const SHEET_HEIGHT = H * 0.55;
@@ -18,6 +19,7 @@ interface Comment {
   id: string;
   content: string;
   like_count: number;
+  reply_count: number;
   is_liked?: boolean;
   created_at: string;
   user: { id: string; username: string; display_name: string; avatar_url: string | null };
@@ -39,7 +41,9 @@ interface Props {
 export function CommentsBottomSheet({ postId, onClose }: Props) {
   const theme = useTheme();
   const qc = useQueryClient();
+  const { user } = useAuthStore();
   const [text, setText] = useState('');
+  const [replyTo, setReplyTo] = useState<{ id: string; username: string } | null>(null);
   const translateY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
   const lastY = useRef(0);
 
@@ -85,8 +89,15 @@ export function CommentsBottomSheet({ postId, onClose }: Props) {
   });
 
   const addMutation = useMutation({
-    mutationFn: (content: string) => api.post(`/comments/post/${postId}`, { content }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['comments', postId] }); setText(''); },
+    mutationFn: (content: string) => api.post(`/comments/post/${postId}`, {
+      content,
+      parent_id: replyTo?.id,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['comments', postId] });
+      setText('');
+      setReplyTo(null);
+    },
   });
 
   if (!postId) return null;
@@ -127,7 +138,20 @@ export function CommentsBottomSheet({ postId, onClose }: Props) {
               contentContainerStyle={styles.list}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
-              renderItem={({ item: c }) => <CommentRow comment={c} theme={theme} />}
+              renderItem={({ item: c }) => (
+                <CommentRow
+                  comment={c}
+                  theme={theme}
+                  currentUserId={user?.id}
+                  onReply={() => setReplyTo({ id: c.id, username: c.user.username })}
+                  onDelete={() => {
+                    api.delete(`/comments/${c.id}`).then(() => {
+                      qc.invalidateQueries({ queryKey: ['comments', postId] });
+                    }).catch(() => {});
+                  }}
+                  postId={postId!}
+                />
+              )}
               ListEmptyComponent={
                 <View style={styles.empty}>
                   <Text style={[styles.emptyText, { color: theme.textMuted }]}>Soyez le premier à commenter</Text>
@@ -138,25 +162,37 @@ export function CommentsBottomSheet({ postId, onClose }: Props) {
 
           {/* Input */}
           <View style={[styles.inputRow, { borderTopColor: theme.borderLight, backgroundColor: theme.surface }]}>
-            <TextInput
-              style={[styles.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
-              value={text}
-              onChangeText={setText}
-              placeholder="Ajouter un commentaire..."
-              placeholderTextColor={theme.textSubtle}
-              multiline
-              maxLength={500}
-            />
-            <TouchableOpacity
-              style={[styles.sendBtn, (!text.trim() || addMutation.isPending) && styles.sendBtnOff]}
-              onPress={() => text.trim() && addMutation.mutate(text.trim())}
-              disabled={!text.trim() || addMutation.isPending}
-            >
-              {addMutation.isPending
-                ? <ActivityIndicator size="small" color={COLORS.white} />
-                : <IcSend size={17} color={COLORS.white} />
-              }
-            </TouchableOpacity>
+            {replyTo && (
+              <View style={[styles.replyBanner, { backgroundColor: theme.inputBg }]}>
+                <Text style={[styles.replyBannerText, { color: theme.textMuted }]}>
+                  Répondre à <Text style={{ color: COLORS.primary }}>@{replyTo.username}</Text>
+                </Text>
+                <TouchableOpacity onPress={() => setReplyTo(null)}>
+                  <IcClose size={14} color={theme.textMuted} />
+                </TouchableOpacity>
+              </View>
+            )}
+            <View style={styles.inputInner}>
+              <TextInput
+                style={[styles.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
+                value={text}
+                onChangeText={setText}
+                placeholder={replyTo ? `Répondre à @${replyTo.username}...` : 'Ajouter un commentaire...'}
+                placeholderTextColor={theme.textSubtle}
+                multiline
+                maxLength={500}
+              />
+              <TouchableOpacity
+                style={[styles.sendBtn, (!text.trim() || addMutation.isPending) && styles.sendBtnOff]}
+                onPress={() => text.trim() && addMutation.mutate(text.trim())}
+                disabled={!text.trim() || addMutation.isPending}
+              >
+                {addMutation.isPending
+                  ? <ActivityIndicator size="small" color={COLORS.white} />
+                  : <IcSend size={17} color={COLORS.white} />
+                }
+              </TouchableOpacity>
+            </View>
           </View>
         </Animated.View>
       </KeyboardAvoidingView>
@@ -164,9 +200,52 @@ export function CommentsBottomSheet({ postId, onClose }: Props) {
   );
 }
 
-function CommentRow({ comment: c, theme }: { comment: Comment; theme: any }) {
+function CommentRow({
+  comment: c, theme, currentUserId, onReply, onDelete, postId,
+}: {
+  comment: Comment; theme: any; currentUserId?: string;
+  onReply: () => void; onDelete: () => void; postId: string;
+}) {
   const [liked, setLiked] = useState(c.is_liked ?? false);
   const [count, setCount] = useState(c.like_count);
+  const isOwn = currentUserId === c.user.id;
+
+  const handleLike = () => {
+    const wasLiked = liked;
+    setLiked(l => !l);
+    setCount(n => wasLiked ? n - 1 : n + 1);
+    api.post(`/comments/${c.id}/like`).catch(() => {
+      setLiked(wasLiked);
+      setCount(c.like_count);
+    });
+  };
+
+  const handleMore = () => {
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: isOwn ? ['Répondre', 'Supprimer', 'Annuler'] : ['Répondre', 'Annuler'],
+          cancelButtonIndex: isOwn ? 2 : 1,
+          destructiveButtonIndex: isOwn ? 1 : undefined,
+        },
+        (i) => {
+          if (i === 0) onReply();
+          if (isOwn && i === 1) {
+            Alert.alert('Supprimer', 'Supprimer ce commentaire ?', [
+              { text: 'Annuler', style: 'cancel' },
+              { text: 'Supprimer', style: 'destructive', onPress: onDelete },
+            ]);
+          }
+        },
+      );
+    } else {
+      Alert.alert('Commentaire', '', [
+        { text: 'Répondre', onPress: onReply },
+        ...(isOwn ? [{ text: 'Supprimer', style: 'destructive' as const, onPress: onDelete }] : []),
+        { text: 'Annuler', style: 'cancel' },
+      ]);
+    }
+  };
 
   return (
     <View style={styles.comment}>
@@ -179,19 +258,24 @@ function CommentRow({ comment: c, theme }: { comment: Comment; theme: any }) {
       <View style={styles.commentBody}>
         <Text style={[styles.commentUser, { color: COLORS.primary }]}>@{c.user.username}</Text>
         <Text style={[styles.commentText, { color: theme.text }]}>{c.content}</Text>
-        <Text style={[styles.commentTime, { color: theme.textSubtle }]}>{fmtTime(c.created_at)}</Text>
+        <View style={styles.commentMeta}>
+          <Text style={[styles.commentTime, { color: theme.textSubtle }]}>{fmtTime(c.created_at)}</Text>
+          {c.reply_count > 0 && (
+            <Text style={[styles.commentTime, { color: theme.textMuted }]}>
+              {c.reply_count} réponse{c.reply_count > 1 ? 's' : ''}
+            </Text>
+          )}
+        </View>
       </View>
-      <TouchableOpacity
-        style={styles.likeBtn}
-        onPress={() => {
-          setLiked(l => !l);
-          setCount(n => liked ? n - 1 : n + 1);
-        }}
-        activeOpacity={0.7}
-      >
-        {liked ? <IcHeartFill size={16} color="#FF3B5C" /> : <IcHeart size={16} color={theme.textMuted} />}
-        {count > 0 && <Text style={[styles.likeCount, { color: liked ? '#FF3B5C' : theme.textMuted }]}>{count}</Text>}
-      </TouchableOpacity>
+      <View style={styles.commentActions}>
+        <TouchableOpacity style={styles.likeBtn} onPress={handleLike} activeOpacity={0.7}>
+          {liked ? <IcHeartFill size={16} color="#FF3B5C" /> : <IcHeart size={16} color={theme.textMuted} />}
+          {count > 0 && <Text style={[styles.likeCount, { color: liked ? '#FF3B5C' : theme.textMuted }]}>{count}</Text>}
+        </TouchableOpacity>
+        <TouchableOpacity onPress={handleMore} activeOpacity={0.7} style={{ padding: 4 }}>
+          <IcMore size={16} color={theme.textSubtle} />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -224,14 +308,22 @@ const styles = StyleSheet.create({
   commentBody: { flex: 1, gap: 2 },
   commentUser: { fontSize: FONT.size.xs, fontWeight: FONT.weight.semibold },
   commentText: { fontSize: FONT.size.sm, lineHeight: 20 },
+  commentMeta: { flexDirection: 'row', gap: 12, marginTop: 2 },
   commentTime: { fontSize: 11 },
+  commentActions: { alignItems: 'center', gap: 6 },
   likeBtn: { alignItems: 'center', gap: 2, paddingLeft: 4 },
   likeCount: { fontSize: 10 },
 
   inputRow: {
-    flexDirection: 'row', gap: 8, padding: SPACING.sm,
-    paddingHorizontal: SPACING.md, borderTopWidth: 1, alignItems: 'flex-end',
+    flexDirection: 'column', padding: SPACING.sm,
+    paddingHorizontal: SPACING.md, borderTopWidth: 1,
   },
+  inputInner: { flexDirection: 'row', gap: 8, alignItems: 'flex-end' },
+  replyBanner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, marginBottom: 8,
+  },
+  replyBannerText: { fontSize: FONT.size.xs },
   input: {
     flex: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 9,
     fontSize: FONT.size.sm, maxHeight: 100, borderWidth: 1,

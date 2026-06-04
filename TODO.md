@@ -22,14 +22,14 @@
 ## 🟠 PRIORITÉ HAUTE (semaine 1)
 
 ### 📱 Feed "Pour toi"
-- [ ] Onglet "Suivis" — feed uniquement des comptes suivis
+- [x] Onglet "Suivis" — feed uniquement des comptes suivis
 - [ ] Pull-to-refresh avec animation (spinner vert)
 - [ ] Indicateur de chargement en bas (skeleton cards)
 - [ ] Precaching des 2-3 vidéos suivantes (backgrounded)
 - [ ] Mémorisation de la position dans le feed (reprendre où on était)
 - [ ] Skip vidéo en swipant vers le haut plus rapidement (animation accélérée)
-- [ ] Indicateur de progression de la vidéo (barre fine en bas)
-- [ ] Durée de la vidéo affichée (badge en haut à droite)
+- [x] Indicateur de progression de la vidéo (barre verte en bas)
+- [x] Durée de la vidéo affichée (badge haut gauche)
 - [ ] Réduire le délai de single-tap pause (300ms → 200ms)
 
 ### 🎬 Lecteur vidéo
@@ -43,11 +43,11 @@
 
 ### 💬 Commentaires
 - [ ] Commentaires en temps réel (Socket.IO, pas de refresh)
-- [ ] Répondre à un commentaire (thread indentation)
-- [ ] Liker un commentaire (cœur à droite)
+- [x] Répondre à un commentaire (parent_id + banner @username)
+- [x] Liker un commentaire (API réelle + toggle)
 - [ ] Mentionner @utilisateur dans un commentaire
 - [ ] Épingler un commentaire (créateur seulement)
-- [ ] Supprimer son propre commentaire
+- [x] Supprimer son propre commentaire (ActionSheet + API)
 - [ ] Pagination des commentaires (load more)
 - [ ] Afficher les commentaires en live dans le player (overlay)
 
@@ -64,7 +64,7 @@
 ### 🔔 Notifications
 - [ ] Page notifications avec 4 onglets : Tous / J'aime / Commentaires / Abonnés
 - [ ] Notification groupée ("X et Y ont aimé ta vidéo")
-- [ ] Badge non-lus sur l'icône notification (dans le profil ou cloche)
+- [x] Badge non-lus sur l'onglet Boite (navigation tab bar)
 - [ ] Marquer tout comme lu
 - [ ] Push notifications APNs (APNS_KEY_ID, APNS_TEAM_ID en env)
 - [ ] Notification quand quelqu'un mentionne @vous dans un commentaire

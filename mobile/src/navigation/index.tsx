@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../api/client';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
   Modal, Pressable,
@@ -91,10 +93,20 @@ function TabIcon({ name, focused, theme }: { name: string; focused: boolean; the
   }
 }
 
+function useUnreadCount() {
+  const { data } = useQuery<{ count: number }>({
+    queryKey: ['notif-unread'],
+    queryFn: () => api.get('/notifications/unread-count').then(r => r.data).catch(() => ({ count: 0 })),
+    refetchInterval: 30_000,
+  });
+  return data?.count ?? 0;
+}
+
 function CustomTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const [showCreateSheet, setShowCreateSheet] = useState(false);
+  const unread = useUnreadCount();
 
   return (
     <>
@@ -162,9 +174,18 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
             );
           }
 
+          const showBadge = route.name === 'Messages' && unread > 0;
+
           return (
             <TouchableOpacity key={route.key} style={styles.tabItem} onPress={onPress} activeOpacity={0.7}>
-              <TabIcon name={route.name} focused={isFocused} theme={theme} />
+              <View style={{ position: 'relative' }}>
+                <TabIcon name={route.name} focused={isFocused} theme={theme} />
+                {showBadge && (
+                  <View style={styles.notifBadge}>
+                    <Text style={styles.notifBadgeText}>{unread > 99 ? '99+' : String(unread)}</Text>
+                  </View>
+                )}
+              </View>
               <Text style={[styles.tabLabel, { color: isFocused ? theme.tabActive : theme.tabInactive }, isFocused && styles.tabLabelActive]}>
                 {TAB_LABELS[route.name]}
               </Text>
@@ -277,6 +298,13 @@ const styles = StyleSheet.create({
     borderTopWidth: 0.5,
     paddingTop: 8, paddingHorizontal: SPACING.sm,
   },
+  notifBadge: {
+    position: 'absolute', top: -4, right: -6,
+    minWidth: 16, height: 16, borderRadius: 8,
+    backgroundColor: '#FF3B30', alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 3, borderWidth: 1.5, borderColor: COLORS.black,
+  },
+  notifBadgeText: { fontSize: 9, fontWeight: FONT.weight.bold, color: COLORS.white },
   tabItem: { flex: 1, alignItems: 'center', gap: 2, position: 'relative', paddingVertical: 4 },
   tabLabel: { fontSize: 10, fontWeight: FONT.weight.medium },
   tabLabelActive: { fontWeight: FONT.weight.semibold },

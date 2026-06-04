@@ -49,6 +49,12 @@ function fmt(n: number) {
   return String(n);
 }
 
+function fmtDuration(s: number) {
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${sec.toString().padStart(2, '0')}`;
+}
+
 export function VideoPlayerItem({ post, isVisible, onComment }: Props) {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const videoRef = useRef<VideoRef>(null);
@@ -62,6 +68,7 @@ export function VideoPlayerItem({ post, isVisible, onComment }: Props) {
   const [rate, setRate] = useState(1);
   const [buffering, setBuffering] = useState(true);
   const [captionExpanded, setCaptionExpanded] = useState(false);
+  const [progress, setProgress] = useState(0); // 0–1
 
   // Long-press zone tracking
   const longPressZoneRef = useRef<'left' | 'middle' | 'right' | null>(null);
@@ -264,6 +271,9 @@ export function VideoPlayerItem({ post, isVisible, onComment }: Props) {
           onBuffer={({ isBuffering }) => setBuffering(isBuffering)}
           onLoad={() => setBuffering(false)}
           onError={() => { setBuffering(false); }}
+          onProgress={({ currentTime, seekableDuration }) => {
+            if (seekableDuration > 0) setProgress(currentTime / seekableDuration);
+          }}
           ignoreSilentSwitch="ignore"
           playInBackground={false}
           playWhenInactive={false}
@@ -330,6 +340,18 @@ export function VideoPlayerItem({ post, isVisible, onComment }: Props) {
       >
         <IcHeartFill size={100} color="#FF3B5C" />
       </Animated.View>
+
+      {/* Progress bar — thin line at very bottom */}
+      <View style={styles.progressBg} pointerEvents="none">
+        <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
+      </View>
+
+      {/* Duration badge — top left */}
+      {post.duration > 0 && (
+        <View style={styles.durationBadge} pointerEvents="none">
+          <Text style={styles.durationText}>{fmtDuration(post.duration)}</Text>
+        </View>
+      )}
 
       {/* Mute button */}
       <TouchableOpacity style={styles.muteBtn} onPress={() => setMuted(m => !m)} activeOpacity={0.8}>
@@ -498,4 +520,17 @@ const styles = StyleSheet.create({
   followDotText: { color: COLORS.white, fontSize: 13, fontWeight: FONT.weight.bold, lineHeight: 18 },
   actionBtn: { alignItems: 'center', gap: 3 },
   actionCount: { fontSize: 12, fontWeight: FONT.weight.semibold, color: COLORS.white },
+
+  progressBg: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, height: 2.5,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  progressFill: { height: '100%', backgroundColor: COLORS.primary },
+
+  durationBadge: {
+    position: 'absolute', top: 54, left: 14,
+    backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: RADIUS.full,
+    paddingHorizontal: 8, paddingVertical: 3,
+  },
+  durationText: { fontSize: 11, color: COLORS.white, fontWeight: FONT.weight.semibold },
 });

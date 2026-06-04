@@ -18,7 +18,7 @@ import { IcFilm, IcUsers, IcSearch } from '../../components/ui/Icons';
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 const { height: H } = Dimensions.get('window');
 
-type FeedTab = 'pourtoi' | 'fils';
+type FeedTab = 'suivis' | 'pourtoi' | 'fils';
 
 interface LiveSession {
   id: string;
@@ -49,7 +49,7 @@ export default function FeedScreen() {
   const [commentsPostId, setCommentsPostId] = useState<string | null>(null);
 
   // Pause all videos when leaving this screen
-  const effectiveVisibleId = isFocused && tab === 'pourtoi' ? visibleId : null;
+  const effectiveVisibleId = isFocused && (tab === 'pourtoi' || tab === 'suivis') ? visibleId : null;
   const seenIds = useRef<string[]>([]);
 
   // ── Pour Toi (video feed) ────────────────────────────────────────────────────
@@ -65,6 +65,23 @@ export default function FeedScreen() {
       }).then(r => r.data as { items: FeedPost[]; next_cursor: string | null }),
     initialPageParam: null as string | null,
     getNextPageParam: last => last.next_cursor,
+  });
+
+  // ── Suivis (following feed) ──────────────────────────────────────────────────
+  const {
+    data: suivisData, fetchNextPage: fetchNextSuivis,
+    hasNextPage: hasNextSuivis, isFetchingNextPage: fetchingSuivis,
+    isLoading: loadingSuivis, refetch: refetchSuivis,
+  } = useInfiniteQuery({
+    queryKey: ['following-feed'],
+    queryFn: ({ pageParam }) =>
+      api.get('/posts/following', {
+        params: { cursor: pageParam, limit: 8 },
+      }).then(r => r.data as { items: FeedPost[]; next_cursor: string | null })
+        .catch(() => ({ items: [], next_cursor: null })),
+    initialPageParam: null as string | null,
+    getNextPageParam: last => last.next_cursor,
+    enabled: tab === 'suivis',
   });
 
   // ── Fils (threads) ───────────────────────────────────────────────────────────
@@ -142,12 +159,8 @@ export default function FeedScreen() {
 
   // Tap "Pour toi" again while already on it → refresh feed
   const handlePourToiPress = useCallback(() => {
-    if (tab === 'pourtoi') {
-      seenIds.current = [];
-      refetchFeed();
-    } else {
-      setTab('pourtoi');
-    }
+    if (tab === 'pourtoi') { seenIds.current = []; refetchFeed(); }
+    else setTab('pourtoi');
   }, [tab, refetchFeed]);
 
   return (
@@ -163,6 +176,10 @@ export default function FeedScreen() {
         </TouchableOpacity>
 
         <View style={styles.tabs}>
+          <TouchableOpacity onPress={() => setTab('suivis')} style={styles.tabBtn} activeOpacity={0.8}>
+            <Text style={[styles.tabText, tab === 'suivis' && styles.tabTextActive]}>Suivis</Text>
+            {tab === 'suivis' && <View style={styles.tabUnderline} />}
+          </TouchableOpacity>
           <TouchableOpacity onPress={handlePourToiPress} style={styles.tabBtn} activeOpacity={0.8}>
             <Text style={[styles.tabText, tab === 'pourtoi' && styles.tabTextActive]}>Pour toi</Text>
             {tab === 'pourtoi' && <View style={styles.tabUnderline} />}
@@ -178,6 +195,39 @@ export default function FeedScreen() {
           <IcSearch size={22} color={COLORS.white} />
         </TouchableOpacity>
       </View>
+
+      {/* ── SUIVIS — feed comptes suivis ── */}
+      {tab === 'suivis' && (
+        <FlatList<FeedPost>
+          data={suivisData?.pages.flatMap(p => p.items) ?? []}
+          keyExtractor={p => p.id}
+          renderItem={({ item }) => (
+            <VideoPlayerItem
+              post={item}
+              isVisible={effectiveVisibleId === item.id}
+              onComment={() => setCommentsPostId(item.id)}
+            />
+          )}
+          pagingEnabled
+          snapToInterval={H}
+          decelerationRate="fast"
+          showsVerticalScrollIndicator={false}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig.current}
+          onEndReached={() => hasNextSuivis && !fetchingSuivis && fetchNextSuivis()}
+          onEndReachedThreshold={0.5}
+          getItemLayout={(_, i) => ({ length: H, offset: H * i, index: i })}
+          ListEmptyComponent={
+            !loadingSuivis ? (
+              <View style={styles.emptyWrap}>
+                <Text style={[styles.emptyText, { textAlign: 'center', paddingHorizontal: 40 }]}>
+                  Abonne-toi à des créateurs pour voir leur contenu ici
+                </Text>
+              </View>
+            ) : null
+          }
+        />
+      )}
 
       {/* ── POUR TOI — fullscreen video feed ── */}
       {tab === 'pourtoi' && (

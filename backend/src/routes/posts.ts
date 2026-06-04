@@ -97,6 +97,51 @@ async function buildFeedItems(userId: string, seenIds: string[], poolSize = 80) 
 }
 
 export async function postRoutes(app: FastifyInstance) {
+  // ── FOLLOWING FEED ──────────────────────────────────────────────────
+  app.get('/following', { preHandler: authenticate }, async (req, reply) => {
+    const userId = req.currentUser!.id;
+    const { cursor, limit = '10' } = req.query as { cursor?: string; limit?: string };
+    const lim = Math.min(parseInt(limit), 20);
+
+    const follows = await prisma.follow.findMany({
+      where: { follower_id: userId },
+      select: { following_id: true },
+    });
+    const ids = follows.map(f => f.following_id);
+    if (ids.length === 0) return reply.send({ items: [], next_cursor: null });
+
+    const posts = await prisma.post.findMany({
+      where: {
+        user_id: { in: ids },
+        status: 'ACTIVE', is_public: true, video_url: { not: '' },
+        ...(cursor ? { id: { lt: cursor } } : {}),
+      },
+      take: lim + 1,
+      orderBy: { created_at: 'desc' },
+      include: {
+        ...POST_INCLUDE,
+        _count: { select: { likes: true, comments: true } },
+      },
+    });
+
+    const hasMore = posts.length > lim;
+    const items = hasMore ? posts.slice(0, lim) : posts;
+
+    const likedIds = await prisma.like.findMany({
+      where: { user_id: userId, post_id: { in: items.map(p => p.id) } },
+      select: { post_id: true },
+    });
+    const likedSet = new Set(likedIds.map(l => l.post_id));
+
+    return reply.send({
+      items: items.map(p => ({
+        ...p, is_liked: likedSet.has(p.id),
+        like_count: p.like_count, comment_count: p.comment_count,
+      })),
+      next_cursor: hasMore ? items[items.length - 1].id : null,
+    });
+  });
+
   // ── FEED (TikTok algorithm) ─────────────────────────────────────────
   app.get('/feed', { preHandler: authenticate }, async (req, reply) => {
     const { cursor, limit = '10', seen } = req.query as {
