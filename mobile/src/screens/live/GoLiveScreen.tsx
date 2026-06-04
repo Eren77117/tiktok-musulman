@@ -92,7 +92,7 @@ export default function GoLiveScreen({ navigation }: Props) {
 
       localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
 
-      pc.onicecandidate = ({ candidate }) => {
+      (pc as any).onicecandidate = ({ candidate }: any) => {
         if (candidate) socket.emit('webrtc:ice', { sessionId: sId, targetId: viewerId, candidate });
       };
 
@@ -292,7 +292,7 @@ export default function GoLiveScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   setupContainer: { flex: 1, backgroundColor: '#000' },
-  preview: { ...StyleSheet.absoluteFillObject },
+  preview: { ...StyleSheet.absoluteFill },
   setupHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.md, marginBottom: 'auto' },
   iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 22 },
   setupTitle: { fontSize: FONT.size.lg, fontWeight: '700', color: COLORS.white },

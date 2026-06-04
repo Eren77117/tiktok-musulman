@@ -89,12 +89,12 @@ export default function LiveViewerScreen({ route, navigation }: Props) {
         pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
         pcRef.current = pc;
 
-        pc.ontrack = (event: any) => {
+        (pc as any).ontrack = (event: any) => {
           const stream = event.streams?.[0];
           if (stream) { setRemoteStream(stream); setConnected(true); }
         };
 
-        pc.onicecandidate = ({ candidate }: any) => {
+        (pc as any).onicecandidate = ({ candidate }: any) => {
           if (candidate) socket.emit('webrtc:ice', { sessionId, targetId: broadcasterId, candidate });
         };
 

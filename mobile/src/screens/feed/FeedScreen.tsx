@@ -99,14 +99,16 @@ export default function FeedScreen() {
   // Auto-set first visible video when feed loads
   React.useEffect(() => {
     if (posts.length > 0 && visibleId === null) {
-      setVisibleId(posts[0].id);
+      const first = posts[0];
+      setVisibleId(first.type === 'video' ? first.data.id : null);
     }
   }, [posts.length]);
 
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (viewableItems.length > 0) {
-        const id = viewableItems[0].item?.id;
+        const feedItem = viewableItems[0].item as FeedItem | undefined;
+        const id = feedItem?.type === 'video' ? feedItem.data.id : undefined;
         setVisibleId(id ?? null);
         if (id && !seenIds.current.includes(id)) seenIds.current.push(id);
       }
@@ -148,16 +150,21 @@ export default function FeedScreen() {
 
       {/* ── POUR TOI — fullscreen video feed ── */}
       {tab === 'pourtoi' && (
-        <FlatList
+        <FlatList<FeedItem>
           data={posts}
-          keyExtractor={p => p.id}
-          renderItem={({ item }) => (
-            <VideoPlayerItem
-              post={item}
-              isVisible={effectiveVisibleId === item.id}
-              onComment={() => setCommentsPostId(item.id)}
-            />
-          )}
+          keyExtractor={p => p.type === 'video' ? p.data.id : `book-${p.data.id}`}
+          renderItem={({ item }) => {
+            if (item.type === 'book') {
+              return <BookCard book={item.data} isVisible={false} />;
+            }
+            return (
+              <VideoPlayerItem
+                post={item.data}
+                isVisible={effectiveVisibleId === item.data.id}
+                onComment={() => setCommentsPostId(item.data.id)}
+              />
+            );
+          }}
           pagingEnabled
           snapToInterval={H}
           snapToAlignment="start"
