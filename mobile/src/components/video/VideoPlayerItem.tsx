@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Dimensions,
   Image, ActivityIndicator, Animated, Share, Pressable, PanResponder,
+  Modal, Alert, Easing,
 } from 'react-native';
 import Video, { VideoRef } from 'react-native-video';
 import { useMutation } from '@tanstack/react-query';
@@ -72,6 +73,11 @@ export function VideoPlayerItem({ post, isVisible, onComment, itemHeight }: Prop
   const [buffering, setBuffering] = useState(true);
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const [progress, setProgress] = useState(0); // 0–1
+  const [soundSheetVisible, setSoundSheetVisible] = useState(false);
+
+  // Vinyl spinning animation
+  const vinylRotation = useRef(new Animated.Value(0)).current;
+  const vinylAnim = useRef<Animated.CompositeAnimation | null>(null);
 
   // Long-press zone tracking
   const longPressZoneRef = useRef<'left' | 'middle' | 'right' | null>(null);
@@ -98,17 +104,18 @@ export function VideoPlayerItem({ post, isVisible, onComment, itemHeight }: Prop
   const seekPanResponder = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
+    // Never give up the gesture to the parent (prevent profilePanResponder stealing it)
+    onPanResponderTerminationRequest: () => false,
     onPanResponderGrant: (evt) => {
       setSeeking(true);
-      const pct = Math.max(0, Math.min(1, evt.nativeEvent.locationX / W));
+      const pct = Math.max(0, Math.min(1, evt.nativeEvent.pageX / W));
       const time = pct * totalDurationRef.current;
       setSeekTime(time);
       setProgress(pct);
       videoRef.current?.seek(time);
     },
-    onPanResponderMove: (_, g) => {
-      const raw = g.moveX; // absolute X on screen
-      const pct = Math.max(0, Math.min(1, raw / W));
+    onPanResponderMove: (evt) => {
+      const pct = Math.max(0, Math.min(1, evt.nativeEvent.pageX / W));
       const time = pct * totalDurationRef.current;
       setSeekTime(time);
       setProgress(pct);
@@ -156,6 +163,24 @@ export function VideoPlayerItem({ post, isVisible, onComment, itemHeight }: Prop
       }
     }
   }, [isVisible]);
+
+  // Vinyl spin control
+  useEffect(() => {
+    if (!paused && isVisible) {
+      vinylAnim.current = Animated.loop(
+        Animated.timing(vinylRotation, {
+          toValue: 1, duration: 4000,
+          easing: Easing.linear, useNativeDriver: true,
+        })
+      );
+      vinylAnim.current.start();
+    } else {
+      vinylAnim.current?.stop();
+    }
+    return () => { vinylAnim.current?.stop(); };
+  }, [paused, isVisible]);
+
+  const vinylSpin = vinylRotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
   const likedRef = useRef(liked);
   useEffect(() => { likedRef.current = liked; }, [liked]);
@@ -492,10 +517,115 @@ export function VideoPlayerItem({ post, isVisible, onComment, itemHeight }: Prop
             Share.share({ message: `Regarde cette vidéo sur Nour\nhttps://nour.app/post/${post.id}` });
           }}
         />
+
+        {/* Vinyl disc — sound */}
+        {post.sound && (
+          <TouchableOpacity onPress={() => setSoundSheetVisible(true)} activeOpacity={0.85} style={styles.vinylWrap}>
+            <Animated.View style={[styles.vinylOuter, { transform: [{ rotate: vinylSpin }] }]}>
+              {/* Outer ring */}
+              <View style={styles.vinylRing} />
+              {/* Center image or fallback */}
+              {post.user.avatar_url
+                ? <Image source={{ uri: post.user.avatar_url }} style={styles.vinylCenter} />
+                : <View style={[styles.vinylCenter, { backgroundColor: COLORS.primaryBg }]}>
+                    <IcMusic size={12} color={COLORS.primary} />
+                  </View>
+              }
+              {/* Center hole */}
+              <View style={styles.vinylHole} />
+            </Animated.View>
+          </TouchableOpacity>
+        )}
       </View>
+
+      {/* Sound Sheet */}
+      {post.sound && (
+        <SoundSheet
+          visible={soundSheetVisible}
+          sound={post.sound}
+          onClose={() => setSoundSheetVisible(false)}
+          onNavigateSound={() => {
+            setSoundSheetVisible(false);
+            nav.navigate('Sound', { soundId: post.sound!.id, title: post.sound!.title, artist: post.sound!.artist });
+          }}
+          onUseSound={() => {
+            setSoundSheetVisible(false);
+            nav.navigate('Create' as any);
+          }}
+        />
+      )}
     </Animated.View>
   );
 }
+
+// ── Sound Sheet ─────────────────────────────────────────────────────────────
+function SoundSheet({
+  visible, sound, onClose, onNavigateSound, onUseSound,
+}: {
+  visible: boolean;
+  sound: { id: string; title: string; artist: string | null };
+  onClose: () => void;
+  onNavigateSound: () => void;
+  onUseSound: () => void;
+}) {
+  if (!visible) return null;
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity style={soundStyles.backdrop} activeOpacity={1} onPress={onClose} />
+      <View style={soundStyles.sheet}>
+        <View style={soundStyles.handle} />
+        {/* Sound info */}
+        <View style={soundStyles.soundInfo}>
+          <View style={soundStyles.soundIcon}>
+            <IcMusic size={22} color={COLORS.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={soundStyles.soundTitle} numberOfLines={1}>{sound.title}</Text>
+            {sound.artist && <Text style={soundStyles.soundArtist} numberOfLines={1}>{sound.artist}</Text>}
+          </View>
+        </View>
+
+        <View style={soundStyles.divider} />
+
+        {/* Options */}
+        <TouchableOpacity style={soundStyles.option} onPress={onUseSound} activeOpacity={0.7}>
+          <IcPlay size={20} color={COLORS.text} />
+          <Text style={soundStyles.optionText}>Utiliser ce son</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={soundStyles.option} onPress={onNavigateSound} activeOpacity={0.7}>
+          <IcHeart size={20} color={COLORS.text} />
+          <Text style={soundStyles.optionText}>Voir toutes les vidéos</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={soundStyles.option} onPress={() => { Alert.alert('Bientôt', 'Téléchargement disponible prochainement.'); onClose(); }} activeOpacity={0.7}>
+          <IcSave size={20} color={COLORS.text} />
+          <Text style={soundStyles.optionText}>Télécharger</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[soundStyles.option, { marginTop: 8 }]} onPress={onClose} activeOpacity={0.7}>
+          <Text style={[soundStyles.optionText, { color: COLORS.textMuted, textAlign: 'center', flex: 1 }]}>Annuler</Text>
+        </TouchableOpacity>
+      </View>
+    </Modal>
+  );
+}
+
+const soundStyles = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+  sheet: {
+    backgroundColor: COLORS.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    paddingHorizontal: 20, paddingBottom: 34, paddingTop: 12,
+  },
+  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: COLORS.border, alignSelf: 'center', marginBottom: 16 },
+  soundInfo: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  soundIcon: {
+    width: 48, height: 48, borderRadius: 24, backgroundColor: COLORS.primaryBg,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  soundTitle: { fontSize: FONT.size.base, fontWeight: FONT.weight.semibold, color: COLORS.text },
+  soundArtist: { fontSize: FONT.size.sm, color: COLORS.textMuted, marginTop: 2 },
+  divider: { height: 1, backgroundColor: COLORS.borderLight, marginBottom: 8 },
+  option: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 4 },
+  optionText: { fontSize: FONT.size.base, color: COLORS.text },
+});
 
 function CaptionText({ text, expanded }: { text: string; expanded: boolean }) {
   const parts = text.split(/(\s+)/);
@@ -602,25 +732,45 @@ const styles = StyleSheet.create({
   actionBtn: { alignItems: 'center', gap: 4 },
   actionCount: { fontSize: 12, fontWeight: FONT.weight.semibold, color: COLORS.white },
 
-  // Seek bar
+  // Vinyl disc
+  vinylWrap: { alignItems: 'center', marginTop: 4 },
+  vinylOuter: {
+    width: 48, height: 48, borderRadius: 24,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2.5, borderColor: 'rgba(255,255,255,0.6)',
+    backgroundColor: '#111',
+  },
+  vinylRing: {
+    position: 'absolute', width: 44, height: 44, borderRadius: 22,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
+  },
+  vinylCenter: {
+    width: 28, height: 28, borderRadius: 14, overflow: 'hidden',
+  },
+  vinylHole: {
+    position: 'absolute', width: 6, height: 6, borderRadius: 3,
+    backgroundColor: '#000', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
+  },
+
+  // Seek bar — positioned 12px above bottom edge, 44px tall touch zone
   seekBarHit: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    height: 28, justifyContent: 'flex-end', paddingBottom: 4,
+    position: 'absolute', bottom: 12, left: 0, right: 0,
+    height: 44, justifyContent: 'center', paddingHorizontal: 0,
   },
   progressBg: {
-    height: 3, backgroundColor: 'rgba(255,255,255,0.25)',
+    height: 3.5, backgroundColor: 'rgba(255,255,255,0.28)',
     marginHorizontal: 0, position: 'relative',
   },
   progressFill: { position: 'absolute', top: 0, left: 0, height: '100%', backgroundColor: COLORS.primary },
   progressThumb: {
-    position: 'absolute', top: -5, width: 12, height: 12,
-    borderRadius: 6, backgroundColor: COLORS.white,
-    marginLeft: -6, shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.4, shadowRadius: 2,
+    position: 'absolute', top: -6, width: 14, height: 14,
+    borderRadius: 7, backgroundColor: COLORS.white,
+    marginLeft: -7, shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5, shadowRadius: 3,
   },
   seekTimeBubble: {
-    position: 'absolute', bottom: 36, alignSelf: 'center',
-    backgroundColor: 'rgba(0,0,0,0.75)', borderRadius: 8,
+    position: 'absolute', bottom: 62, alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.8)', borderRadius: 8,
     paddingHorizontal: 12, paddingVertical: 5,
   },
   seekTimeText: { fontSize: 12, color: COLORS.white, fontWeight: FONT.weight.semibold },

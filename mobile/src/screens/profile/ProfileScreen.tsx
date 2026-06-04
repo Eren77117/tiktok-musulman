@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createThumbnail } from 'react-native-create-thumbnail';
 import {
   View, Text, StyleSheet, Image, TouchableOpacity,
   FlatList, ScrollView, Alert, ActivityIndicator, RefreshControl, Modal, ActionSheetIOS, Platform,
@@ -289,12 +290,40 @@ export default function ProfileScreen() {
   );
 }
 
+// In-memory thumbnail cache (persists for app session)
+const THUMB_CACHE = new Map<string, string>();
+
 function GridItem({ item, onPress }: { item: Post; onPress: () => void }) {
-  const thumb = getThumbUrl(item);
+  const precomputed = getThumbUrl(item);
+  const [thumb, setThumb] = useState<string | null>(precomputed ?? THUMB_CACHE.get(item.id) ?? null);
+  const [loading, setLoading] = useState(!thumb && !!item.video_url);
+
+  useEffect(() => {
+    if (thumb || !item.video_url) return;
+    // Already cached?
+    if (THUMB_CACHE.has(item.id)) {
+      setThumb(THUMB_CACHE.get(item.id)!);
+      setLoading(false);
+      return;
+    }
+    // Generate lazily from remote URL
+    createThumbnail({ url: item.video_url, timeStamp: 0, format: 'jpeg' })
+      .then(r => {
+        THUMB_CACHE.set(item.id, r.path);
+        setThumb(r.path);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [item.id]);
+
   return (
     <TouchableOpacity style={styles.gridItem} activeOpacity={0.8} onPress={onPress}>
       {thumb ? (
         <Image source={{ uri: thumb }} style={styles.gridThumb} resizeMode="cover" />
+      ) : loading ? (
+        <View style={[styles.gridThumb, styles.gridThumbFallback]}>
+          <ActivityIndicator size="small" color={COLORS.primary} />
+        </View>
       ) : (
         <View style={[styles.gridThumb, styles.gridThumbFallback]}>
           <IcGrid size={24} color={COLORS.primaryLight} />

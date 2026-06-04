@@ -152,7 +152,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 
       <View style={[
         styles.tabBar,
-        { paddingBottom: insets.bottom + 2, backgroundColor: theme.tabBg, borderTopColor: theme.navBorder },
+        { paddingBottom: insets.bottom > 0 ? insets.bottom - 4 : 4, backgroundColor: theme.tabBg, borderTopColor: theme.navBorder },
       ]}>
         {state.routes.map((route: any, index: number) => {
           const isFocused = state.index === index;
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
   tabBar: {
     flexDirection: 'row',
     borderTopWidth: 0.5,
-    paddingTop: 8, paddingHorizontal: SPACING.sm,
+    paddingTop: 6, paddingHorizontal: SPACING.sm,
   },
   notifBadge: {
     position: 'absolute', top: -4, right: -6,

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createThumbnail } from 'react-native-create-thumbnail';
 import {
   View, Text, StyleSheet, Image, TouchableOpacity,
   FlatList, ActivityIndicator, Alert, Dimensions, ActionSheetIOS, Platform,
@@ -276,22 +277,11 @@ export default function UserProfileScreen({ route, navigation }: Props) {
           </View>
         }
         renderItem={({ item: p }) => (
-          <TouchableOpacity
-            style={[styles.cell, { backgroundColor: theme.surface }]}
+          <LazyVideoCell
+            post={p}
+            theme={theme}
             onPress={() => navigation.navigate('VideoPlayer', { postId: p.id })}
-            activeOpacity={0.85}
-          >
-            {getThumbUrl(p)
-              ? <Image source={{ uri: getThumbUrl(p)! }} style={styles.cellImg} resizeMode="cover" />
-              : <View style={[styles.cellImg, styles.cellFallback, { backgroundColor: theme.card }]}>
-                  <IcPlay size={24} color={COLORS.primaryLight} />
-                </View>
-            }
-            <View style={styles.cellOverlay}>
-              <IcPlay size={10} color={COLORS.white} />
-              <Text style={styles.cellCount}>{fmtNum(p.view_count)}</Text>
-            </View>
-          </TouchableOpacity>
+          />
         )}
         ListEmptyComponent={
           postsLoading
@@ -304,6 +294,43 @@ export default function UserProfileScreen({ route, navigation }: Props) {
         }
       />
     </View>
+  );
+}
+
+const USER_THUMB_CACHE = new Map<string, string>();
+
+function LazyVideoCell({ post: p, theme, onPress }: { post: Post; theme: any; onPress: () => void }) {
+  const precomputed = getThumbUrl(p);
+  const [thumb, setThumb] = useState<string | null>(precomputed ?? USER_THUMB_CACHE.get(p.id) ?? null);
+  const [loading, setLoading] = useState(!thumb && !!p.video_url);
+
+  useEffect(() => {
+    if (thumb || !p.video_url) return;
+    if (USER_THUMB_CACHE.has(p.id)) { setThumb(USER_THUMB_CACHE.get(p.id)!); setLoading(false); return; }
+    createThumbnail({ url: p.video_url, timeStamp: 0, format: 'jpeg' })
+      .then(r => { USER_THUMB_CACHE.set(p.id, r.path); setThumb(r.path); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [p.id]);
+
+  return (
+    <TouchableOpacity style={[styles.cell, { backgroundColor: theme.surface }]} onPress={onPress} activeOpacity={0.85}>
+      {thumb ? (
+        <Image source={{ uri: thumb }} style={styles.cellImg} resizeMode="cover" />
+      ) : loading ? (
+        <View style={[styles.cellImg, styles.cellFallback, { backgroundColor: theme.card }]}>
+          <ActivityIndicator size="small" color={COLORS.primary} />
+        </View>
+      ) : (
+        <View style={[styles.cellImg, styles.cellFallback, { backgroundColor: theme.card }]}>
+          <IcPlay size={24} color={COLORS.primaryLight} />
+        </View>
+      )}
+      <View style={styles.cellOverlay}>
+        <IcPlay size={10} color={COLORS.white} />
+        <Text style={styles.cellCount}>{fmtNum(p.view_count)}</Text>
+      </View>
+    </TouchableOpacity>
   );
 }
 

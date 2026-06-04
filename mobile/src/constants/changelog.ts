@@ -6,6 +6,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.9.0',
+    date: '2026-06-04 · 11h00',
+    changes: [
+      'Seek bar: drag fluide (pageX, terminationRequest false)',
+      'Seek bar: remontee de 12px, zone tactile 44px',
+      'Nav bar: gap reduit en bas de l\'ecran',
+      'Commentaire: clavier s\'ouvre auto a la reponse',
+      'Preview video profil: createThumbnail lazy + cache memoire',
+      'Vinyl disc tournant sur chaque video avec son',
+      'Sound sheet: utiliser / voir toutes les videos / telecharger',
+    ],
+  },
+  {
     version: '1.8.0',
     date: '2026-06-04 · 09h30',
     changes: [

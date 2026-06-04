@@ -44,7 +44,15 @@ export function CommentsBottomSheet({ postId, onClose }: Props) {
   const { user } = useAuthStore();
   const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState<{ id: string; username: string } | null>(null);
+  const inputRef = useRef<any>(null);
   const translateY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
+
+  // Auto-focus input when replying
+  React.useEffect(() => {
+    if (replyTo) {
+      setTimeout(() => inputRef.current?.focus(), 120);
+    }
+  }, [replyTo]);
   const lastY = useRef(0);
 
   // Animate in/out
@@ -186,6 +194,7 @@ export function CommentsBottomSheet({ postId, onClose }: Props) {
             )}
             <View style={styles.inputInner}>
               <TextInput
+                ref={inputRef}
                 style={[styles.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
                 value={text}
                 onChangeText={setText}
