@@ -3,7 +3,7 @@ import {
   View, FlatList, StyleSheet, Text, TouchableOpacity,
   StatusBar, Dimensions, ViewToken,
 } from 'react-native';
-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,11 +13,20 @@ import { VideoPlayerItem, FeedPost } from '../../components/video/VideoPlayerIte
 import { CommentsBottomSheet } from '../../components/video/CommentsBottomSheet';
 import { BookCard, BookItem } from '../../components/books/BookCard';
 import { COLORS, FONT } from '../../constants/theme';
+import { IcFilm, IcUsers } from '../../components/ui/Icons';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 const { height: H } = Dimensions.get('window');
 
 type FeedTab = 'pourtoi' | 'fils';
+
+interface LiveSession {
+  id: string;
+  title: string;
+  viewer_count: number;
+  thumbnail_url: string | null;
+  user: { id: string; username: string; display_name: string; avatar_url: string | null };
+}
 
 interface ThreadItem {
   id: string;
@@ -85,13 +94,24 @@ export default function FeedScreen() {
   });
   const books = booksData?.pages.flatMap(p => p.items) ?? [];
 
-  // Mix: inject 1 book every 3 videos
-  type FeedItem = { type: 'video'; data: FeedPost } | { type: 'book'; data: BookItem };
+  // Active lives (refreshes every 30s)
+  const { data: livesData } = useQuery<{ items: LiveSession[] }>({
+    queryKey: ['feed-live-active'],
+    queryFn: () => api.get('/live/active', { params: { limit: 10 } }).then(r => r.data).catch(() => ({ items: [] })),
+    refetchInterval: 30_000,
+  });
+  const lives = livesData?.items ?? [];
+
+  // Mix: 1 book every 3 videos + 1 live card every 4 videos
+  type FeedItem = { type: 'video'; data: FeedPost } | { type: 'book'; data: BookItem } | { type: 'live'; data: LiveSession };
   const posts: FeedItem[] = [];
   let bookIdx = 0;
+  let liveIdx = 0;
   rawPosts.forEach((post, i) => {
     posts.push({ type: 'video', data: post });
-    if ((i + 1) % 3 === 0 && bookIdx < books.length) {
+    if ((i + 1) % 4 === 0 && liveIdx < lives.length) {
+      posts.push({ type: 'live', data: lives[liveIdx++] });
+    } else if ((i + 1) % 3 === 0 && bookIdx < books.length) {
       posts.push({ type: 'book', data: books[bookIdx++] });
     }
   });
@@ -134,8 +154,9 @@ export default function FeedScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {/* Header overlay — tabs only, no side buttons */}
+      {/* Header overlay */}
       <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+        <View style={{ width: 40 }} />
         <View style={styles.tabs}>
           <TouchableOpacity onPress={handlePourToiPress} style={styles.tabBtn} activeOpacity={0.8}>
             <Text style={[styles.tabText, tab === 'pourtoi' && styles.tabTextActive]}>Pour toi</Text>
@@ -146,16 +167,32 @@ export default function FeedScreen() {
             {tab === 'fils' && <View style={styles.tabUnderline} />}
           </TouchableOpacity>
         </View>
+        {/* Live button top right */}
+        <TouchableOpacity
+          style={styles.liveBtn}
+          onPress={() => nav.navigate('LiveList')}
+          activeOpacity={0.8}
+        >
+          <View style={styles.liveDot} />
+          <IcFilm size={18} color={COLORS.white} />
+        </TouchableOpacity>
       </View>
 
       {/* ── POUR TOI — fullscreen video feed ── */}
       {tab === 'pourtoi' && (
         <FlatList<FeedItem>
           data={posts}
-          keyExtractor={p => p.type === 'video' ? p.data.id : `book-${p.data.id}`}
+          keyExtractor={p =>
+            p.type === 'video' ? p.data.id :
+            p.type === 'book' ? `book-${p.data.id}` :
+            `live-${p.data.id}`
+          }
           renderItem={({ item }) => {
             if (item.type === 'book') {
               return <BookCard book={item.data} isVisible={false} />;
+            }
+            if (item.type === 'live') {
+              return <FeedLiveCard live={item.data} onPress={() => nav.navigate('LiveViewer', { sessionId: item.data.id, broadcasterId: item.data.user.id })} />;
             }
             return (
               <VideoPlayerItem
@@ -201,6 +238,52 @@ export default function FeedScreen() {
         />
       )}
     </View>
+  );
+}
+
+// ── Live card in feed ────────────────────────────────────────────────────────────
+import { Image } from 'react-native';
+
+function FeedLiveCard({ live, onPress }: { live: LiveSession; onPress: () => void }) {
+  const { height: H2 } = Dimensions.get('window');
+  return (
+    <TouchableOpacity style={{ width: '100%', height: H2, backgroundColor: '#0a0a0a' }} onPress={onPress} activeOpacity={0.95}>
+      {live.thumbnail_url
+        ? <Image source={{ uri: live.thumbnail_url }} style={{ ...StyleSheet.absoluteFill, opacity: 0.7 }} resizeMode="cover" />
+        : live.user.avatar_url
+          ? <Image source={{ uri: live.user.avatar_url }} style={{ ...StyleSheet.absoluteFill, opacity: 0.3 }} resizeMode="cover" />
+          : null
+      }
+      {/* Red live badge */}
+      <View style={{ position: 'absolute', top: 60, left: 16, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FF3B30', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 }}>
+        <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#fff' }} />
+        <Text style={{ fontSize: 12, fontWeight: '800', color: '#fff', letterSpacing: 0.5 }}>EN DIRECT</Text>
+      </View>
+      {/* Viewer count */}
+      <View style={{ position: 'absolute', top: 60, right: 16, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 }}>
+        <IcUsers size={12} color="#fff" />
+        <Text style={{ fontSize: 12, fontWeight: '700', color: '#fff' }}>{live.viewer_count}</Text>
+      </View>
+      {/* Bottom info */}
+      <View style={{ position: 'absolute', bottom: 90, left: 16, right: 80, gap: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          {live.user.avatar_url
+            ? <Image source={{ uri: live.user.avatar_url }} style={{ width: 42, height: 42, borderRadius: 21, borderWidth: 2, borderColor: '#FF3B30' }} />
+            : <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: COLORS.primaryBg, borderWidth: 2, borderColor: '#FF3B30', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: COLORS.primary }}>{live.user.display_name[0]?.toUpperCase()}</Text>
+              </View>
+          }
+          <View>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff' }}>{live.user.display_name}</Text>
+            <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>@{live.user.username}</Text>
+          </View>
+        </View>
+        <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff', lineHeight: 20 }} numberOfLines={2}>{live.title}</Text>
+        <View style={{ backgroundColor: '#FF3B3025', borderWidth: 1, borderColor: '#FF3B30', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4, alignSelf: 'flex-start' }}>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: '#FF3B30' }}>Appuyer pour rejoindre</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
   );
 }
 
@@ -390,14 +473,24 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   header: {
     position: 'absolute', top: 0, left: 0, right: 0,
-    alignItems: 'center', paddingBottom: 10,
-    zIndex: 10,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingBottom: 10, zIndex: 10,
   },
   tabs: { flexDirection: 'row', gap: 24 },
   tabBtn: { alignItems: 'center', paddingBottom: 4 },
   tabText: { fontSize: FONT.size.base, fontWeight: FONT.weight.semibold, color: 'rgba(255,255,255,0.6)' },
   tabTextActive: { color: COLORS.white },
   tabUnderline: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, backgroundColor: COLORS.white, borderRadius: 1 },
+  liveBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(255,59,48,0.25)', borderWidth: 1.5, borderColor: '#FF3B30',
+    alignItems: 'center', justifyContent: 'center', position: 'relative',
+  },
+  liveDot: {
+    position: 'absolute', top: 6, right: 6,
+    width: 7, height: 7, borderRadius: 4, backgroundColor: '#FF3B30',
+    borderWidth: 1.5, borderColor: '#000',
+  },
   emptyWrap: { height: H, alignItems: 'center', justifyContent: 'center' },
   emptyText: { color: COLORS.white, fontSize: FONT.size.base },
 });

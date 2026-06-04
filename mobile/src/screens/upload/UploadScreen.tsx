@@ -184,15 +184,15 @@ export default function UploadScreen() {
       if (media.isImage) {
         thumbnailUrl = videoUrl;
       } else {
-        // Step 1: Extract first frame from local file
+        // Step 1: Extract first frame from local file and upload
         try {
           setUploadStep('Extraction de la couverture...');
           animateProgress(75);
           const localUri = media.uri.startsWith('file://') ? media.uri : `file://${media.uri}`;
-          const thumb = await createThumbnail({ url: localUri, timeStamp: 100, format: 'jpeg' });
-          const thumbPath = thumb.path.startsWith('file://') ? thumb.path : `file://${thumb.path}`;
+          const thumb = await createThumbnail({ url: localUri, timeStamp: 0, format: 'jpeg' });
+          const thumbUri = thumb.path.startsWith('file://') ? thumb.path : `file://${thumb.path}`;
           const thumbForm = new FormData();
-          thumbForm.append('file', { uri: thumbPath, type: 'image/jpeg', name: 'cover.jpg' } as any);
+          thumbForm.append('file', { uri: thumbUri, type: 'image/jpeg', name: 'cover.jpg' } as any);
           const thumbRes = await fetch(`${API_BASE_URL}/upload/image`, {
             method: 'POST',
             headers: { Authorization: `Bearer ${tokens.access}` },
@@ -202,13 +202,13 @@ export default function UploadScreen() {
             const td = await thumbRes.json();
             if (td?.url) thumbnailUrl = td.url;
           }
-        } catch {
-          // Step 2 fallback: Cloudinary auto-thumbnail
-          if (videoUrl.includes('cloudinary.com')) {
-            thumbnailUrl = videoUrl
-              .replace('/video/upload/', '/video/upload/so_0,w_600,h_1066,c_fill,q_auto/')
-              .replace(/\.(mp4|mov|avi|webm|mkv)$/i, '.jpg');
-          }
+        } catch {}
+
+        // Step 2: Cloudinary auto-thumbnail (always as final fallback for video)
+        if (!thumbnailUrl && videoUrl.includes('cloudinary.com')) {
+          thumbnailUrl = videoUrl
+            .replace('/video/upload/', '/video/upload/so_0,q_auto,f_jpg/')
+            .replace(/\.(mp4|mov|avi|webm|mkv)$/i, '.jpg');
         }
       }
 

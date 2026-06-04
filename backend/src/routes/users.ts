@@ -49,16 +49,17 @@ export async function userRoutes(app: FastifyInstance) {
     });
     if (!user) return reply.status(404).send({ error: 'User not found' });
 
-    const isFollowing = await prisma.follow.findUnique({
-      where: {
-        follower_id_following_id: {
-          follower_id: req.currentUser!.id,
-          following_id: user.id,
-        },
-      },
-    });
+    const [isFollowing, activeLive] = await Promise.all([
+      prisma.follow.findUnique({
+        where: { follower_id_following_id: { follower_id: req.currentUser!.id, following_id: user.id } },
+      }),
+      prisma.liveSession.findFirst({
+        where: { user_id: user.id, is_active: true },
+        select: { id: true },
+      }),
+    ]);
 
-    return reply.send({ ...user, is_following: !!isFollowing });
+    return reply.send({ ...user, is_following: !!isFollowing, active_live_session_id: activeLive?.id ?? null });
   });
 
   app.patch('/me', { preHandler: authenticate }, async (req, reply) => {

@@ -30,27 +30,38 @@ export async function messageRoutes(app: FastifyInstance) {
       return reply.status(403).send({ error: 'cross_gender', message: 'Messagerie entre hommes et femmes non mahrams non autorisée sur Nour.' });
     }
 
-    // Same gender: find or create conversation directly (auto-accepted)
-    const existing = await prisma.conversationRequest.findFirst({
+    // Same gender: find or create conversation (handle all existing request states)
+    const existingAny = await prisma.conversationRequest.findFirst({
       where: {
         OR: [
           { requester_id: requesterId, recipient_id },
           { requester_id: recipient_id, recipient_id: requesterId },
         ],
-        status: 'ACCEPTED',
       },
       include: { conversation: true },
     });
 
-    if (existing?.conversation) {
-      return reply.send({ conversation_id: existing.conversation.id });
+    if (existingAny) {
+      // Already has a conversation → return it
+      if (existingAny.conversation) {
+        return reply.send({ conversation_id: existingAny.conversation.id });
+      }
+      // Request exists but no conversation yet → accept it and create one
+      const conversation = await prisma.$transaction(async (tx) => {
+        await tx.conversationRequest.update({
+          where: { id: existingAny.id },
+          data: { status: 'ACCEPTED' },
+        });
+        return tx.conversation.create({ data: { request_id: existingAny.id } });
+      });
+      return reply.send({ conversation_id: conversation.id });
     }
 
     const conversation = await prisma.$transaction(async (tx) => {
-      const req2 = await tx.conversationRequest.create({
+      const createdReq = await tx.conversationRequest.create({
         data: { requester_id: requesterId, recipient_id, status: 'ACCEPTED' },
       });
-      return tx.conversation.create({ data: { request_id: req2.id } });
+      return tx.conversation.create({ data: { request_id: createdReq.id } });
     });
 
     return reply.status(201).send({ conversation_id: conversation.id });

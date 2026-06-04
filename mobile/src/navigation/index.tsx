@@ -38,6 +38,7 @@ import VideoPlayerScreen from '../screens/feed/VideoPlayerScreen';
 import ThreadDetailScreen from '../screens/threads/ThreadDetailScreen';
 import GoLiveScreen from '../screens/live/GoLiveScreen';
 import LiveViewerScreen from '../screens/live/LiveViewerScreen';
+import LiveListScreen from '../screens/live/LiveListScreen';
 
 export type RootStackParamList = {
   Auth: undefined;
@@ -54,6 +55,7 @@ export type RootStackParamList = {
   ThreadDetail: { threadId: string };
   GoLive: undefined;
   LiveViewer: { sessionId: string; broadcasterId: string };
+  LiveList: undefined;
 };
 
 export type AuthStackParamList = {
@@ -249,6 +251,8 @@ export function AppNavigator() {
               options={{ animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
             <RootStack.Screen name="LiveViewer" component={LiveViewerScreen}
               options={{ animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
+            <RootStack.Screen name="LiveList" component={LiveListScreen}
+              options={{ animation: 'slide_from_right' }} />
           </>
         ) : (
           <RootStack.Screen name="Auth" component={AuthNavigator} />

@@ -27,6 +27,7 @@ interface Profile {
   following_count: number;
   post_count: number;
   gender: 'MALE' | 'FEMALE';
+  active_live_session_id: string | null;
 }
 
 interface Post {
@@ -124,10 +125,11 @@ export default function UserProfileScreen({ route, navigation }: Props) {
 
   const handleMessage = async () => {
     if (!user || !profile) return;
+    // Cross-gender blocked by backend; same gender goes through directly
     if (user.gender !== profile.gender) {
       Alert.alert(
         'Messagerie restreinte',
-        'Sur Nour, la messagerie directe entre hommes et femmes non mahrams n\'est pas autorisée.',
+        'La messagerie directe entre hommes et femmes non mahrams n\'est pas autorisée sur Nour.',
         [{ text: 'Compris' }],
       );
       return;
@@ -139,8 +141,14 @@ export default function UserProfileScreen({ route, navigation }: Props) {
         otherUser: { id: profile.id, display_name: profile.display_name },
       });
     } catch (e: any) {
+      // If a prior request exists in non-accepted state, retry won't fail now (backend fixed)
       Alert.alert('Erreur', e?.response?.data?.message ?? 'Impossible d\'ouvrir la conversation.');
     }
+  };
+
+  const handleLivePress = () => {
+    if (!profile?.active_live_session_id) return;
+    navigation.navigate('LiveViewer', { sessionId: profile.active_live_session_id, broadcasterId: profile.id });
   };
 
   if (isLoading) {
@@ -180,15 +188,25 @@ export default function UserProfileScreen({ route, navigation }: Props) {
         columnWrapperStyle={{ gap: 1 }}
         ListHeaderComponent={
           <View style={[styles.hero, { backgroundColor: theme.surface, borderBottomColor: theme.borderLight }]}>
-            {/* Avatar */}
-            <TouchableOpacity style={styles.avatarWrap} activeOpacity={0.85}>
+            {/* Avatar — red ring if live */}
+            <TouchableOpacity
+              style={[styles.avatarWrap, profile.active_live_session_id && styles.avatarLiveRing]}
+              activeOpacity={profile.active_live_session_id ? 0.8 : 1}
+              onPress={profile.active_live_session_id ? handleLivePress : undefined}
+            >
               {profile.avatar_url
                 ? <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
                 : <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: theme.primaryBg }]}>
                     <Text style={styles.avatarInitial}>{profile.display_name[0]?.toUpperCase()}</Text>
                   </View>
               }
-              {profile.is_verified && (
+              {profile.active_live_session_id && (
+                <View style={styles.liveBadge}>
+                  <View style={styles.liveDot} />
+                  <Text style={styles.liveText}>EN DIRECT</Text>
+                </View>
+              )}
+              {profile.is_verified && !profile.active_live_session_id && (
                 <View style={styles.verifiedBadge}>
                   <IcCheck size={9} color={COLORS.white} strokeWidth={3} />
                 </View>
@@ -303,6 +321,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   avatarWrap: { position: 'relative', marginBottom: 4 },
+  avatarLiveRing: { padding: 3, borderRadius: 50, borderWidth: 3, borderColor: '#FF3B30' },
   avatar: { width: 88, height: 88, borderRadius: 44 },
   avatarFallback: { borderWidth: 3, borderColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
   avatarInitial: { fontSize: 34, fontWeight: FONT.weight.bold, color: COLORS.primary },
@@ -312,6 +331,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary, borderWidth: 2, borderColor: COLORS.white,
     alignItems: 'center', justifyContent: 'center',
   },
+  liveBadge: {
+    position: 'absolute', bottom: -10, left: '50%', transform: [{ translateX: -28 }],
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#FF3B30', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2,
+    borderWidth: 1.5, borderColor: COLORS.white,
+  },
+  liveDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: COLORS.white },
+  liveText: { fontSize: 9, fontWeight: FONT.weight.bold, color: COLORS.white, letterSpacing: 0.3 },
 
   displayName: { fontSize: FONT.size.xxl, fontWeight: FONT.weight.bold, letterSpacing: -0.3 },
   bio: { fontSize: FONT.size.sm, textAlign: 'center', lineHeight: 20 },
