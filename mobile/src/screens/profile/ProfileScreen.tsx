@@ -46,6 +46,8 @@ interface Thread {
 }
 
 const TABS = ['Vidéos', 'Fils', "J'aime", 'Favoris'];
+const LIKE_SUBTABS = ['Pour toi', 'Fils'] as const;
+type LikeSubTab = typeof LIKE_SUBTABS[number];
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -63,6 +65,7 @@ export default function ProfileScreen() {
   });
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState(0);
+  const [likeSubTab, setLikeSubTab] = useState<LikeSubTab>('Pour toi');
   const [editVisible, setEditVisible] = useState(false);
   const [avatarLoading, setAvatarLoading] = useState(false);
 
@@ -83,7 +86,13 @@ export default function ProfileScreen() {
   const { data: liked, isLoading: likedLoading } = useQuery<{ items: Post[] }>({
     queryKey: ['user-liked', user?.id],
     queryFn: () => api.get('/posts/liked').then((r) => r.data).catch(() => ({ items: [] })),
-    enabled: !!user?.id && activeTab === 2,
+    enabled: !!user?.id && activeTab === 2 && likeSubTab === 'Pour toi',
+  });
+
+  const { data: likedThreads, isLoading: likedThreadsLoading } = useQuery<{ items: Thread[] }>({
+    queryKey: ['user-liked-threads', user?.id],
+    queryFn: () => api.get('/threads/liked').then((r) => r.data).catch(() => ({ items: [] })),
+    enabled: !!user?.id && activeTab === 2 && likeSubTab === 'Fils',
   });
 
   const { data: favorites, isLoading: favLoading } = useQuery<{ items: Post[] }>({
@@ -159,12 +168,13 @@ export default function ProfileScreen() {
   };
 
   const gridData = activeTab === 0 ? posts?.items
-    : activeTab === 2 ? liked?.items
+    : activeTab === 2 && likeSubTab === 'Pour toi' ? liked?.items
     : activeTab === 3 ? favorites?.items
     : null;
 
   const gridLoading = activeTab === 0 ? postsLoading
-    : activeTab === 2 ? likedLoading
+    : activeTab === 2 && likeSubTab === 'Pour toi' ? likedLoading
+    : activeTab === 2 && likeSubTab === 'Fils' ? likedThreadsLoading
     : activeTab === 3 ? favLoading
     : false;
 
@@ -236,9 +246,29 @@ export default function ProfileScreen() {
           ))}
         </View>
 
+        {/* Like sub-tabs */}
+        {activeTab === 2 && (
+          <View style={[styles.subTabs, { backgroundColor: theme.surface, borderBottomColor: theme.borderLight }]}>
+            {LIKE_SUBTABS.map(sub => (
+              <TouchableOpacity
+                key={sub}
+                style={[styles.subTab, likeSubTab === sub && styles.subTabActive]}
+                onPress={() => setLikeSubTab(sub)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.subTabLabel, { color: likeSubTab === sub ? COLORS.primary : theme.textMuted }, likeSubTab === sub && styles.subTabLabelActive]}>
+                  {sub}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
         {/* Content */}
         {activeTab === 1 ? (
           <ThreadsTab threads={threads?.items} loading={threadsLoading} />
+        ) : activeTab === 2 && likeSubTab === 'Fils' ? (
+          <ThreadsTab threads={likedThreads?.items} loading={likedThreadsLoading} />
         ) : gridLoading ? (
           <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
         ) : (
@@ -378,6 +408,15 @@ const styles = StyleSheet.create({
   tabActive: { borderBottomWidth: 2, borderBottomColor: COLORS.primary },
   tabLabel: { fontSize: 12, fontWeight: FONT.weight.medium, color: COLORS.textMuted },
   tabLabelActive: { color: COLORS.primary, fontWeight: FONT.weight.semibold },
+
+  subTabs: {
+    flexDirection: 'row', borderBottomWidth: 1,
+    paddingHorizontal: SPACING.md,
+  },
+  subTab: { paddingVertical: 9, paddingHorizontal: SPACING.sm, marginRight: 16 },
+  subTabActive: { borderBottomWidth: 2, borderBottomColor: COLORS.primary },
+  subTabLabel: { fontSize: 13, fontWeight: FONT.weight.medium, color: COLORS.textMuted },
+  subTabLabelActive: { color: COLORS.primary, fontWeight: FONT.weight.semibold },
 
   gridRow: { gap: 1 },
   gridItem: { flex: 1 / 3, aspectRatio: 9 / 16, position: 'relative', margin: 0.5 },

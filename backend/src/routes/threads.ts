@@ -134,6 +134,49 @@ export async function threadRoutes(app: FastifyInstance) {
     });
   });
 
+  // GET /threads/liked — threads liked by the current user
+  app.get('/liked', { preHandler: authenticate }, async (req, reply) => {
+    const userId = req.currentUser!.id;
+    const { cursor, limit = '15' } = req.query as { cursor?: string; limit?: string };
+    const lim = parseInt(limit);
+
+    const likes = await prisma.like.findMany({
+      where: {
+        user_id: userId,
+        post: { video_url: { equals: '' }, caption: { not: null }, status: 'ACTIVE' },
+      },
+      take: lim + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      orderBy: { created_at: 'desc' },
+      include: {
+        post: {
+          include: {
+            user: { select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true } },
+            _count: { select: { comments: true } },
+          },
+        },
+      },
+    });
+
+    const hasMore = likes.length > lim;
+    const items = hasMore ? likes.slice(0, -1) : likes;
+
+    return reply.send({
+      items: items
+        .filter(l => l.post)
+        .map(l => ({
+          id: l.post!.id,
+          content: l.post!.caption ?? '',
+          like_count: l.post!.like_count,
+          reply_count: l.post!._count.comments,
+          is_liked: true,
+          created_at: l.post!.created_at,
+          user: l.post!.user,
+        })),
+      next_cursor: hasMore ? items[items.length - 1].id : null,
+    });
+  });
+
   // POST /threads/:id/like
   app.post('/:id/like', { preHandler: authenticate }, async (req, reply) => {
     const { id } = req.params as { id: string };

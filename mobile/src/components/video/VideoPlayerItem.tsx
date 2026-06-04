@@ -59,12 +59,17 @@ export function VideoPlayerItem({ post, isVisible, onComment }: Props) {
   const [saved, setSaved] = useState(post.is_saved ?? false);
   const [muted, setMuted] = useState(false);
   const [paused, setPaused] = useState(!isVisible);
+  const [rate, setRate] = useState(1);
   const [buffering, setBuffering] = useState(true);
   const [captionExpanded, setCaptionExpanded] = useState(false);
 
-  // Double-tap like
-  const tapCountRef = useRef(0);
-  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Long-press zone tracking
+  const longPressZoneRef = useRef<'left' | 'middle' | 'right' | null>(null);
+  const pausedBeforeLongRef = useRef(false);
+
+  // Double-tap like (instant — no delay on double tap)
+  const lastTapRef = useRef(0);
+  const singleTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heartAnim = useRef(new Animated.Value(0)).current;
   const heartScale = useRef(new Animated.Value(0.3)).current;
   const [heartPos, setHeartPos] = useState({ x: W / 2 - 50, y: H / 2 - 80 });
@@ -72,23 +77,19 @@ export function VideoPlayerItem({ post, isVisible, onComment }: Props) {
   // Pause indicator
   const pauseAnim = useRef(new Animated.Value(0)).current;
 
+  // Speed indicator
+  const speedAnim = useRef(new Animated.Value(0)).current;
+
   // Horizontal swipe → profile
   const swipeX = useRef(new Animated.Value(0)).current;
   const profilePanResponder = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => false,
     onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 15 && Math.abs(g.dx) > Math.abs(g.dy),
-    onPanResponderMove: (_, g) => {
-      if (g.dx < 0) swipeX.setValue(g.dx); // only left swipe
-    },
+    onPanResponderMove: (_, g) => { if (g.dx < 0) swipeX.setValue(g.dx); },
     onPanResponderRelease: (_, g) => {
       if (g.dx < -80 || g.vx < -0.5) {
-        // Animate out then navigate to profile
-        Animated.timing(swipeX, { toValue: -W, duration: 200, useNativeDriver: true }).start(() => {
-          swipeX.setValue(0);
-        });
-        setTimeout(() => {
-          nav.navigate('UserProfile', { userId: post.user.id, username: post.user.username });
-        }, 150);
+        Animated.timing(swipeX, { toValue: -W, duration: 200, useNativeDriver: true }).start(() => swipeX.setValue(0));
+        setTimeout(() => nav.navigate('UserProfile', { userId: post.user.id, username: post.user.username }), 150);
       } else {
         Animated.spring(swipeX, { toValue: 0, useNativeDriver: true, tension: 80, friction: 10 }).start();
       }
@@ -107,7 +108,6 @@ export function VideoPlayerItem({ post, isVisible, onComment }: Props) {
       if (watchStartRef.current) {
         watchAccumRef.current += (Date.now() - watchStartRef.current) / 1000;
         watchStartRef.current = null;
-        // Send watch time when leaving video (fire & forget)
         if (watchAccumRef.current > 0.5) {
           api.post(`/posts/${post.id}/view`, {
             watch_time: Math.round(watchAccumRef.current),
@@ -119,13 +119,11 @@ export function VideoPlayerItem({ post, isVisible, onComment }: Props) {
     }
   }, [isVisible]);
 
+  const likedRef = useRef(liked);
+  useEffect(() => { likedRef.current = liked; }, [liked]);
+
   const likeMutation = useMutation({
     mutationFn: () => api.post(`/posts/${post.id}/like`),
-    onMutate: () => {
-      const was = liked;
-      setLiked(l => !l);
-      setLikeCount(c => was ? c - 1 : c + 1);
-    },
     onError: () => { setLiked(post.is_liked); setLikeCount(post.like_count); },
   });
 
@@ -135,12 +133,8 @@ export function VideoPlayerItem({ post, isVisible, onComment }: Props) {
     onError: () => setSaved(post.is_saved ?? false),
   });
 
-  const triggerLike = useCallback((x: number, y: number) => {
-    if (!liked) {
-      setLiked(true);
-      setLikeCount(c => c + 1);
-      likeMutation.mutate();
-    }
+  // ── Heart animation (always plays on double-tap) ──────────────────────────
+  const animateHeart = useCallback((x: number, y: number) => {
     setHeartPos({ x: x - 50, y: y - 80 });
     heartAnim.setValue(1);
     heartScale.setValue(0.3);
@@ -151,42 +145,112 @@ export function VideoPlayerItem({ post, isVisible, onComment }: Props) {
         Animated.timing(heartAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
       ]),
     ]).start();
-  }, [liked, likeMutation, heartAnim, heartScale]);
+  }, [heartAnim, heartScale]);
 
+  // ── Trigger like (on double-tap) — single like per video ─────────────────
+  const triggerLike = useCallback((x: number, y: number) => {
+    animateHeart(x, y);
+    // Only call API / update state if not already liked
+    if (!likedRef.current) {
+      setLiked(true);
+      setLikeCount(c => c + 1);
+      likedRef.current = true;
+      likeMutation.mutate();
+    }
+  }, [animateHeart, likeMutation]);
+
+  // ── Pause indicator ───────────────────────────────────────────────────────
   const showPauseIndicator = useCallback(() => {
     pauseAnim.setValue(1);
     Animated.timing(pauseAnim, { toValue: 0, duration: 700, delay: 300, useNativeDriver: true }).start();
   }, [pauseAnim]);
 
-  const handleVideoTap = useCallback((evt: any) => {
-    const { locationX, locationY } = evt.nativeEvent;
-    tapCountRef.current += 1;
-    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
-    tapTimerRef.current = setTimeout(() => {
-      if (tapCountRef.current >= 2) {
-        triggerLike(locationX, locationY);
-      } else {
-        setPaused(p => { showPauseIndicator(); return !p; });
+  // ── Speed indicator ───────────────────────────────────────────────────────
+  const showSpeedIndicator = useCallback(() => {
+    speedAnim.setValue(1);
+  }, [speedAnim]);
+
+  const hideSpeedIndicator = useCallback(() => {
+    Animated.timing(speedAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+  }, [speedAnim]);
+
+  // ── Tap handler (shared across all zones) ────────────────────────────────
+  // Double tap = instant like; single tap = toggle pause (after 300ms)
+  const handleZoneTap = useCallback((x: number, y: number) => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      // Double tap — fire immediately, cancel pending single-tap
+      if (singleTapTimerRef.current) {
+        clearTimeout(singleTapTimerRef.current);
+        singleTapTimerRef.current = null;
       }
-      tapCountRef.current = 0;
-    }, 250);
+      triggerLike(x, y);
+      lastTapRef.current = 0;
+    } else {
+      lastTapRef.current = now;
+      singleTapTimerRef.current = setTimeout(() => {
+        singleTapTimerRef.current = null;
+        lastTapRef.current = 0;
+        setPaused(p => { showPauseIndicator(); return !p; });
+      }, 300);
+    }
   }, [triggerLike, showPauseIndicator]);
+
+  // ── Long press handlers ───────────────────────────────────────────────────
+  const handleLongPress = useCallback((zone: 'left' | 'middle' | 'right') => {
+    // Cancel any pending single-tap
+    if (singleTapTimerRef.current) {
+      clearTimeout(singleTapTimerRef.current);
+      singleTapTimerRef.current = null;
+    }
+    lastTapRef.current = 0;
+    longPressZoneRef.current = zone;
+
+    if (zone === 'left' || zone === 'right') {
+      setRate(2);
+      showSpeedIndicator();
+    } else {
+      pausedBeforeLongRef.current = paused;
+      setPaused(true);
+      showPauseIndicator();
+    }
+  }, [paused, showPauseIndicator, showSpeedIndicator]);
+
+  const handlePressOut = useCallback((zone: 'left' | 'middle' | 'right') => {
+    if (longPressZoneRef.current === zone) {
+      longPressZoneRef.current = null;
+      if (zone === 'left' || zone === 'right') {
+        setRate(1);
+        hideSpeedIndicator();
+      } else {
+        setPaused(pausedBeforeLongRef.current);
+      }
+    }
+  }, [hideSpeedIndicator]);
 
   const goToProfile = () => nav.navigate('UserProfile', { userId: post.user.id, username: post.user.username });
 
   const isVideo = post.video_url && post.video_url !== '' &&
     (post.video_url.startsWith('http') || post.video_url.startsWith('file'));
 
+  // ── Like button toggle (left heart icon) ─────────────────────────────────
+  const handleLikePress = useCallback(() => {
+    const wasLiked = likedRef.current;
+    setLiked(l => !l);
+    setLikeCount(c => wasLiked ? c - 1 : c + 1);
+    likedRef.current = !wasLiked;
+    likeMutation.mutate();
+  }, [likeMutation]);
+
   return (
     <Animated.View style={[styles.container, { transform: [{ translateX: swipeX }] }]} {...profilePanResponder.panHandlers}>
-    <Pressable style={styles.container} onPress={handleVideoTap}>
-      {/* LAYER 1 — Thumbnail background (prevents black flash) */}
+      {/* LAYER 1 — Thumbnail */}
       {post.thumbnail_url
         ? <Image source={{ uri: post.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
         : <View style={[StyleSheet.absoluteFill, styles.fallback]} />
       }
 
-      {/* LAYER 2 — Video (direct child, no wrapper) */}
+      {/* LAYER 2 — Video */}
       {isVideo && (
         <Video
           ref={videoRef}
@@ -196,36 +260,67 @@ export function VideoPlayerItem({ post, isVisible, onComment }: Props) {
           repeat
           paused={paused}
           muted={muted}
+          rate={rate}
           onBuffer={({ isBuffering }) => setBuffering(isBuffering)}
-          onLoad={() => { setBuffering(false); }}
-          onError={() => { setBuffering(false); setPaused(false); }}
+          onLoad={() => setBuffering(false)}
+          onError={() => { setBuffering(false); }}
           ignoreSilentSwitch="ignore"
           playInBackground={false}
           playWhenInactive={false}
-          bufferConfig={{
-            minBufferMs: 2500,
-            maxBufferMs: 15000,
-            bufferForPlaybackMs: 1000,
-            bufferForPlaybackAfterRebufferMs: 2000,
-          }}
+          bufferConfig={{ minBufferMs: 2500, maxBufferMs: 15000, bufferForPlaybackMs: 1000, bufferForPlaybackAfterRebufferMs: 2000 }}
         />
       )}
 
-      {/* Buffering spinner */}
+      {/* LAYER 3 — Gesture zones (behind UI elements) */}
+      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+        <View style={styles.zonesRow} pointerEvents="box-none">
+          {/* Left zone — long press = 2x speed */}
+          <Pressable
+            style={styles.zoneLeft}
+            onPress={e => handleZoneTap(e.nativeEvent.locationX, e.nativeEvent.locationY)}
+            onLongPress={() => handleLongPress('left')}
+            onPressOut={() => handlePressOut('left')}
+            delayLongPress={200}
+          />
+          {/* Middle zone — long press = pause while held */}
+          <Pressable
+            style={styles.zoneMiddle}
+            onPress={e => handleZoneTap(e.nativeEvent.locationX + W * 0.35, e.nativeEvent.locationY)}
+            onLongPress={() => handleLongPress('middle')}
+            onPressOut={() => handlePressOut('middle')}
+            delayLongPress={200}
+          />
+          {/* Right zone — long press = 2x speed */}
+          <Pressable
+            style={styles.zoneRight}
+            onPress={e => handleZoneTap(e.nativeEvent.locationX + W * 0.65, e.nativeEvent.locationY)}
+            onLongPress={() => handleLongPress('right')}
+            onPressOut={() => handlePressOut('right')}
+            delayLongPress={200}
+          />
+        </View>
+      </View>
+
+      {/* Buffering */}
       {buffering && isVideo && (
         <View style={styles.bufferWrap} pointerEvents="none">
           <ActivityIndicator color={COLORS.white} size="large" />
         </View>
       )}
 
-      {/* Pause/play flash indicator */}
+      {/* Pause indicator */}
       <Animated.View style={[styles.pauseIndicator, { opacity: pauseAnim }]} pointerEvents="none">
         <View style={styles.pauseCircle}>
           {paused
-            ? <IcPlay size={32} color={COLORS.white} fill={COLORS.white} />
+            ? <IcPlay size={32} color={COLORS.white} />
             : <View style={styles.pauseBars}><View style={styles.pauseBar} /><View style={styles.pauseBar} /></View>
           }
         </View>
+      </Animated.View>
+
+      {/* 2x speed indicator */}
+      <Animated.View style={[styles.speedBadge, { opacity: speedAnim }]} pointerEvents="none">
+        <Text style={styles.speedText}>2x</Text>
       </Animated.View>
 
       {/* Floating heart on double-tap */}
@@ -236,33 +331,27 @@ export function VideoPlayerItem({ post, isVisible, onComment }: Props) {
         <IcHeartFill size={100} color="#FF3B5C" />
       </Animated.View>
 
-      {/* Mute button (top right) */}
+      {/* Mute button */}
       <TouchableOpacity style={styles.muteBtn} onPress={() => setMuted(m => !m)} activeOpacity={0.8}>
         {muted ? <IcMute size={18} color={COLORS.white} /> : <IcVolume size={18} color={COLORS.white} />}
       </TouchableOpacity>
 
       {/* Bottom gradient */}
-      <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.7)']}
-        style={styles.gradient}
-        pointerEvents="none"
-      />
+      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} style={styles.gradient} pointerEvents="none" />
 
-      {/* ── Bottom left — username + caption ── */}
+      {/* Bottom left — username + caption */}
       <View style={styles.bottomLeft}>
         <TouchableOpacity onPress={goToProfile} activeOpacity={0.8}>
           <Text style={styles.username}>@{post.user.username}</Text>
         </TouchableOpacity>
         {post.caption ? (
           <TouchableOpacity onPress={() => setCaptionExpanded(e => !e)} activeOpacity={0.9}>
-            <Text style={styles.caption} numberOfLines={captionExpanded ? undefined : 2}>
-              {post.caption}
-            </Text>
+            <Text style={styles.caption} numberOfLines={captionExpanded ? undefined : 2}>{post.caption}</Text>
           </TouchableOpacity>
         ) : null}
       </View>
 
-      {/* ── Bottom right — sound (clickable) ── */}
+      {/* Bottom right — sound */}
       {post.sound && (
         <TouchableOpacity
           style={styles.bottomRight}
@@ -276,38 +365,32 @@ export function VideoPlayerItem({ post, isVisible, onComment }: Props) {
         </TouchableOpacity>
       )}
 
-      {/* ── Right actions ── */}
+      {/* Right actions */}
       <View style={styles.rightActions}>
-        {/* Avatar + follow */}
         <TouchableOpacity style={styles.avatarWrap} onPress={goToProfile} activeOpacity={0.85}>
-          {post.user.avatar_url ? (
-            <Image source={{ uri: post.user.avatar_url }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatarFallback}>
-              <Text style={styles.avatarInitial}>{post.user.display_name[0]?.toUpperCase()}</Text>
-            </View>
-          )}
+          {post.user.avatar_url
+            ? <Image source={{ uri: post.user.avatar_url }} style={styles.avatar} />
+            : <View style={styles.avatarFallback}>
+                <Text style={styles.avatarInitial}>{post.user.display_name[0]?.toUpperCase()}</Text>
+              </View>
+          }
           <View style={styles.followDot}>
             <Text style={styles.followDotText}>+</Text>
           </View>
         </TouchableOpacity>
 
-        {/* Like */}
+        {/* Like — sync with double-tap state */}
         <ActionBtn
           icon={liked ? <IcHeartFill size={30} color="#FF3B5C" /> : <IcHeart size={30} color={COLORS.white} />}
           count={fmt(likeCount)}
-          onPress={() => likeMutation.mutate()}
+          onPress={handleLikePress}
           countColor={liked ? '#FF3B5C' : COLORS.white}
         />
 
         {/* Comment */}
-        <ActionBtn
-          icon={<IcComment size={28} color={COLORS.white} />}
-          count={fmt(post.comment_count)}
-          onPress={onComment}
-        />
+        <ActionBtn icon={<IcComment size={28} color={COLORS.white} />} count={fmt(post.comment_count)} onPress={onComment} />
 
-        {/* Save / Favoris */}
+        {/* Save */}
         <ActionBtn
           icon={saved ? <IcSaveFill size={26} color={COLORS.primary} /> : <IcSave size={26} color={COLORS.white} />}
           onPress={() => saveMutation.mutate()}
@@ -318,15 +401,11 @@ export function VideoPlayerItem({ post, isVisible, onComment }: Props) {
           icon={<IcShare size={26} color={COLORS.white} />}
           count={fmt(post.share_count || 0)}
           onPress={() => {
-            Share.share({
-              message: `Regarde cette vidéo sur Nour 🌙\nhttps://nour.app/post/${post.id}`,
-              url: `https://nour.app/post/${post.id}`,
-            });
+            Share.share({ message: `Regarde cette vidéo sur Nour\nhttps://nour.app/post/${post.id}` });
             api.post(`/posts/${post.id}/view`, {}).catch(() => {});
           }}
         />
       </View>
-    </Pressable>
     </Animated.View>
   );
 }
@@ -344,8 +423,13 @@ function ActionBtn({
 
 const styles = StyleSheet.create({
   container: { width: W, height: H, backgroundColor: '#000', overflow: 'hidden' },
-  video: { width: W, height: H },
   fallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#111' },
+
+  // Gesture zones
+  zonesRow: { flex: 1, flexDirection: 'row' },
+  zoneLeft: { width: W * 0.35, height: '100%' },
+  zoneMiddle: { width: W * 0.30, height: '100%' },
+  zoneRight: { width: W * 0.35, height: '100%' },
 
   bufferWrap: {
     ...StyleSheet.absoluteFill,
@@ -356,6 +440,7 @@ const styles = StyleSheet.create({
   pauseIndicator: {
     ...StyleSheet.absoluteFill,
     alignItems: 'center', justifyContent: 'center',
+    pointerEvents: 'none',
   },
   pauseCircle: {
     width: 80, height: 80, borderRadius: 40,
@@ -364,6 +449,14 @@ const styles = StyleSheet.create({
   },
   pauseBars: { flexDirection: 'row', gap: 6 },
   pauseBar: { width: 6, height: 26, backgroundColor: COLORS.white, borderRadius: 3 },
+
+  speedBadge: {
+    position: 'absolute', top: '45%', alignSelf: 'center',
+    left: W / 2 - 32,
+    backgroundColor: 'rgba(0,0,0,0.65)', borderRadius: RADIUS.full,
+    paddingHorizontal: 18, paddingVertical: 8,
+  },
+  speedText: { fontSize: 24, fontWeight: '800', color: COLORS.white },
 
   floatingHeart: { position: 'absolute', width: 100, height: 100 },
 
@@ -376,27 +469,17 @@ const styles = StyleSheet.create({
 
   gradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: H * 0.5 },
 
-  // Bottom left: username + caption
-  bottomLeft: {
-    position: 'absolute', bottom: 104, left: 14, right: 90,
-    gap: 5,
-  },
+  bottomLeft: { position: 'absolute', bottom: 104, left: 14, right: 90, gap: 5 },
   username: { fontSize: FONT.size.base, fontWeight: FONT.weight.bold, color: COLORS.white },
   caption: { fontSize: FONT.size.sm, color: 'rgba(255,255,255,0.9)', lineHeight: 19 },
 
-  // Bottom right: sound
   bottomRight: {
     position: 'absolute', bottom: 78, right: 14, left: '35%',
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    justifyContent: 'flex-end',
+    flexDirection: 'row', alignItems: 'center', gap: 5, justifyContent: 'flex-end',
   },
   soundText: { fontSize: FONT.size.xs, color: 'rgba(255,255,255,0.85)', flexShrink: 1 },
 
-  // Right side actions
-  rightActions: {
-    position: 'absolute', right: 10, bottom: 96,
-    alignItems: 'center', gap: 22,
-  },
+  rightActions: { position: 'absolute', right: 10, bottom: 96, alignItems: 'center', gap: 22 },
   avatarWrap: { position: 'relative', marginBottom: 2 },
   avatar: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: COLORS.white },
   avatarFallback: {
@@ -413,7 +496,6 @@ const styles = StyleSheet.create({
     borderWidth: 2, borderColor: COLORS.white,
   },
   followDotText: { color: COLORS.white, fontSize: 13, fontWeight: FONT.weight.bold, lineHeight: 18 },
-
   actionBtn: { alignItems: 'center', gap: 3 },
   actionCount: { fontSize: 12, fontWeight: FONT.weight.semibold, color: COLORS.white },
 });
