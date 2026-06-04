@@ -281,7 +281,10 @@ export function VideoPlayerItem({ post, isVisible, onComment, itemHeight }: Prop
   }, [likeMutation]);
 
   return (
-    <Animated.View style={[styles.container, { transform: [{ translateX: swipeX }] }]} {...profilePanResponder.panHandlers}>
+    <Animated.View
+      style={[styles.container, { height: ITEM_H }, { transform: [{ translateX: swipeX }] }]}
+      {...profilePanResponder.panHandlers}
+    >
       {/* LAYER 1 — Thumbnail */}
       {post.thumbnail_url
         ? <Image source={{ uri: post.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
@@ -402,36 +405,49 @@ export function VideoPlayerItem({ post, isVisible, onComment, itemHeight }: Prop
       </TouchableOpacity>
 
       {/* Bottom gradient */}
-      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} style={styles.gradient} pointerEvents="none" />
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.85)']}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0.5 }}
+        end={{ x: 0, y: 1 }}
+        pointerEvents="none"
+      />
 
       {/* Bottom left — username + caption */}
       <View style={styles.bottomLeft}>
-        <TouchableOpacity onPress={goToProfile} activeOpacity={0.8}>
+        <TouchableOpacity onPress={goToProfile} activeOpacity={0.8} style={styles.usernameRow}>
           <Text style={styles.username}>@{post.user.username}</Text>
+          {post.user.is_verified && (
+            <View style={styles.verifiedBadge}>
+              <IcCheck size={9} color={COLORS.white} strokeWidth={3} />
+            </View>
+          )}
         </TouchableOpacity>
         {post.caption ? (
           <TouchableOpacity onPress={() => setCaptionExpanded(e => !e)} activeOpacity={0.9}>
-            <Text style={styles.caption} numberOfLines={captionExpanded ? undefined : 2}>{post.caption}</Text>
+            <CaptionText
+              text={post.caption}
+              expanded={captionExpanded}
+            />
           </TouchableOpacity>
         ) : null}
+        {post.sound && (
+          <TouchableOpacity
+            style={styles.soundRow}
+            onPress={() => nav.navigate('Sound', { soundId: post.sound!.id, title: post.sound!.title, artist: post.sound!.artist })}
+            activeOpacity={0.8}
+          >
+            <IcMusic size={13} color={COLORS.white} />
+            <Text style={styles.soundText} numberOfLines={1}>
+              {post.sound.title}{post.sound.artist ? ` · ${post.sound.artist}` : ''}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
-
-      {/* Bottom right — sound */}
-      {post.sound && (
-        <TouchableOpacity
-          style={styles.bottomRight}
-          onPress={() => nav.navigate('Sound', { soundId: post.sound!.id, title: post.sound!.title, artist: post.sound!.artist })}
-          activeOpacity={0.8}
-        >
-          <IcMusic size={12} color={COLORS.white} />
-          <Text style={styles.soundText} numberOfLines={1}>
-            {post.sound.title}{post.sound.artist ? ` · ${post.sound.artist}` : ''}
-          </Text>
-        </TouchableOpacity>
-      )}
 
       {/* Right actions */}
       <View style={styles.rightActions}>
+        {/* Avatar + follow */}
         <TouchableOpacity style={styles.avatarWrap} onPress={goToProfile} activeOpacity={0.85}>
           {post.user.avatar_url
             ? <Image source={{ uri: post.user.avatar_url }} style={styles.avatar} />
@@ -444,34 +460,47 @@ export function VideoPlayerItem({ post, isVisible, onComment, itemHeight }: Prop
           </View>
         </TouchableOpacity>
 
-        {/* Like — sync with double-tap state */}
+        {/* Like */}
         <ActionBtn
-          icon={liked ? <IcHeartFill size={30} color="#FF3B5C" /> : <IcHeart size={30} color={COLORS.white} />}
+          icon={liked ? <IcHeartFill size={32} color="#FF3B5C" /> : <IcHeart size={32} color={COLORS.white} />}
           count={fmt(likeCount)}
           onPress={handleLikePress}
           countColor={liked ? '#FF3B5C' : COLORS.white}
         />
 
         {/* Comment */}
-        <ActionBtn icon={<IcComment size={28} color={COLORS.white} />} count={fmt(post.comment_count)} onPress={onComment} />
+        <ActionBtn icon={<IcComment size={30} color={COLORS.white} />} count={fmt(post.comment_count)} onPress={onComment} />
 
         {/* Save */}
         <ActionBtn
-          icon={saved ? <IcSaveFill size={26} color={COLORS.primary} /> : <IcSave size={26} color={COLORS.white} />}
+          icon={saved ? <IcSaveFill size={28} color={COLORS.primary} /> : <IcSave size={28} color={COLORS.white} />}
+          count={fmt(0)}
           onPress={() => saveMutation.mutate()}
         />
 
         {/* Share */}
         <ActionBtn
-          icon={<IcShare size={26} color={COLORS.white} />}
+          icon={<IcShare size={28} color={COLORS.white} />}
           count={fmt(post.share_count || 0)}
           onPress={() => {
             Share.share({ message: `Regarde cette vidéo sur Nour\nhttps://nour.app/post/${post.id}` });
-            api.post(`/posts/${post.id}/view`, {}).catch(() => {});
           }}
         />
       </View>
     </Animated.View>
+  );
+}
+
+function CaptionText({ text, expanded }: { text: string; expanded: boolean }) {
+  const parts = text.split(/(\s+)/);
+  return (
+    <Text style={styles.caption} numberOfLines={expanded ? undefined : 2}>
+      {parts.map((part, i) =>
+        part.startsWith('#') || part.startsWith('@')
+          ? <Text key={i} style={styles.captionTag}>{part}</Text>
+          : part
+      )}
+    </Text>
   );
 }
 
@@ -487,8 +516,8 @@ function ActionBtn({
 }
 
 const styles = StyleSheet.create({
-  container: { width: W, height: H, backgroundColor: '#000', overflow: 'hidden' },
-  fallback: { backgroundColor: '#111' },
+  container: { width: W, height: H, backgroundColor: '#000', overflow: 'hidden' }, // H overridden by inline
+  fallback: { backgroundColor: '#0A0A0A' },
 
   // Gesture zones
   zonesRow: { flex: 1, flexDirection: 'row' },
@@ -532,36 +561,39 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
-  gradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: H * 0.5 },
-
-  bottomLeft: { position: 'absolute', bottom: 104, left: 14, right: 90, gap: 5 },
+  bottomLeft: { position: 'absolute', bottom: 44, left: 14, right: 88, gap: 6 },
+  usernameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   username: { fontSize: FONT.size.base, fontWeight: FONT.weight.bold, color: COLORS.white },
-  caption: { fontSize: FONT.size.sm, color: 'rgba(255,255,255,0.9)', lineHeight: 19 },
-
-  bottomRight: {
-    position: 'absolute', bottom: 78, right: 14, left: '35%',
-    flexDirection: 'row', alignItems: 'center', gap: 5, justifyContent: 'flex-end',
+  verifiedBadge: {
+    width: 18, height: 18, borderRadius: 9,
+    backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center',
   },
+  caption: { fontSize: FONT.size.sm, color: 'rgba(255,255,255,0.92)', lineHeight: 20 },
+  captionTag: { color: COLORS.primaryLight, fontWeight: FONT.weight.semibold },
+  soundRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   soundText: { fontSize: FONT.size.xs, color: 'rgba(255,255,255,0.85)', flexShrink: 1 },
 
-  rightActions: { position: 'absolute', right: 10, bottom: 96, alignItems: 'center', gap: 22 },
-  avatarWrap: { position: 'relative', marginBottom: 2 },
-  avatar: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: COLORS.white },
+  rightActions: { position: 'absolute', right: 10, bottom: 48, alignItems: 'center', gap: 24 },
+  avatarWrap: { position: 'relative', marginBottom: 4 },
+  avatar: {
+    width: 50, height: 50, borderRadius: 25,
+    borderWidth: 2.5, borderColor: COLORS.primary, // green ring like the design
+  },
   avatarFallback: {
-    width: 48, height: 48, borderRadius: 24,
-    backgroundColor: COLORS.primaryBg, borderWidth: 2, borderColor: COLORS.white,
+    width: 50, height: 50, borderRadius: 25,
+    backgroundColor: COLORS.primaryBg, borderWidth: 2.5, borderColor: COLORS.primary,
     alignItems: 'center', justifyContent: 'center',
   },
   avatarInitial: { fontSize: 18, fontWeight: FONT.weight.bold, color: COLORS.primary },
   followDot: {
-    position: 'absolute', bottom: -8, left: '50%',
-    transform: [{ translateX: -10 }],
-    width: 20, height: 20, borderRadius: 10,
-    backgroundColor: '#FF3B5C', alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: COLORS.white,
+    position: 'absolute', bottom: -10, left: '50%',
+    transform: [{ translateX: -11 }],
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: '#000',
   },
-  followDotText: { color: COLORS.white, fontSize: 13, fontWeight: FONT.weight.bold, lineHeight: 18 },
-  actionBtn: { alignItems: 'center', gap: 3 },
+  followDotText: { color: COLORS.white, fontSize: 14, fontWeight: FONT.weight.bold, lineHeight: 20 },
+  actionBtn: { alignItems: 'center', gap: 4 },
   actionCount: { fontSize: 12, fontWeight: FONT.weight.semibold, color: COLORS.white },
 
   // Seek bar

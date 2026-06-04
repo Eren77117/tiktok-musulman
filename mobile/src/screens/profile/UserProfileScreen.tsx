@@ -42,9 +42,10 @@ interface Post {
 function getThumbUrl(post: Pick<Post, 'thumbnail_url' | 'video_url'>): string | null {
   if (post.thumbnail_url) return post.thumbnail_url;
   const v = post.video_url;
-  if (v?.includes('cloudinary.com')) {
+  if (!v) return null;
+  if (v.includes('cloudinary.com')) {
     return v
-      .replace('/video/upload/', '/video/upload/so_0,w_600,h_1066,c_fill,q_auto,f_jpg/')
+      .replace('/video/upload/', '/video/upload/so_0,q_auto,f_jpg/')
       .replace(/\.(mp4|mov|avi|webm|mkv)$/i, '.jpg');
   }
   return null;

@@ -314,10 +314,10 @@ const styles = StyleSheet.create({
   },
   createBtn: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   createInner: {
-    width: 48, height: 48, borderRadius: 14,
+    width: 52, height: 52, borderRadius: 26, // circle like the design
     backgroundColor: COLORS.primary,
     alignItems: 'center', justifyContent: 'center',
-    marginTop: -12, ...SHADOW.green,
+    marginTop: -14, ...SHADOW.green,
   },
 
   sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },

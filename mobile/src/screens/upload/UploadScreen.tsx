@@ -148,35 +148,34 @@ export default function UploadScreen() {
       const tokens = await getTokens();
       if (!tokens) throw new Error('Non authentifié');
 
-      // Upload via XMLHttpRequest for progress tracking
+      // Upload via fetch (plus fiable que XHR sur iOS)
       const formData = new FormData();
-      formData.append('file', { uri: media.uri, type: media.type, name: media.name } as any);
+      // Ensure correct MIME type for iOS videos
+      const mimeType = media.isImage ? 'image/jpeg'
+        : media.type?.startsWith('video/') ? media.type : 'video/mp4';
+      formData.append('file', { uri: media.uri, type: mimeType, name: media.name } as any);
       const endpoint = media.isImage ? '/upload/image' : '/upload/video';
 
-      const uploadData: { url: string } = await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) {
-            const pct = Math.round((e.loaded / e.total) * 70);
-            setUploadProgress(pct);
-            animateProgress(pct);
-          }
-        };
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try { resolve(JSON.parse(xhr.responseText)); } catch { reject(new Error('Réponse invalide')); }
-          } else {
-            try { reject(new Error(JSON.parse(xhr.responseText)?.error ?? `Erreur ${xhr.status}`)); }
-            catch { reject(new Error(`Erreur ${xhr.status}`)); }
-          }
-        };
-        xhr.onerror = () => reject(new Error('Erreur réseau'));
-        xhr.open('POST', `${API_BASE_URL}${endpoint}`);
-        xhr.setRequestHeader('Authorization', `Bearer ${tokens.access}`);
-        xhr.send(formData);
+      setUploadProgress(30);
+      animateProgress(30);
+
+      const uploadRes = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokens.access}` },
+        body: formData,
       });
 
-      if (!uploadData?.url) throw new Error('URL manquante dans la réponse');
+      if (!uploadRes.ok) {
+        let errMsg = `Erreur ${uploadRes.status}`;
+        try { const j = await uploadRes.json(); errMsg = j?.error ?? errMsg; } catch {}
+        throw new Error(errMsg);
+      }
+
+      const uploadData = await uploadRes.json();
+      setUploadProgress(70);
+      animateProgress(70);
+
+      if (!uploadData?.url) throw new Error('URL manquante — vérifiez la configuration Cloudinary');
       const videoUrl = uploadData.url.startsWith('http') ? uploadData.url : `${API_BASE_URL.replace('/api', '')}${uploadData.url}`;
 
       // ── Thumbnail extraction (BEFORE publishing) ─────────────────────────

@@ -6,6 +6,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.7.0',
+    date: '2026-06-04 · 08h00',
+    changes: [
+      'DA: design TikTok pur — video plein ecran sans chevauchement nav bar',
+      'DA: avatar vert (ring vert), hashtags en vert, badge verifie vert',
+      'DA: bouton + navigation cercle (style image reference)',
+      'Seek bar draggable: glisser pour avancer/reculer dans la video',
+      'Upload video: remplacement XHR par fetch (plus fiable iOS)',
+      'Messagerie H->H et F->F corrigee (genre bien inclus dans le profil)',
+      'Reponses commentaires: "Voir N reponses" inline',
+      'Barre de progression visible au-dessus de la nav (hauteur ITEM_H)',
+    ],
+  },
+  {
     version: '1.6.0',
     date: '2026-06-04 · 06h00',
     changes: [

@@ -174,11 +174,7 @@ export default function FeedScreen() {
 
       {/* Header overlay */}
       <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
-        {/* Live button — top LEFT */}
-        <TouchableOpacity style={styles.liveBtn} onPress={() => nav.navigate('LiveList')} activeOpacity={0.8}>
-          <View style={styles.liveDot} />
-          <IcFilm size={18} color={COLORS.white} />
-        </TouchableOpacity>
+        <View style={{ width: 40 }} />
 
         <View style={styles.tabs}>
           <TouchableOpacity onPress={() => setTab('suivis')} style={styles.tabBtn} activeOpacity={0.8}>
