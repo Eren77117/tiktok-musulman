@@ -6,6 +6,26 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.6.0',
+    date: '2026-06-04 · 06h00',
+    changes: [
+      'Onglet "Suivis" dans le feed — videos des comptes suivis',
+      'Live streaming corrige — viewer recoit la camera du broadcaster',
+      'Barre de progression verte sur chaque video',
+      'Badge duree video (haut gauche)',
+      'Commentaires : liker, repondre, supprimer les siens',
+      'Badge rouge sur onglet Boite (notifications non-lues)',
+      'J\'aime : sous-onglets "Pour toi" et "Fils"',
+      'Navigation : "Boite" (ex-Messages), bouton Live en haut gauche',
+      'Dark theme pur noir (#0A0A0A) style TikTok',
+      'Theme clair premium (gris perle)',
+      'Icone recherche en haut droite du feed',
+      'Photo de couverture sur les videos dans le profil (Cloudinary)',
+      'Avatars personnalises : sauvegarde + propagation corrigees',
+      'Messagerie H->H et F->F : fonctionne meme si conversation existante',
+    ],
+  },
+  {
     version: '1.5.0',
     date: '2026-06-04 · 02h06',
     changes: [
