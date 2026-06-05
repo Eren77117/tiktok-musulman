@@ -9,8 +9,9 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../../api/client';
 import { RootStackParamList } from '../../navigation';
-import { COLORS, FONT, SPACING, RADIUS, SHADOW } from '../../constants/theme';
-import { IcSearch, IcClose, IcHeart, IcUsers, IcPlay } from '../../components/ui/Icons';
+import { COLORS, FONT, SPACING, RADIUS } from '../../constants/theme';
+import { useTheme } from '../../hooks/useTheme';
+import { IcSearch, IcClose, IcHeart, IcPlay } from '../../components/ui/Icons';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -48,6 +49,7 @@ const CELL = (W - 2) / 3;
 export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<Nav>();
+  const theme = useTheme();
   const [query, setQuery] = useState('');
   const [debouncedQ, setDebouncedQ] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
@@ -98,9 +100,9 @@ export default function ExploreScreen() {
   ), [navigation]);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: theme.bg }]}>
       {/* Search bar */}
-      <View style={[styles.searchWrap, { backgroundColor: COLORS.white, borderBottomColor: COLORS.borderLight }]}>
+      <View style={[styles.searchWrap, { backgroundColor: theme.surface, borderBottomColor: theme.borderLight }]}>
         <View style={styles.searchBar}>
           <IcSearch size={18} color={COLORS.textMuted} />
           <TextInput
@@ -123,7 +125,7 @@ export default function ExploreScreen() {
       {isSearching ? (
         <View style={{ flex: 1 }}>
           {/* Search tabs */}
-          <View style={styles.searchTabs}>
+          <View style={[styles.searchTabs, { backgroundColor: theme.surface, borderBottomColor: theme.borderLight }]}>
             <TouchableOpacity style={[styles.searchTab, searchTab === 'videos' && styles.searchTabActive]} onPress={() => setSearchTab('videos')} activeOpacity={0.8}>
               <Text style={[styles.searchTabText, searchTab === 'videos' && styles.searchTabTextActive]}>Vidéos ({searchData?.posts?.length ?? 0})</Text>
             </TouchableOpacity>
@@ -138,10 +140,10 @@ export default function ExploreScreen() {
             <FlatList
               data={searchData?.users ?? []}
               keyExtractor={(u) => u.id}
-              contentContainerStyle={styles.listContent}
+              contentContainerStyle={[styles.listContent, { backgroundColor: theme.bg }]}
               renderItem={({ item: u }) => (
                 <TouchableOpacity
-                  style={styles.userRow}
+                  style={[styles.userRow, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}
                   onPress={() => navigation.navigate('UserProfile', { userId: u.id, username: u.username })}
                   activeOpacity={0.7}
                 >
@@ -154,10 +156,10 @@ export default function ExploreScreen() {
                   )}
                   <View style={styles.userInfo}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Text style={styles.displayName}>{u.display_name}</Text>
+                      <Text style={[styles.displayName, { color: theme.text }]}>{u.display_name}</Text>
                       {u.is_verified && <View style={styles.verifiedDot} />}
                     </View>
-                    <Text style={styles.username}>@{u.username} · {fmtNum(u.follower_count)} abonnés</Text>
+                    <Text style={[styles.username, { color: theme.textMuted }]}>@{u.username} · {fmtNum(u.follower_count)} abonnés</Text>
                   </View>
                 </TouchableOpacity>
               )}
@@ -180,19 +182,19 @@ export default function ExploreScreen() {
           data={trending?.items ?? []}
           keyExtractor={(p) => p.id}
           numColumns={3}
-          contentContainerStyle={{ gap: 1 }}
+          contentContainerStyle={{ gap: 1, flexGrow: 1, backgroundColor: theme.bg }}
           columnWrapperStyle={{ gap: 1 }}
           ListHeaderComponent={
-            <View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catsRow}>
+            <View style={{ backgroundColor: theme.surface }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.catsRow, { backgroundColor: theme.surface }]}>
                 {CATEGORIES.map((cat) => (
                   <TouchableOpacity
                     key={cat.id}
-                    style={[styles.catChip, activeCategory === cat.id && styles.catChipActive]}
+                    style={[styles.catChip, { backgroundColor: theme.card, borderColor: theme.border }, activeCategory === cat.id && styles.catChipActive]}
                     onPress={() => setActiveCategory(cat.id)}
                     activeOpacity={0.8}
                   >
-                    <Text style={[styles.catLabel, activeCategory === cat.id && styles.catLabelActive]}>{cat.label}</Text>
+                    <Text style={[styles.catLabel, { color: theme.textMuted }, activeCategory === cat.id && styles.catLabelActive]}>{cat.label}</Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -203,9 +205,9 @@ export default function ExploreScreen() {
             trendingLoading ? (
               <ActivityIndicator color={COLORS.primary} style={{ marginTop: 60 }} />
             ) : (
-              <View style={styles.emptyWrap}>
-                <Text style={styles.emptyTitle}>Aucun contenu</Text>
-                <Text style={styles.emptySubtitle}>Revenez bientôt</Text>
+              <View style={[styles.emptyWrap, { backgroundColor: theme.bg }]}>
+                <Text style={[styles.emptyTitle, { color: theme.text }]}>Aucun contenu</Text>
+                <Text style={[styles.emptySubtitle, { color: theme.textMuted }]}>Revenez bientôt</Text>
               </View>
             )
           }
@@ -232,7 +234,7 @@ function fmtNum(n: number) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
+  container: { flex: 1 },
 
   searchWrap: {
     padding: SPACING.sm, paddingHorizontal: SPACING.md,
@@ -247,8 +249,8 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: FONT.size.base },
 
   searchTabs: {
-    flexDirection: 'row', backgroundColor: COLORS.white,
-    borderBottomWidth: 1, borderBottomColor: COLORS.borderLight,
+    flexDirection: 'row',
+    borderBottomWidth: 1,
   },
   searchTab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
   searchTabActive: { borderBottomWidth: 2, borderBottomColor: COLORS.primary },

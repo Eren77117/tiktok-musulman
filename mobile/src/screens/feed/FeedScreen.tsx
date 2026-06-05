@@ -15,6 +15,7 @@ import { CommentsBottomSheet } from '../../components/video/CommentsBottomSheet'
 import { BookCard, BookItem } from '../../components/books/BookCard';
 import { COLORS, FONT } from '../../constants/theme';
 import { IcFilm, IcUsers, IcSearch } from '../../components/ui/Icons';
+import { Skeleton } from '../../components/ui/Skeleton';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 const { height: H } = Dimensions.get('window');
@@ -49,9 +50,10 @@ export default function FeedScreen() {
   const [visibleId, setVisibleId] = useState<string | null>(null);
   const [commentsPostId, setCommentsPostId] = useState<string | null>(null);
 
-  // Height available for each video item (screen H minus tab bar)
+  // Height = actual FlatList rendered height (measured via onLayout — avoids calculation bugs)
   const tabBarHeight = useBottomTabBarHeight();
-  const ITEM_H = H - tabBarHeight;
+  const [listHeight, setListHeight] = React.useState(H - tabBarHeight);
+  const ITEM_H = listHeight > 100 ? listHeight : H - tabBarHeight;
 
   // Pause all videos when leaving this screen
   const effectiveVisibleId = isFocused && (tab === 'pourtoi' || tab === 'suivis') ? visibleId : null;
@@ -202,6 +204,7 @@ export default function FeedScreen() {
         <FlatList<FeedPost>
           data={suivisData?.pages.flatMap(p => p.items) ?? []}
           keyExtractor={p => p.id}
+          onLayout={e => setListHeight(e.nativeEvent.layout.height)}
           renderItem={({ item }) => (
             <VideoPlayerItem
               post={item}
@@ -232,9 +235,15 @@ export default function FeedScreen() {
       )}
 
       {/* ── POUR TOI — fullscreen video feed ── */}
-      {tab === 'pourtoi' && (
+      {tab === 'pourtoi' && loadingFeed && (
+        <View style={{ flex: 1 }}>
+          {[0, 1, 2].map(i => <VideoSkeleton key={i} height={ITEM_H} />)}
+        </View>
+      )}
+      {tab === 'pourtoi' && !loadingFeed && (
         <FlatList<FeedItem>
           data={posts}
+          onLayout={e => setListHeight(e.nativeEvent.layout.height)}
           keyExtractor={p =>
             p.type === 'video' ? p.data.id :
             p.type === 'book' ? `book-${p.data.id}` :
@@ -267,11 +276,9 @@ export default function FeedScreen() {
           onEndReachedThreshold={0.5}
           getItemLayout={(_, index) => ({ length: ITEM_H, offset: ITEM_H * index, index })}
           ListEmptyComponent={
-            !loadingFeed ? (
-              <View style={styles.emptyWrap}>
-                <Text style={styles.emptyText}>Aucune vidéo pour l'instant</Text>
-              </View>
-            ) : null
+            <View style={styles.emptyWrap}>
+              <Text style={styles.emptyText}>Aucune vidéo pour l'instant</Text>
+            </View>
           }
         />
       )}
@@ -291,6 +298,31 @@ export default function FeedScreen() {
           insets={insets}
         />
       )}
+    </View>
+  );
+}
+
+// ── Video skeleton placeholder ───────────────────────────────────────────────────
+function VideoSkeleton({ height }: { height: number }) {
+  return (
+    <View style={{ width: '100%', height, backgroundColor: '#0a0a0a', overflow: 'hidden' }}>
+      {/* Background shimmer */}
+      <Skeleton width="100%" height={height} borderRadius={0} />
+      {/* Bottom-left info */}
+      <View style={{ position: 'absolute', bottom: 90, left: 16, gap: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Skeleton width={42} height={42} borderRadius={21} />
+          <Skeleton width={120} height={14} borderRadius={7} />
+        </View>
+        <Skeleton width={200} height={12} borderRadius={6} />
+        <Skeleton width={150} height={12} borderRadius={6} />
+      </View>
+      {/* Right side actions */}
+      <View style={{ position: 'absolute', right: 12, bottom: 100, gap: 22, alignItems: 'center' }}>
+        {[44, 44, 44, 44].map((s, i) => (
+          <Skeleton key={i} width={s} height={s} borderRadius={22} />
+        ))}
+      </View>
     </View>
   );
 }

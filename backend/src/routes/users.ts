@@ -8,6 +8,7 @@ const updateProfileSchema = z.object({
   display_name: z.string().min(1).max(50).optional(),
   bio: z.string().max(300).optional().nullable(),
   avatar_url: z.string().optional().nullable(),
+  cover_url: z.string().optional().nullable(),
 }).passthrough(); // allow extra keys from mobile settings
 
 export async function userRoutes(app: FastifyInstance) {
@@ -42,7 +43,7 @@ export async function userRoutes(app: FastifyInstance) {
       where: { username },
       select: {
         id: true, username: true, display_name: true, bio: true,
-        avatar_url: true, is_verified: true, gender: true,
+        avatar_url: true, cover_url: true, is_verified: true, gender: true,
         follower_count: true, following_count: true, post_count: true,
         like_count: true, created_at: true,
       },
@@ -67,22 +68,23 @@ export async function userRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
     // Only update fields that exist in User model
-    const { display_name, bio, avatar_url } = parsed.data;
+    const { display_name, bio, avatar_url, cover_url } = parsed.data;
     const updateData: Record<string, unknown> = {};
     if (display_name !== undefined) updateData.display_name = display_name;
     if (bio !== undefined) updateData.bio = bio;
     if (avatar_url !== undefined) updateData.avatar_url = avatar_url;
+    if (cover_url !== undefined) updateData.cover_url = cover_url;
 
     if (Object.keys(updateData).length === 0) {
       // Nothing to update in DB (e.g. settings-only patch)
-      const me = await prisma.user.findUnique({ where: { id: req.currentUser!.id }, select: { id: true, username: true, display_name: true, bio: true, avatar_url: true, is_verified: true } });
+      const me = await prisma.user.findUnique({ where: { id: req.currentUser!.id }, select: { id: true, username: true, display_name: true, bio: true, avatar_url: true, cover_url: true, is_verified: true } });
       return reply.send(me);
     }
 
     const user = await prisma.user.update({
       where: { id: req.currentUser!.id },
       data: updateData,
-      select: { id: true, username: true, display_name: true, bio: true, avatar_url: true, is_verified: true },
+      select: { id: true, username: true, display_name: true, bio: true, avatar_url: true, cover_url: true, is_verified: true },
     });
     return reply.send(user);
   });
@@ -151,6 +153,65 @@ export async function userRoutes(app: FastifyInstance) {
     return reply.send({
       items: items.map((f) => f.follower),
       next_cursor: hasMore ? items[items.length - 1].id : null,
+    });
+  });
+
+  app.get('/:id/following', { preHandler: authenticate }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { cursor, limit = '20' } = req.query as { cursor?: string; limit?: string };
+
+    const follows = await prisma.follow.findMany({
+      where: { follower_id: id },
+      take: parseInt(limit) + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      include: {
+        following: {
+          select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true },
+        },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+
+    const hasMore = follows.length > parseInt(limit);
+    const items = hasMore ? follows.slice(0, -1) : follows;
+    return reply.send({
+      items: items.map((f) => f.following),
+      next_cursor: hasMore ? items[items.length - 1].id : null,
+    });
+  });
+
+  // ── CREATOR STATS ────────────────────────────────────────────────────────────
+  app.get('/me/stats', { preHandler: authenticate }, async (req, reply) => {
+    const userId = req.currentUser!.id;
+    const [posts, views] = await Promise.all([
+      prisma.post.findMany({
+        where: { user_id: userId },
+        select: { id: true, caption: true, view_count: true, like_count: true, comment_count: true, share_count: true, thumbnail_url: true, created_at: true },
+        orderBy: { view_count: 'desc' },
+        take: 20,
+      }),
+      prisma.postView.aggregate({
+        where: { post: { user_id: userId } },
+        _count: { id: true },
+        _sum: { watch_time_ms: true },
+      }),
+    ]);
+
+    const completedViews = await prisma.postView.count({
+      where: { post: { user_id: userId }, completed: true },
+    });
+
+    const totalViews = views._count.id;
+    const completionRate = totalViews > 0 ? Math.round((completedViews / totalViews) * 100) : 0;
+    const totalWatchMs = views._sum.watch_time_ms ?? 0;
+
+    return reply.send({
+      total_views: posts.reduce((s, p) => s + p.view_count, 0),
+      total_likes: posts.reduce((s, p) => s + p.like_count, 0),
+      total_comments: posts.reduce((s, p) => s + p.comment_count, 0),
+      completion_rate: completionRate,
+      total_watch_ms: totalWatchMs,
+      top_posts: posts.slice(0, 10),
     });
   });
 

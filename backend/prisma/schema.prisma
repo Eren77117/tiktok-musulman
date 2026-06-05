@@ -63,6 +63,7 @@ model User {
   display_name      String
   bio               String?
   avatar_url        String?
+  cover_url         String?
   gender            Gender
   role              Role     @default(USER)
   is_verified       Boolean  @default(false)

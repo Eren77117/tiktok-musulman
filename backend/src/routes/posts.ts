@@ -186,7 +186,7 @@ export async function postRoutes(app: FastifyInstance) {
     const { category, limit = '20' } = req.query as { category?: string; limit?: string };
     const lim = parseInt(limit);
 
-    const where: Record<string, unknown> = { status: 'ACTIVE', is_public: true, video_url: { not: '' } };
+    const where: Record<string, unknown> = { video_url: { not: '' } };
 
     if (category && category !== 'all') {
       const cat = await prisma.category.findFirst({ where: { slug: category } });

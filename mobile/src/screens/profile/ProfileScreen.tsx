@@ -14,7 +14,7 @@ import { api } from '../../api/client';
 import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, SPACING, RADIUS, SHADOW } from '../../constants/theme';
 import { useTheme } from '../../hooks/useTheme';
-import { IcSettings, IcSave, IcCheck, IcHeart, IcGrid, IcEdit } from '../../components/ui/Icons';
+import { IcSettings, IcSave, IcCheck, IcHeart, IcGrid, IcEdit, IcCamera, IcChart } from '../../components/ui/Icons';
 import { EditProfileScreen } from './EditProfileScreen';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -71,6 +71,7 @@ export default function ProfileScreen() {
   const [likeSubTab, setLikeSubTab] = useState<LikeSubTab>('Pour toi');
   const [editVisible, setEditVisible] = useState(false);
   const [avatarLoading, setAvatarLoading] = useState(false);
+  const [coverLoading, setCoverLoading] = useState(false);
 
   const { data: posts, isLoading: postsLoading, refetch: refetchPosts, isRefetching } = useQuery<{ items: Post[] }>({
     queryKey: ['user-posts', user?.id],
