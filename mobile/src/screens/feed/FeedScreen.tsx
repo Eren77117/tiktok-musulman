@@ -61,7 +61,7 @@ export default function FeedScreen() {
   const ITEM_H = listHeight > 100 ? listHeight : H - tabBarHeight;
 
   // Pause all videos when leaving this screen
-  const effectiveVisibleId = isFocused && (tab === 'pourtoi' || tab === 'suivis' || tab === 'communaute') ? visibleId : null;
+  const effectiveVisibleId = isFocused && (tab === 'pourtoi' || tab === 'suivis') ? visibleId : null;
   const seenIds = useRef<string[]>([]);
 
   // ── Pour Toi (video feed) ────────────────────────────────────────────────────
@@ -214,10 +214,7 @@ export default function FeedScreen() {
           style={styles.tabsScroll}
         >
           {([
-            ['communaute', 'Communauté'],
-            ['proche', 'Proche'],
             ['suivis', 'Suivis'],
-            ['boutique', 'Boutique'],
             ['pourtoi', 'Pour toi'],
             ['fils', 'Fils'],
           ] as [FeedTab, string][]).map(([key, label]) => (

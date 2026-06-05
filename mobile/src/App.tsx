@@ -8,6 +8,7 @@ import { AppNavigator } from './navigation';
 import { useAuthStore } from './stores/authStore';
 import { useThemeStore } from './stores/themeStore';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { SplashScreen } from './components/ui/SplashScreen';
 import OnboardingScreen, { ONBOARDING_KEY } from './screens/onboarding/OnboardingScreen';
 import { api } from './api/client';
 
@@ -69,6 +70,7 @@ function AppRoot() {
   const { loadTheme, syncSystem } = useThemeStore();
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
   const [booted, setBooted] = useState(false);
+  const [splashDone, setSplashDone] = useState(false);
   const prevUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -104,9 +106,15 @@ function AppRoot() {
     }
   }, [user, booted]);
 
-  if (onboarded === null) return null;
-  if (!onboarded) return <OnboardingScreen onDone={() => setOnboarded(true)} />;
-  return <AppNavigator />;
+  return (
+    <>
+      {onboarded === null ? null : !onboarded
+        ? <OnboardingScreen onDone={() => setOnboarded(true)} />
+        : <AppNavigator />
+      }
+      {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
+    </>
+  );
 }
 
 export default function App() {
