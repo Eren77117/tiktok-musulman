@@ -697,7 +697,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
-  bottomLeft: { position: 'absolute', bottom: 44, left: 14, right: 88, gap: 6 },
+  bottomLeft: { position: 'absolute', bottom: 72, left: 14, right: 88, gap: 6 },
   usernameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   username: { fontSize: FONT.size.base, fontWeight: FONT.weight.bold, color: COLORS.white },
   verifiedBadge: {
@@ -709,7 +709,7 @@ const styles = StyleSheet.create({
   soundRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   soundText: { fontSize: FONT.size.xs, color: 'rgba(255,255,255,0.85)', flexShrink: 1 },
 
-  rightActions: { position: 'absolute', right: 10, bottom: 48, alignItems: 'center', gap: 24 },
+  rightActions: { position: 'absolute', right: 10, bottom: 76, alignItems: 'center', gap: 24 },
   avatarWrap: { position: 'relative', marginBottom: 4 },
   avatar: {
     width: 50, height: 50, borderRadius: 25,
@@ -752,21 +752,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#000', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
   },
 
-  // Seek bar — positioned 12px above bottom edge, 44px tall touch zone
+  // Seek bar — 16px above bottom, 44px touch zone, 4px bar
   seekBarHit: {
-    position: 'absolute', bottom: 12, left: 0, right: 0,
-    height: 44, justifyContent: 'center', paddingHorizontal: 0,
+    position: 'absolute', bottom: 16, left: 0, right: 0,
+    height: 44, justifyContent: 'center',
   },
   progressBg: {
-    height: 3.5, backgroundColor: 'rgba(255,255,255,0.28)',
-    marginHorizontal: 0, position: 'relative',
+    height: 4, backgroundColor: 'rgba(255,255,255,0.30)',
+    marginHorizontal: 0, position: 'relative', borderRadius: 2,
   },
-  progressFill: { position: 'absolute', top: 0, left: 0, height: '100%', backgroundColor: COLORS.primary },
+  progressFill: { position: 'absolute', top: 0, left: 0, height: '100%', backgroundColor: COLORS.primaryLight, borderRadius: 2 },
   progressThumb: {
-    position: 'absolute', top: -6, width: 14, height: 14,
-    borderRadius: 7, backgroundColor: COLORS.white,
-    marginLeft: -7, shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5, shadowRadius: 3,
+    position: 'absolute', top: -7, width: 16, height: 16,
+    borderRadius: 8, backgroundColor: COLORS.white,
+    marginLeft: -8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.6, shadowRadius: 4,
   },
   seekTimeBubble: {
     position: 'absolute', bottom: 62, alignSelf: 'center',

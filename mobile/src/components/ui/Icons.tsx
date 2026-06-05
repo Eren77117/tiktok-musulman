@@ -16,6 +16,7 @@ import {
   Star, Award, Shield, Zap, LogOut, HelpCircle,
   Globe, Volume2, VolumeX, Moon, Sun, FileText,
   AtSign, Hash, Repeat2, ThumbsUp, Smile, Flag,
+  Radio, PenLine,
 } from 'lucide-react-native';
 import { COLORS } from '../../constants/theme';
 
@@ -118,6 +119,10 @@ export const IcClock      = mk(Clock);
 export const IcRefresh    = mk(RefreshCw);
 export const IcText       = mk(FileText);
 export const IcSmile      = mk(Smile);
+
+// ── Live / Radio ──────────────────────────────────────────────────────────────
+export const IcLive       = mk(Radio);
+export const IcPen        = mk(PenLine);
 
 // ── Brand icon (moon = symbole islamique propre) ──────────────────────────────
 export const IcBrand = ({ size = 32, color = COLORS.primary }: IconProps) =>

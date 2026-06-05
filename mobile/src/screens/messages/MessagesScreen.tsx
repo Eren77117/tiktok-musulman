@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
   },
   badgeText: { color: COLORS.white, fontSize: 11, fontWeight: '700' },
-  empty: { alignItems: 'center', paddingTop: 80, gap: 8 },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80, gap: 8 },
   emptyTitle: { fontSize: FONT.size.lg, fontWeight: FONT.weight.semibold },
   emptySub: { fontSize: FONT.size.sm },
 });

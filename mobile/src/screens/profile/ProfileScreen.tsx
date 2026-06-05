@@ -229,15 +229,15 @@ export default function ProfileScreen() {
           {user.bio ? <Text style={[styles.bio, { color: theme.textMuted }]}>{user.bio}</Text> : null}
 
           <View style={styles.statsRow}>
-            <StatItem label="Abonnements" value={user.following_count ?? 0} />
-            <View style={styles.statDivider} />
-            <StatItem label="Abonnés" value={user.follower_count ?? 0} />
-            <View style={styles.statDivider} />
-            <StatItem label="Publications" value={user.post_count ?? 0} />
+            <StatItem label="Abonnements" value={user.following_count ?? 0} theme={theme} />
+            <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
+            <StatItem label="Abonnés" value={user.follower_count ?? 0} theme={theme} />
+            <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
+            <StatItem label="Publications" value={user.post_count ?? 0} theme={theme} />
           </View>
 
-          <TouchableOpacity style={styles.editBtn} onPress={() => setEditVisible(true)} activeOpacity={0.8}>
-            <Text style={styles.editBtnText}>Modifier le profil</Text>
+          <TouchableOpacity style={[styles.editBtn, { borderColor: theme.border }]} onPress={() => setEditVisible(true)} activeOpacity={0.8}>
+            <Text style={[styles.editBtnText, { color: theme.text }]}>Modifier le profil</Text>
           </TouchableOpacity>
         </View>
 
@@ -368,11 +368,11 @@ function EmptyTab({ tab }: { tab: number }) {
   );
 }
 
-function StatItem({ label, value }: { label: string; value: number }) {
+function StatItem({ label, value, theme }: { label: string; value: number; theme: any }) {
   return (
     <View style={styles.statItem}>
-      <Text style={styles.statValue}>{fmtNum(value)}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={[styles.statValue, { color: theme.text }]}>{fmtNum(value)}</Text>
+      <Text style={[styles.statLabel, { color: theme.textMuted }]}>{label}</Text>
     </View>
   );
 }

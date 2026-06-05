@@ -14,7 +14,7 @@ import { useAuthStore } from '../stores/authStore';
 import { COLORS, FONT, SPACING, RADIUS, SHADOW } from '../constants/theme';
 import {
   IcHome, IcExplore, IcCreate, IcMail,
-  IcProfile, IcBrand,
+  IcProfile, IcBrand, IcLive, IcPen,
 } from '../components/ui/Icons';
 
 // Auth
@@ -129,7 +129,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
             <TouchableOpacity style={[styles.sheetOption, { backgroundColor: theme.bg }]} activeOpacity={0.8}
               onPress={() => { setShowCreateSheet(false); navigation.navigate('ThreadComposer'); }}>
               <View style={[styles.sheetOptionIcon, { backgroundColor: theme.primaryBg }]}>
-                <IcBrand size={24} color={COLORS.primary} />
+                <IcPen size={24} color={COLORS.primary} />
               </View>
               <View style={styles.sheetOptionText}>
                 <Text style={[styles.sheetOptionTitle, { color: theme.text }]}>Nouveau fil</Text>
@@ -138,8 +138,8 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
             </TouchableOpacity>
             <TouchableOpacity style={[styles.sheetOption, { backgroundColor: theme.bg }]} activeOpacity={0.8}
               onPress={() => { setShowCreateSheet(false); navigation.navigate('GoLive'); }}>
-              <View style={[styles.sheetOptionIcon, { backgroundColor: '#FEE2E2' }]}>
-                <Text style={{ fontSize: 22 }}>🔴</Text>
+              <View style={[styles.sheetOptionIcon, { backgroundColor: '#FF3B3020' }]}>
+                <IcLive size={24} color="#FF3B30" />
               </View>
               <View style={styles.sheetOptionText}>
                 <Text style={[styles.sheetOptionTitle, { color: theme.text }]}>Démarrer un live</Text>
