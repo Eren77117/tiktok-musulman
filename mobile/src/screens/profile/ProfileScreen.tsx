@@ -478,8 +478,10 @@ const styles = StyleSheet.create({
   avatarContainer: { position: 'relative' },
   storyRing: {
     position: 'absolute', width: 108, height: 108, borderRadius: 54,
-    borderWidth: 3, borderColor: COLORS.primary,
+    borderWidth: 3, borderColor: '#00E57A',
     top: -6, left: -6, zIndex: 0,
+    shadowColor: '#00E57A', shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9, shadowRadius: 10, elevation: 10,
   },
   avatarWrap: { position: 'relative', zIndex: 1 },
   avatarWrapWithStory: { padding: 3 },

@@ -90,6 +90,14 @@ export default function UserProfileScreen({ route, navigation }: Props) {
     enabled: !!(userId || profile?.id) && activeTab === 1,
   });
 
+  const { data: userStories } = useQuery<any[]>({
+    queryKey: ['user-stories', userId || profile?.id],
+    queryFn: () => api.get(`/stories?user_id=${userId || profile?.id}`).then(r => r.data).catch(() => []),
+    enabled: !!(userId || profile?.id),
+    staleTime: 30_000,
+  });
+  const hasStory = (userStories ?? []).length > 0;
+
   const followMutation = useMutation({
     mutationFn: () => api.post(`/users/${profile?.id}/follow`),
     onMutate: () => {
@@ -263,11 +271,17 @@ export default function UserProfileScreen({ route, navigation }: Props) {
         columnWrapperStyle={{ gap: 1 }}
         ListHeaderComponent={
           <View style={[styles.hero, { backgroundColor: theme.surface, borderBottomColor: theme.borderLight }]}>
-            {/* Avatar — red ring if live */}
+            {/* Avatar — ring story vert ou ring live rouge */}
             <TouchableOpacity
-              style={[styles.avatarWrap, profile.active_live_session_id && styles.avatarLiveRing]}
-              activeOpacity={profile.active_live_session_id ? 0.8 : 1}
-              onPress={profile.active_live_session_id ? handleLivePress : undefined}
+              style={[
+                styles.avatarWrap,
+                profile.active_live_session_id && styles.avatarLiveRing,
+                hasStory && !profile.active_live_session_id && styles.avatarStoryRing,
+              ]}
+              activeOpacity={0.85}
+              onPress={profile.active_live_session_id ? handleLivePress
+                : hasStory ? () => navigation.navigate('StoryViewer', { groups: userStories ?? [], initialGroupIndex: 0 })
+                : undefined}
             >
               {profile.avatar_url
                 ? <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
@@ -541,6 +555,11 @@ const styles = StyleSheet.create({
   },
   avatarWrap: { position: 'relative', marginBottom: 4 },
   avatarLiveRing: { padding: 3, borderRadius: 50, borderWidth: 3, borderColor: '#FF3B30' },
+  avatarStoryRing: {
+    padding: 3, borderRadius: 50, borderWidth: 3, borderColor: '#00E57A',
+    shadowColor: '#00E57A', shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.85, shadowRadius: 8, elevation: 8,
+  },
   avatar: { width: 88, height: 88, borderRadius: 44 },
   avatarFallback: { borderWidth: 3, borderColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
   avatarInitial: { fontSize: 34, fontWeight: FONT.weight.bold, color: COLORS.primary },

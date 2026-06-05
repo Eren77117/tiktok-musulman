@@ -35,7 +35,7 @@ export interface FeedPost {
   is_saved?: boolean;
   user: {
     id: string; username: string; display_name: string;
-    avatar_url: string | null; is_verified: boolean; is_following?: boolean;
+    avatar_url: string | null; is_verified: boolean; is_following?: boolean; has_story?: boolean;
   };
   sound: { id: string; title: string; artist: string | null } | null;
   reposted_by?: { id: string; username: string; avatar_url: string | null } | null;
@@ -555,9 +555,13 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
       {/* Right actions */}
       <View style={styles.rightActions}>
         {/* Avatar + follow */}
-        <TouchableOpacity style={styles.avatarWrap} onPress={goToProfile} activeOpacity={0.85}>
+        <TouchableOpacity
+          style={[styles.avatarWrap, post.user.has_story && styles.avatarStoryRing]}
+          onPress={goToProfile}
+          activeOpacity={0.85}
+        >
           {post.user.avatar_url
-            ? <Image source={{ uri: post.user.avatar_url }} style={styles.avatar} />
+            ? <Image source={{ uri: post.user.avatar_url }} style={[styles.avatar, post.user.has_story && { borderColor: 'transparent' }]} />
             : <View style={styles.avatarFallback}>
                 <Text style={styles.avatarInitial}>{post.user.display_name[0]?.toUpperCase()}</Text>
               </View>
@@ -825,6 +829,10 @@ const styles = StyleSheet.create({
 
   rightActions: { position: 'absolute', right: 10, bottom: 88, alignItems: 'center', gap: 20 },
   avatarWrap: { position: 'relative', marginBottom: 6 },
+  avatarStoryRing: {
+    borderRadius: 30, borderWidth: 2.5, borderColor: '#00E57A', padding: 2,
+    shadowColor: '#00E57A', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.9, shadowRadius: 8,
+  },
   avatar: {
     width: 50, height: 50, borderRadius: 25,
     borderWidth: 2, borderColor: '#00C26E',

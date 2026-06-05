@@ -352,14 +352,16 @@ export async function postRoutes(app: FastifyInstance) {
 
     const itemPosts = items.map(s => s.post);
     const userIds = [...new Set(itemPosts.map(p => p.user.id))];
-    const [likedIds, savedIds, followedIds] = await Promise.all([
+    const [likedIds, savedIds, followedIds, activeStories] = await Promise.all([
       prisma.like.findMany({ where: { user_id: userId, post_id: { in: itemPosts.map(p => p.id) } }, select: { post_id: true } }),
       prisma.favorite.findMany({ where: { user_id: userId, post_id: { in: itemPosts.map(p => p.id) } }, select: { post_id: true } }),
       prisma.follow.findMany({ where: { follower_id: userId, following_id: { in: userIds } }, select: { following_id: true } }),
+      prisma.story.findMany({ where: { user_id: { in: userIds }, expires_at: { gt: new Date() }, archived: false }, select: { user_id: true } }),
     ]);
     const likedSet = new Set(likedIds.map(l => l.post_id));
     const savedSet = new Set(savedIds.map(s => s.post_id));
     const followedSet = new Set(followedIds.map(f => f.following_id));
+    const storyUserSet = new Set(activeStories.map(s => s.user_id));
 
     return reply.send({
       items: itemPosts.map(p => ({
@@ -368,7 +370,7 @@ export async function postRoutes(app: FastifyInstance) {
         is_saved: savedSet.has(p.id),
         categories: p.post_categories.map(pc => pc.category),
         post_categories: undefined,
-        user: { ...p.user, is_following: followedSet.has(p.user.id) },
+        user: { ...p.user, is_following: followedSet.has(p.user.id), has_story: storyUserSet.has(p.user.id) },
       })),
       next_cursor: hasMore ? items[items.length - 1].post.id : null,
     });
