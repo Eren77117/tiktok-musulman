@@ -327,7 +327,7 @@ function GridItem({ item, onPress }: { item: Post; onPress: () => void }) {
         </View>
       ) : (
         <View style={[styles.gridThumb, styles.gridThumbFallback]}>
-          <IcGrid size={24} color={COLORS.primaryLight} />
+          <IcPlay size={28} color={COLORS.primaryLight} />
         </View>
       )}
       <View style={styles.gridOverlay}>

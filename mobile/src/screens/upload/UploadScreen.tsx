@@ -178,12 +178,13 @@ export default function UploadScreen() {
       if (!uploadData?.url) throw new Error('URL manquante — vérifiez la configuration Cloudinary');
       const videoUrl = uploadData.url.startsWith('http') ? uploadData.url : `${API_BASE_URL.replace('/api', '')}${uploadData.url}`;
 
-      // ── Thumbnail extraction (BEFORE publishing) ─────────────────────────
-      let thumbnailUrl: string | undefined;
+      // ── Thumbnail — priorité: backend Cloudinary → local extract → fallback ──
+      let thumbnailUrl: string | undefined = uploadData.thumbnail_url ?? undefined;
+
       if (media.isImage) {
         thumbnailUrl = videoUrl;
-      } else {
-        // Step 1: Extract first frame from local file and upload
+      } else if (!thumbnailUrl) {
+        // Local frame extraction → upload as image
         try {
           setUploadStep('Extraction de la couverture...');
           animateProgress(75);
@@ -203,10 +204,10 @@ export default function UploadScreen() {
           }
         } catch {}
 
-        // Step 2: Cloudinary auto-thumbnail (always as final fallback for video)
+        // Cloudinary auto-thumbnail fallback
         if (!thumbnailUrl && videoUrl.includes('cloudinary.com')) {
           thumbnailUrl = videoUrl
-            .replace('/video/upload/', '/video/upload/so_0,q_auto,f_jpg/')
+            .replace('/video/upload/', '/video/upload/so_0,q_auto,f_jpg,w_720,h_1280,c_fill/')
             .replace(/\.(mp4|mov|avi|webm|mkv)$/i, '.jpg');
         }
       }

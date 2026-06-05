@@ -57,16 +57,21 @@ export async function uploadRoutes(app: FastifyInstance) {
       return reply.send({ url: `${base}/uploads/${filename}` });
     }
 
-    const result = await new Promise<{ secure_url: string }>((resolve, reject) => {
+    const result = await new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
       cloudinary.uploader
         .upload_stream({ resource_type: 'video', folder: 'nour/videos' }, (err, res) => {
           if (err || !res) return reject(err ?? new Error('Upload failed'));
-          resolve(res as { secure_url: string });
+          resolve(res as { secure_url: string; public_id: string });
         })
         .end(buffer);
     });
 
-    return reply.send({ url: result.secure_url });
+    // Derive thumbnail URL from Cloudinary video (first frame, portrait crop)
+    const thumbnailUrl = result.secure_url
+      .replace('/video/upload/', '/video/upload/so_0,q_auto,f_jpg,w_720,h_1280,c_fill/')
+      .replace(/\.(mp4|mov|avi|webm|mkv)$/i, '.jpg');
+
+    return reply.send({ url: result.secure_url, thumbnail_url: thumbnailUrl });
   });
 
   app.post('/image', { preHandler: authenticate }, async (req, reply) => {
