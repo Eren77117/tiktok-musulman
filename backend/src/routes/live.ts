@@ -32,7 +32,7 @@ export async function liveRoutes(app: FastifyInstance) {
       await prisma.notification.createMany({
         data: followers.map(f => ({
           user_id: f.follower_id, type: 'LIVE_START',
-          title: '🔴 Live en cours',
+          title: 'Live en cours',
           body: `${session.user.display_name} est en direct — rejoignez maintenant !`,
           data: { session_id: session.id },
         })),

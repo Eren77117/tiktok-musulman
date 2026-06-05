@@ -16,7 +16,7 @@ import { API_BASE_URL } from '../../constants/theme';
 import { useAuthStore } from '../../stores/authStore';
 import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, SPACING, RADIUS } from '../../constants/theme';
-import { IcClose, IcUsers, IcMail } from '../../components/ui/Icons';
+import { IcClose, IcUsers, IcMail, IcRefresh } from '../../components/ui/Icons';
 
 const { width: W, height: H } = Dimensions.get('window');
 const SOCKET_URL = API_BASE_URL.replace('/api', '');
@@ -188,7 +188,7 @@ export default function GoLiveScreen({ navigation }: Props) {
     const newState = !chatEnabled;
     setChatEnabled(newState);
     await api.patch(`/live/${sessionRef.current}/chat`, { enabled: newState }).catch(() => {});
-    socketRef.current?.emit('live:comment', { sessionId: sessionRef.current, text: `💬 Chat ${newState ? 'activé' : 'désactivé'}` });
+    socketRef.current?.emit('live:comment', { sessionId: sessionRef.current, text: `Chat ${newState ? 'activé' : 'désactivé'}` });
   };
 
   const CATEGORIES = ['general', 'rappel', 'coran', 'motivation', 'question'];
@@ -211,7 +211,7 @@ export default function GoLiveScreen({ navigation }: Props) {
           </TouchableOpacity>
           <Text style={styles.setupTitle}>Nouveau live</Text>
           <TouchableOpacity onPress={toggleCamera} style={styles.iconBtn}>
-            <Text style={styles.flipIcon}>⟲</Text>
+            <IcRefresh size={22} color={COLORS.white} />
           </TouchableOpacity>
         </View>
 
@@ -235,7 +235,7 @@ export default function GoLiveScreen({ navigation }: Props) {
           </View>
 
           <TouchableOpacity style={[styles.goBtn, (!title.trim() || loading) && { opacity: 0.5 }]} onPress={startLive} disabled={!title.trim() || loading} activeOpacity={0.85}>
-            {loading ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.goBtnText}>🔴 Commencer le live</Text>}
+            {loading ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.goBtnText}>Commencer le live</Text>}
           </TouchableOpacity>
         </View>
       </View>
@@ -295,7 +295,7 @@ export default function GoLiveScreen({ navigation }: Props) {
             returnKeyType="send"
           />
           <TouchableOpacity style={styles.sendBtn} onPress={sendChatMessage} activeOpacity={0.8}>
-            <Text style={styles.sendBtnText}>→</Text>
+            <IcMail size={16} color={COLORS.white} />
           </TouchableOpacity>
         </View>
       )}
@@ -303,7 +303,7 @@ export default function GoLiveScreen({ navigation }: Props) {
       {/* Controls */}
       <View style={[styles.controls, { bottom: insets.bottom + 80 }]}>
         <TouchableOpacity style={styles.ctrlBtn} onPress={toggleCamera} activeOpacity={0.8}>
-          <Text style={styles.ctrlIcon}>⟲</Text>
+          <IcRefresh size={20} color={COLORS.white} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.ctrlBtn} onPress={toggleChat} activeOpacity={0.8}>
           <IcMail size={18} color={chatEnabled ? COLORS.primary : COLORS.white} />

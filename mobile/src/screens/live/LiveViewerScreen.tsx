@@ -16,7 +16,7 @@ import { api, getTokens } from '../../api/client';
 import { API_BASE_URL } from '../../constants/theme';
 import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, SPACING, RADIUS } from '../../constants/theme';
-import { IcClose, IcHeart, IcUsers } from '../../components/ui/Icons';
+import { IcClose, IcHeart, IcUsers, IcSend } from '../../components/ui/Icons';
 
 const { width: W, height: H } = Dimensions.get('window');
 const SOCKET_URL = API_BASE_URL.replace('/api', '');
@@ -224,7 +224,7 @@ export default function LiveViewerScreen({ route, navigation }: Props) {
             returnKeyType="send"
           />
           <TouchableOpacity style={styles.sendBtn} onPress={sendMessage}>
-            <Text style={styles.sendText}>→</Text>
+            <IcSend size={16} color={COLORS.white} />
           </TouchableOpacity>
         </View>
       )}

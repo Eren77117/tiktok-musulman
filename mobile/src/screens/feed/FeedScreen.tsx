@@ -220,7 +220,7 @@ export default function FeedScreen() {
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig.current}
           onEndReached={() => hasNextSuivis && !fetchingSuivis && fetchNextSuivis()}
-          onEndReachedThreshold={0.5}
+          onEndReachedThreshold={2}
           getItemLayout={(_, i) => ({ length: ITEM_H, offset: ITEM_H * i, index: i })}
           ListEmptyComponent={
             !loadingSuivis ? (
@@ -272,7 +272,7 @@ export default function FeedScreen() {
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig.current}
           onEndReached={() => hasNextFeed && !fetchingFeed && fetchNextFeed()}
-          onEndReachedThreshold={0.5}
+          onEndReachedThreshold={2}
           getItemLayout={(_, index) => ({ length: ITEM_H, offset: ITEM_H * index, index })}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
@@ -482,7 +482,7 @@ function FilsFeed({
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.primary} />}
         onEndReached={onLoadMore}
-        onEndReachedThreshold={0.4}
+        onEndReachedThreshold={2}
         renderItem={({ item: t }) => (
           <ThreadCard item={t} onUserPress={() => onUserPress(t.user.id, t.user.username)} onPress={() => onThreadPress(t.id)} theme={theme} />
         )}

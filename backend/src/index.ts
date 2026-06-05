@@ -89,6 +89,19 @@ async function bootstrap() {
 
   process.stdout.write(`[OK] Backend running on port ${env.PORT}\n`);
 
+  // ── Keep-alive self-ping (Railway free tier prevention) ──────────────────────
+  const SELF_URL = process.env.RAILWAY_STATIC_URL
+    ? `https://${process.env.RAILWAY_STATIC_URL}/health`
+    : `http://localhost:${env.PORT}/health`;
+  setInterval(async () => {
+    try {
+      const res = await fetch(SELF_URL);
+      if (!res.ok) process.stdout.write(`[PING] Health check failed: ${res.status}\n`);
+    } catch (e: any) {
+      process.stdout.write(`[PING] Self-ping error: ${e.message}\n`);
+    }
+  }, 4 * 60 * 1000); // toutes les 4 minutes
+
   const shutdown = async () => {
     await app.close();
     await prisma.$disconnect();

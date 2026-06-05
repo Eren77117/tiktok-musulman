@@ -9,28 +9,87 @@ import { useAuthStore } from './stores/authStore';
 import { useThemeStore } from './stores/themeStore';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import OnboardingScreen, { ONBOARDING_KEY } from './screens/onboarding/OnboardingScreen';
+import { api } from './api/client';
 
+// ── QueryClient global — stale 30s, retry 2× ────────────────────────────────
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 20_000, retry: 2, refetchOnWindowFocus: true },
+    queries: { staleTime: 30_000, retry: 2, refetchOnWindowFocus: true },
     mutations: { retry: 0 },
   },
 });
 
+// ── Boot prefetch — charge tout en parallèle au lancement ───────────────────
+// Met les résultats dans React Query cache → écrans s'ouvrent instantanément
+async function bootPrefetch() {
+  try {
+    const [feed, threads, conversations, unread, me] = await Promise.allSettled([
+      // 3 premières vidéos (Pour toi)
+      api.get('/posts/feed', { params: { limit: 5 } }),
+      // 10 premiers fils
+      api.get('/threads', { params: { limit: 10 } }),
+      // liste conversations
+      api.get('/messages/conversations'),
+      // badge notifications
+      api.get('/notifications/unread-count'),
+      // profil
+      api.get('/auth/me'),
+    ]);
+
+    // Injecte dans le cache React Query — zéro appel réseau au premier rendu
+    if (feed.status === 'fulfilled') {
+      queryClient.setQueryData(['feed'], {
+        pages: [feed.value.data],
+        pageParams: [null],
+      });
+    }
+    if (threads.status === 'fulfilled') {
+      queryClient.setQueryData(['threads'], {
+        pages: [threads.value.data],
+        pageParams: [null],
+      });
+    }
+    if (conversations.status === 'fulfilled') {
+      queryClient.setQueryData(['conversations'], conversations.value.data);
+    }
+    if (unread.status === 'fulfilled') {
+      queryClient.setQueryData(['notif-unread'], unread.value.data);
+    }
+    if (me.status === 'fulfilled') {
+      queryClient.setQueryData(['me'], me.value.data);
+    }
+  } catch {
+    // Silencieux — l'app fonctionne normalement si prefetch échoue
+  }
+}
+
 function AppRoot() {
-  const { loadMe } = useAuthStore();
+  const { loadMe, user } = useAuthStore();
   const { loadTheme, syncSystem } = useThemeStore();
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
+  const [booted, setBooted] = useState(false);
 
   useEffect(() => {
-    loadMe();
-    loadTheme();
-    AsyncStorage.getItem(ONBOARDING_KEY).then(v => setOnboarded(!!v));
+    (async () => {
+      await loadMe();
+      await loadTheme();
+      const v = await AsyncStorage.getItem(ONBOARDING_KEY);
+      setOnboarded(!!v);
+    })();
+
     const sub = Appearance.addChangeListener(() => syncSystem());
     return () => sub.remove();
   }, []);
 
-  if (onboarded === null) return null; // Loading
+  // Lance le prefetch dès que l'user est connu (authentifié)
+  useEffect(() => {
+    if (user && !booted) {
+      setBooted(true);
+      bootPrefetch();
+    }
+  }, [user, booted]);
+
+  if (onboarded === null) return null;
   if (!onboarded) return <OnboardingScreen onDone={() => setOnboarded(true)} />;
   return <AppNavigator />;
 }

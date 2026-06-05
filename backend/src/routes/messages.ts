@@ -246,6 +246,42 @@ export async function messageRoutes(app: FastifyInstance) {
     return reply.status(201).send(message);
   });
 
+  // ── Message reaction (toggle) ───────────────────────────────────────────────
+  app.post('/conversations/:id/messages/:msgId/react', { preHandler: authenticate }, async (req, reply) => {
+    const { id, msgId } = req.params as { id: string; msgId: string };
+    const { emoji } = req.body as { emoji: string };
+    const userId = req.currentUser!.id;
+
+    const message = await prisma.message.findUnique({ where: { id: msgId } });
+    if (!message || message.conversation_id !== id) return reply.status(404).send({ error: 'Not found' });
+
+    // reactions stored as JSON in message.metadata field or just log reaction
+    // For now: store in a separate field — use metadata JSON
+    const meta = (message as any).metadata as Record<string, unknown> ?? {};
+    const reactions = (meta.reactions as Record<string, string>) ?? {};
+
+    if (emoji) reactions[userId] = emoji;
+    else delete reactions[userId];
+
+    await prisma.message.update({
+      where: { id: msgId },
+      data: { metadata: { ...meta, reactions } } as any,
+    });
+
+    return reply.send({ ok: true, reactions });
+  });
+
+  // ── Delete a message ────────────────────────────────────────────────────────
+  app.delete('/conversations/:id/messages/:msgId', { preHandler: authenticate }, async (req, reply) => {
+    const { id, msgId } = req.params as { id: string; msgId: string };
+    const userId = req.currentUser!.id;
+    const message = await prisma.message.findUnique({ where: { id: msgId } });
+    if (!message || message.conversation_id !== id) return reply.status(404).send({ error: 'Not found' });
+    if (message.sender_id !== userId) return reply.status(403).send({ error: 'Forbidden' });
+    await prisma.message.update({ where: { id: msgId }, data: { content: '[DELETED]' } });
+    return reply.send({ ok: true });
+  });
+
   app.get('/requests/pending', { preHandler: authenticate }, async (req, reply) => {
     const requests = await prisma.conversationRequest.findMany({
       where: { recipient_id: req.currentUser!.id, status: 'PENDING' },
