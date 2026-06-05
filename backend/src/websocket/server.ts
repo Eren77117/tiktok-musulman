@@ -79,20 +79,24 @@ export function createSocketServer(httpServer: HttpServer) {
       io.to(`conversation:${data.conversationId}`).emit('message:new', message);
     });
 
-    socket.on('live:join', (sessionId: string) => {
+    socket.on('live:join', async (sessionId: string) => {
       socket.join(`live:${sessionId}`);
-      prisma.liveSession.update({
+      const session = await prisma.liveSession.update({
         where: { id: sessionId },
         data: { viewer_count: { increment: 1 } },
-      }).catch(() => {});
+        select: { viewer_count: true },
+      }).catch(() => null);
+      if (session) io.to(`live:${sessionId}`).emit('live:viewer:count', session.viewer_count);
     });
 
-    socket.on('live:leave', (sessionId: string) => {
+    socket.on('live:leave', async (sessionId: string) => {
       socket.leave(`live:${sessionId}`);
-      prisma.liveSession.update({
+      const session = await prisma.liveSession.update({
         where: { id: sessionId },
         data: { viewer_count: { decrement: 1 } },
-      }).catch(() => {});
+        select: { viewer_count: true },
+      }).catch(() => null);
+      if (session) io.to(`live:${sessionId}`).emit('live:viewer:count', Math.max(0, session.viewer_count));
     });
 
     socket.on('live:comment', async (data: { sessionId: string; text: string }) => {

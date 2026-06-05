@@ -118,8 +118,8 @@ export default function LiveViewerScreen({ route, navigation }: Props) {
         }
       });
 
-      // Viewer count updates
-      socket.on('live:viewer:joined', () => setViewerCount(c => c + 1));
+      // Viewer count updates (real-time from backend)
+      socket.on('live:viewer:count', (count: number) => setViewerCount(count));
     })();
 
     return () => {
