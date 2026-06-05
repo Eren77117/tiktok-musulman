@@ -2,6 +2,7 @@ import type { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import { env } from '../config/env';
 import { prisma } from '../config/database';
+import { setIo } from './instance';
 
 interface AuthSocket extends Socket {
   userId?: string;
@@ -13,6 +14,7 @@ export function createSocketServer(httpServer: HttpServer) {
     transports: ['websocket', 'polling'],
   });
 
+  setIo(io);
   const userSockets = new Map<string, Set<string>>();
 
   io.use(async (socket: AuthSocket, next) => {
@@ -46,6 +48,14 @@ export function createSocketServer(httpServer: HttpServer) {
     userSockets.get(userId)!.add(socket.id);
 
     socket.join(`user:${userId}`);
+
+    socket.on('post:watch', (postId: string) => {
+      socket.join(`post:${postId}`);
+    });
+
+    socket.on('post:unwatch', (postId: string) => {
+      socket.leave(`post:${postId}`);
+    });
 
     socket.on('join:conversation', (conversationId: string) => {
       socket.join(`conversation:${conversationId}`);

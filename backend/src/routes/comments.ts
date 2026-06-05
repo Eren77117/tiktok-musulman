@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { prisma } from '../config/database';
 import { authenticate } from '../middleware/auth';
 import { z } from 'zod';
+import { getIo } from '../websocket/instance';
 
 const commentSchema = z.object({
   content: z.string().min(1).max(500),
@@ -79,6 +80,14 @@ export async function commentRoutes(app: FastifyInstance) {
         },
       });
     }
+
+    // Broadcast new comment to everyone watching this post
+    getIo()?.to(`post:${postId}`).emit('comment:new', {
+      ...comment,
+      like_count: 0,
+      reply_count: 0,
+      is_liked: false,
+    });
 
     return reply.status(201).send(comment);
   });

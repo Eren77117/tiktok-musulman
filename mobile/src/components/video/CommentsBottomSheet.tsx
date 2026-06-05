@@ -6,11 +6,14 @@ import {
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-import { api } from '../../api/client';
+import { io, Socket } from 'socket.io-client';
+import { api, getTokens } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
 import { useTheme } from '../../hooks/useTheme';
-import { COLORS, FONT, SPACING, RADIUS } from '../../constants/theme';
+import { COLORS, FONT, SPACING, RADIUS, API_BASE_URL } from '../../constants/theme';
 import { IcClose, IcSend, IcHeartFill, IcHeart, IcComment, IcMore, IcFilterSort } from '../ui/Icons';
+
+const SOCKET_URL = API_BASE_URL.replace('/api', '');
 
 const { height: H } = Dimensions.get('window');
 const SHEET_HEIGHT = H * 0.55;
@@ -91,6 +94,37 @@ export function CommentsBottomSheet({ postId, onClose }: Props) {
     },
   })).current;
 
+  const socketRef = useRef<Socket | null>(null);
+  const flatListRef = useRef<FlatList>(null);
+
+  // Real-time comments via Socket.IO
+  useEffect(() => {
+    if (!postId) return;
+    let socket: Socket;
+    (async () => {
+      const tokens = await getTokens();
+      if (!tokens) return;
+      socket = io(SOCKET_URL, { auth: { token: tokens.access }, transports: ['websocket'] });
+      socketRef.current = socket;
+      socket.on('connect', () => socket.emit('post:watch', postId));
+      socket.on('reconnect', () => socket.emit('post:watch', postId));
+      socket.on('comment:new', (comment: Comment) => {
+        qc.setQueryData(['comments', postId, limit], (old: any) => {
+          if (!old) return old;
+          const exists = old.items.some((c: Comment) => c.id === comment.id);
+          if (exists) return old;
+          return { ...old, items: [...old.items, comment] };
+        });
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+      });
+    })();
+    return () => {
+      socketRef.current?.emit('post:unwatch', postId);
+      socketRef.current?.disconnect();
+      socketRef.current = null;
+    };
+  }, [postId]);
+
   const [limit, setLimit] = useState(20);
   const { data, isLoading } = useQuery<{ items: Comment[]; next_cursor: string | null }>({
     queryKey: ['comments', postId, limit],
@@ -146,6 +180,7 @@ export function CommentsBottomSheet({ postId, onClose }: Props) {
             <View style={styles.center}><ActivityIndicator color={COLORS.primary} /></View>
           ) : (
             <FlatList
+              ref={flatListRef}
               data={data?.items ?? []}
               keyExtractor={c => c.id}
               contentContainerStyle={styles.list}
