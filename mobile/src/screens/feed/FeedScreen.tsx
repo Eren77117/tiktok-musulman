@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import {
   View, FlatList, StyleSheet, Text, TouchableOpacity,
   StatusBar, Dimensions, ViewToken, ScrollView, Image,
-  RefreshControl, Alert, TextInput, KeyboardAvoidingView, Platform,
+  RefreshControl, Alert, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
 import { useInfiniteQuery, useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
@@ -272,6 +272,15 @@ export default function FeedScreen() {
           onEndReached={() => hasNextSuivis && !fetchingSuivis && fetchNextSuivis()}
           onEndReachedThreshold={2}
           getItemLayout={(_, i) => ({ length: ITEM_H, offset: ITEM_H * i, index: i })}
+          refreshControl={
+            <RefreshControl
+              refreshing={!!loadingSuivis}
+              onRefresh={() => { seenIds.current = []; refetchSuivis(); }}
+              tintColor={COLORS.primary}
+              colors={[COLORS.primary]}
+            />
+          }
+          ListFooterComponent={fetchingSuivis ? <ActivityIndicator color={COLORS.primary} style={{ marginVertical: 20 }} /> : null}
           ListEmptyComponent={
             !loadingSuivis ? (
               <View style={styles.emptyWrap}>
@@ -337,6 +346,15 @@ export default function FeedScreen() {
           onEndReached={() => hasNextFeed && !fetchingFeed && fetchNextFeed()}
           onEndReachedThreshold={3}
           getItemLayout={(_, index) => ({ length: ITEM_H, offset: ITEM_H * index, index })}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshingFeed}
+              onRefresh={() => { seenIds.current = []; refetchFeed(); }}
+              tintColor={COLORS.primary}
+              colors={[COLORS.primary]}
+            />
+          }
+          ListFooterComponent={fetchingFeed ? <ActivityIndicator color={COLORS.primary} style={{ marginVertical: 20 }} /> : null}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
               <Text style={styles.emptyText}>Aucune vidéo pour l'instant</Text>

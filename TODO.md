@@ -48,14 +48,14 @@
 
 ### 📱 Feed "Pour toi"
 - [x] Onglet "Suivis" — feed uniquement des comptes suivis
-- [ ] Pull-to-refresh avec animation (spinner vert)
-- [ ] Indicateur de chargement en bas (skeleton cards)
+- [x] Pull-to-refresh avec animation (spinner vert)
+- [x] Indicateur de chargement en bas (spinner vert)
 - [ ] Precaching des 2-3 vidéos suivantes (backgrounded)
 - [ ] Mémorisation de la position dans le feed (reprendre où on était)
 - [ ] Skip vidéo en swipant vers le haut plus rapidement (animation accélérée)
 - [x] Indicateur de progression de la vidéo (barre verte en bas)
 - [x] Durée de la vidéo affichée (badge haut gauche)
-- [ ] Réduire le délai de single-tap pause (300ms → 200ms)
+- [x] Réduire le délai de single-tap pause (300ms → 200ms)
 
 ### 🎬 Lecteur vidéo
 - [ ] Seek en maintenant appuyé gauche/droite (afficher le temps)
