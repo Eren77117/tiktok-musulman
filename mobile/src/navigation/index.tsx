@@ -14,7 +14,7 @@ import { useAuthStore } from '../stores/authStore';
 import { COLORS, FONT, SPACING, RADIUS, SHADOW } from '../constants/theme';
 import {
   IcHome, IcExplore, IcCreate, IcMail,
-  IcProfile, IcBrand, IcLive, IcPen,
+  IcProfile, IcBrand, IcLive, IcPen, IcVideo, IcBell,
 } from '../components/ui/Icons';
 
 // Auth
@@ -93,12 +93,12 @@ const TAB_LABELS: Record<string, string> = {
 
 function TabIcon({ name, focused, theme }: { name: string; focused: boolean; theme: any }) {
   const color = focused ? theme.tabActive : theme.tabInactive;
-  const size = 24;
+  const sw = focused ? 1.8 : 1.5;
   switch (name) {
-    case 'Home':     return <IcHome    size={size} color={color} strokeWidth={focused ? 2.2 : 1.8} />;
-    case 'Explore':  return <IcExplore size={size} color={color} strokeWidth={focused ? 2.2 : 1.8} />;
-    case 'Messages': return <IcMail    size={size} color={color} strokeWidth={focused ? 2.2 : 1.8} />;
-    case 'Profile':  return <IcProfile size={size} color={color} strokeWidth={focused ? 2.2 : 1.8} />;
+    case 'Home':     return <IcHome    size={22} color={color} strokeWidth={sw} />;
+    case 'Explore':  return <IcExplore size={22} color={color} strokeWidth={sw} />;
+    case 'Messages': return <IcMail    size={22} color={color} strokeWidth={sw} />;
+    case 'Profile':  return <IcProfile size={22} color={color} strokeWidth={sw} />;
     default:         return null;
   }
 }
@@ -123,21 +123,34 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
       {/* Create bottom sheet */}
       <Modal visible={showCreateSheet} transparent animationType="slide" onRequestClose={() => setShowCreateSheet(false)}>
         <Pressable style={styles.sheetBackdrop} onPress={() => setShowCreateSheet(false)}>
-          <Pressable style={[styles.sheetContainer, { paddingBottom: insets.bottom + 16, backgroundColor: theme.surface }]}>
-            <View style={[styles.sheetHandle, { backgroundColor: theme.border }]} />
-            <Text style={[styles.sheetTitle, { color: theme.text }]}>Créer</Text>
-            <TouchableOpacity style={[styles.sheetOption, { backgroundColor: theme.bg }]} activeOpacity={0.8}
-              onPress={() => { setShowCreateSheet(false); navigation.navigate('Create'); }}>
+          <Pressable style={[styles.sheetContainer, {
+            paddingBottom: insets.bottom + 20,
+            backgroundColor: theme.isDark ? '#131313' : theme.surface,
+            borderTopColor: theme.border,
+          }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: theme.isDark ? '#333' : theme.border }]} />
+            <Text style={[styles.sheetTitle, { color: theme.text }]}>Créer du contenu</Text>
+
+            <TouchableOpacity
+              style={[styles.sheetOption, { backgroundColor: theme.card, borderColor: theme.border }]}
+              activeOpacity={0.75}
+              onPress={() => { setShowCreateSheet(false); navigation.navigate('Create'); }}
+            >
               <View style={[styles.sheetOptionIcon, { backgroundColor: theme.primaryBg }]}>
-                <IcCreate size={24} color={COLORS.primary} />
+                <IcVideo size={20} color={COLORS.primary} strokeWidth={1.5} />
               </View>
               <View style={styles.sheetOptionText}>
                 <Text style={[styles.sheetOptionTitle, { color: theme.text }]}>Publier une vidéo</Text>
                 <Text style={[styles.sheetOptionSub, { color: theme.textMuted }]}>Partage une vidéo avec la communauté</Text>
               </View>
+              <View style={styles.sheetArrow}><Text style={{ color: theme.textSubtle, fontSize: 16 }}>›</Text></View>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.sheetOption, { backgroundColor: theme.bg }]} activeOpacity={0.8}
-              onPress={() => { setShowCreateSheet(false); navigation.navigate('ThreadComposer'); }}>
+
+            <TouchableOpacity
+              style={[styles.sheetOption, { backgroundColor: theme.card, borderColor: theme.border }]}
+              activeOpacity={0.75}
+              onPress={() => { setShowCreateSheet(false); navigation.navigate('ThreadComposer'); }}
+            >
               <View style={[styles.sheetOptionIcon, { backgroundColor: theme.primaryBg }]}>
                 <IcPen size={24} color={COLORS.primary} />
               </View>
@@ -145,25 +158,33 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
                 <Text style={[styles.sheetOptionTitle, { color: theme.text }]}>Nouveau fil</Text>
                 <Text style={[styles.sheetOptionSub, { color: theme.textMuted }]}>Texte, image ou vidéo courte</Text>
               </View>
+              <View style={styles.sheetArrow}><Text style={{ color: theme.textSubtle, fontSize: 16 }}>›</Text></View>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.sheetOption, { backgroundColor: theme.bg }]} activeOpacity={0.8}
-              onPress={() => { setShowCreateSheet(false); navigation.navigate('GoLive'); }}>
-              <View style={[styles.sheetOptionIcon, { backgroundColor: '#FF3B3020' }]}>
+
+            <TouchableOpacity
+              style={[styles.sheetOption, { backgroundColor: theme.card, borderColor: theme.border }]}
+              activeOpacity={0.75}
+              onPress={() => { setShowCreateSheet(false); navigation.navigate('GoLive'); }}
+            >
+              <View style={[styles.sheetOptionIcon, { backgroundColor: '#1A0000' }]}>
                 <IcLive size={24} color="#FF3B30" />
               </View>
               <View style={styles.sheetOptionText}>
                 <Text style={[styles.sheetOptionTitle, { color: theme.text }]}>Démarrer un live</Text>
                 <Text style={[styles.sheetOptionSub, { color: theme.textMuted }]}>Streaming en direct avec chat</Text>
               </View>
+              <View style={styles.sheetArrow}><Text style={{ color: theme.textSubtle, fontSize: 16 }}>›</Text></View>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
       </Modal>
 
-      <View style={[
-        styles.tabBar,
-        { paddingBottom: insets.bottom > 0 ? insets.bottom - 4 : 4, backgroundColor: theme.tabBg, borderTopColor: theme.navBorder },
-      ]}>
+      {/* Tab bar */}
+      <View style={[styles.tabBar, {
+        paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
+        backgroundColor: theme.tabBg,
+        borderTopColor: theme.navBorder,
+      }]}>
         {state.routes.map((route: any, index: number) => {
           const isFocused = state.index === index;
           const isCreate = route.name === 'Create';
@@ -176,9 +197,9 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 
           if (isCreate) {
             return (
-              <TouchableOpacity key={route.key} style={styles.createBtn} onPress={onPress} activeOpacity={0.85}>
-                <View style={styles.createInner}>
-                  <IcCreate size={22} color={COLORS.white} strokeWidth={2.5} />
+              <TouchableOpacity key={route.key} style={styles.createBtnWrap} onPress={onPress} activeOpacity={0.85}>
+                <View style={[styles.createInner, SHADOW.green]}>
+                  <IcCreate size={20} color={COLORS.white} strokeWidth={2.2} />
                 </View>
               </TouchableOpacity>
             );
@@ -188,7 +209,10 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 
           return (
             <TouchableOpacity key={route.key} style={styles.tabItem} onPress={onPress} activeOpacity={0.7}>
-              <View style={{ position: 'relative' }}>
+              <View style={styles.iconWrap}>
+                {isFocused && (
+                  <View style={[styles.activeGlow, { backgroundColor: `${COLORS.primary}18` }]} />
+                )}
                 <TabIcon name={route.name} focused={isFocused} theme={theme} />
                 {showBadge && (
                   <View style={[styles.notifBadge, { borderColor: theme.tabBg }]}>
@@ -196,7 +220,11 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
                   </View>
                 )}
               </View>
-              <Text style={[styles.tabLabel, { color: isFocused ? theme.tabActive : theme.tabInactive }, isFocused && styles.tabLabelActive]}>
+              <Text style={[
+                styles.tabLabel,
+                { color: isFocused ? theme.tabActive : theme.tabInactive },
+                isFocused && styles.tabLabelActive,
+              ]}>
                 {TAB_LABELS[route.name]}
               </Text>
             </TouchableOpacity>
@@ -237,11 +265,11 @@ export function AppNavigator() {
 
   if (loading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: theme.bg }]}>
-        <View style={[styles.loadingLogo, { backgroundColor: theme.primaryBg, borderColor: theme.primaryLight }]}>
-          <IcBrand size={32} color={theme.primary} />
+      <View style={styles.loadingContainer}>
+        <View style={styles.loadingLogo}>
+          <IcBrand size={36} color={COLORS.primary} />
         </View>
-        <ActivityIndicator color={theme.primary} size="large" style={{ marginTop: 32 }} />
+        <ActivityIndicator color={COLORS.primary} size="large" style={{ marginTop: 40 }} />
       </View>
     );
   }
@@ -259,8 +287,8 @@ export function AppNavigator() {
             <RootStack.Screen name="Conversation" component={ConversationScreen}
               options={{
                 headerShown: true,
-                headerStyle: { backgroundColor: theme.surface },
-                headerTintColor: theme.primary,
+                headerStyle: { backgroundColor: '#0B0B0B' },
+                headerTintColor: COLORS.primary,
                 headerTitle: '',
                 headerShadowVisible: false,
                 gestureEnabled: true,
@@ -306,53 +334,82 @@ export function AppNavigator() {
 
 const styles = StyleSheet.create({
   loadingContainer: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
+    flex: 1, backgroundColor: '#0B0B0B', alignItems: 'center', justifyContent: 'center',
   },
   loadingLogo: {
     width: 80, height: 80, borderRadius: 40,
+    backgroundColor: '#001F12',
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2,
+    borderWidth: 1.5, borderColor: '#00C26E40',
+    shadowColor: '#00C26E', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 20, elevation: 8,
   },
+
+  // Tab bar
   tabBar: {
     flexDirection: 'row',
     borderTopWidth: 0.5,
-    paddingTop: 6, paddingHorizontal: SPACING.sm,
+    paddingTop: 8,
+    paddingHorizontal: 4,
   },
-  notifBadge: {
-    position: 'absolute', top: -4, right: -6,
-    minWidth: 16, height: 16, borderRadius: 8,
-    backgroundColor: '#FF3B30', alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 3, borderWidth: 1.5,
+  tabItem: {
+    flex: 1, alignItems: 'center', gap: 3, paddingVertical: 2,
   },
-  notifBadgeText: { fontSize: 9, fontWeight: FONT.weight.bold, color: COLORS.white },
-  tabItem: { flex: 1, alignItems: 'center', gap: 2, position: 'relative', paddingVertical: 4 },
-  tabLabel: { fontSize: 10, fontWeight: FONT.weight.medium },
+  iconWrap: {
+    width: 44, height: 36, alignItems: 'center', justifyContent: 'center',
+    position: 'relative',
+  },
+  activeGlow: {
+    position: 'absolute', width: 40, height: 32, borderRadius: 10,
+  },
+  tabLabel: {
+    fontSize: 10, fontWeight: FONT.weight.medium, letterSpacing: 0.1,
+  },
   tabLabelActive: { fontWeight: FONT.weight.semibold },
-  createBtn: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
+  notifBadge: {
+    position: 'absolute', top: 0, right: -2,
+    minWidth: 15, height: 15, borderRadius: 7.5,
+    backgroundColor: '#FF3B30', alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 3, borderWidth: 1.5, borderColor: '#0B0B0B',
+  },
+  notifBadgeText: { fontSize: 8, fontWeight: FONT.weight.bold, color: '#fff' },
+
+  createBtnWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   createInner: {
-    width: 52, height: 52, borderRadius: 26, // circle like the design
+    width: 48, height: 48, borderRadius: 15,
     backgroundColor: COLORS.primary,
     alignItems: 'center', justifyContent: 'center',
-    marginTop: -14, ...SHADOW.green,
+    marginTop: -16,
   },
 
-  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  // Create sheet
+  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   sheetContainer: {
-    backgroundColor: COLORS.white, borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    padding: SPACING.md, gap: 4,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: SPACING.md, paddingTop: 12,
+    gap: 8,
+    borderTopWidth: 0.5,
   },
   sheetHandle: {
-    width: 36, height: 4, borderRadius: 2, backgroundColor: COLORS.border,
-    alignSelf: 'center', marginBottom: 12,
+    width: 32, height: 3, borderRadius: 2,
+    alignSelf: 'center', marginBottom: 16,
   },
-  sheetTitle: { fontSize: FONT.size.lg, fontWeight: FONT.weight.bold, color: COLORS.text, marginBottom: 8, paddingHorizontal: 4 },
+  sheetTitle: {
+    fontSize: FONT.size.lg, fontWeight: FONT.weight.bold,
+    marginBottom: 4, paddingHorizontal: 4, letterSpacing: -0.3,
+  },
   sheetOption: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
-    padding: SPACING.md, borderRadius: 12,
-    backgroundColor: COLORS.bg, marginBottom: 6,
+    padding: 14, borderRadius: 14,
+    borderWidth: 0.5, marginBottom: 2,
   },
-  sheetOptionIcon: { width: 48, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  sheetOptionIcon: {
+    width: 44, height: 44, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+  },
   sheetOptionText: { flex: 1, gap: 2 },
-  sheetOptionTitle: { fontSize: FONT.size.base, fontWeight: FONT.weight.semibold, color: COLORS.text },
-  sheetOptionSub: { fontSize: FONT.size.xs, color: COLORS.textMuted },
+  sheetOptionTitle: { fontSize: FONT.size.base, fontWeight: FONT.weight.semibold, letterSpacing: -0.2 },
+  sheetOptionSub: { fontSize: FONT.size.xs, lineHeight: 16 },
+  sheetArrow: { width: 20, alignItems: 'center' },
 });

@@ -14,7 +14,7 @@ import { api, getTokens } from '../../api/client';
 import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, SPACING, RADIUS, SHADOW, API_BASE_URL } from '../../constants/theme';
 import { useTheme } from '../../hooks/useTheme';
-import { IcSettings, IcSave, IcCheck, IcHeart, IcGrid, IcEdit, IcCamera, IcChart, IcPlay, IcRepeat } from '../../components/ui/Icons';
+import { IcSettings, IcMenu, IcSave, IcCheck, IcHeart, IcGrid, IcEdit, IcCamera, IcChart, IcPlay, IcRepeat } from '../../components/ui/Icons';
 import { EditProfileScreen } from './EditProfileScreen';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -199,10 +199,10 @@ export default function ProfileScreen() {
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetchPosts} tintColor={COLORS.primary} />}
       >
         {/* Top bar */}
-        <View style={[styles.topBar, { backgroundColor: theme.surface, borderBottomColor: theme.borderLight }]}>
+        <View style={[styles.topBar, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
           <Text style={[styles.topUsername, { color: theme.text }]}>@{user.username}</Text>
           <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Settings')} activeOpacity={0.7}>
-            <IcSettings size={22} color={theme.textMuted} />
+            <IcMenu size={20} color={theme.text} />
           </TouchableOpacity>
         </View>
 
@@ -226,7 +226,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* Hero */}
-        <View style={[styles.heroSection, { backgroundColor: theme.surface }]}>
+        <View style={[styles.heroSection, { backgroundColor: theme.bg }]}>
           <TouchableOpacity onPress={handleAvatarPress} activeOpacity={0.85} style={styles.avatarWrap}>
             {avatarLoading ? (
               <View style={[styles.avatar, styles.avatarFallback]}>
@@ -270,7 +270,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* Tabs */}
-        <View style={[styles.tabs, { backgroundColor: theme.surface, borderBottomColor: theme.borderLight }]}>
+        <View style={[styles.tabs, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
           {TABS.map((tab, i) => (
             <TouchableOpacity key={tab} style={[styles.tab, activeTab === i && styles.tabActive]} onPress={() => setActiveTab(i)} activeOpacity={0.8}>
               <Text style={[styles.tabLabel, { color: activeTab === i ? COLORS.primary : theme.textMuted }, activeTab === i && styles.tabLabelActive]}>{tab}</Text>
@@ -280,7 +280,7 @@ export default function ProfileScreen() {
 
         {/* Like sub-tabs */}
         {activeTab === 2 && (
-          <View style={[styles.subTabs, { backgroundColor: theme.surface, borderBottomColor: theme.borderLight }]}>
+          <View style={[styles.subTabs, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
             {LIKE_SUBTABS.map(sub => (
               <TouchableOpacity
                 key={sub}
@@ -298,7 +298,7 @@ export default function ProfileScreen() {
 
         {/* Content */}
         {activeTab === 1 ? (
-          <ThreadsTab threads={threads?.items} loading={threadsLoading} />
+          <ThreadsTab threads={threads?.items} loading={threadsLoading} theme={theme} />
         ) : activeTab === 2 && likeSubTab === 'Fils' ? (
           <ThreadsTab threads={likedThreads?.items} loading={likedThreadsLoading} />
         ) : activeTab === 4 ? (
@@ -331,7 +331,7 @@ export default function ProfileScreen() {
             scrollEnabled={false}
             columnWrapperStyle={styles.gridRow}
             renderItem={({ item }) => <GridItem item={item} onPress={() => navigation.navigate('VideoPlayer', { postId: item.id })} />}
-            ListEmptyComponent={<EmptyTab tab={activeTab} />}
+            ListEmptyComponent={<EmptyTab tab={activeTab} theme={theme} />}
           />
         )}
       </ScrollView>
@@ -391,22 +391,22 @@ function GridItem({ item, onPress, repostBadge }: { item: Post & { _repostedBy?:
   );
 }
 
-function ThreadsTab({ threads, loading }: { threads?: Thread[]; loading: boolean }) {
+function ThreadsTab({ threads, loading, theme }: { threads?: Thread[]; loading: boolean; theme: any }) {
   if (loading) return <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />;
-  if (!threads?.length) return <EmptyTab tab={1} />;
+  if (!threads?.length) return <EmptyTab tab={1} theme={theme} />;
   return (
     <View>
       {threads.map((t) => (
-        <View key={t.id} style={styles.threadItem}>
-          <Text style={styles.threadContent}>{t.content}</Text>
-          <Text style={styles.threadMeta}>{t.like_count} j'aime · {t.reply_count} réponses</Text>
+        <View key={t.id} style={[styles.threadItem, { borderBottomColor: theme.border }]}>
+          <Text style={[styles.threadContent, { color: theme.text }]}>{t.content}</Text>
+          <Text style={[styles.threadMeta, { color: theme.textMuted }]}>{t.like_count} j'aime · {t.reply_count} réponses</Text>
         </View>
       ))}
     </View>
   );
 }
 
-function EmptyTab({ tab }: { tab: number }) {
+function EmptyTab({ tab, theme }: { tab: number; theme: any }) {
   const msgs = [
     { title: 'Aucune vidéo', sub: 'Publiez votre première vidéo !' },
     { title: 'Aucun fil', sub: 'Partagez vos pensées !' },
@@ -415,8 +415,8 @@ function EmptyTab({ tab }: { tab: number }) {
   ];
   return (
     <View style={styles.emptyWrap}>
-      <Text style={styles.emptyTitle}>{msgs[tab]?.title}</Text>
-      <Text style={styles.emptySubtitle}>{msgs[tab]?.sub}</Text>
+      <Text style={[styles.emptyTitle, { color: theme.text }]}>{msgs[tab]?.title}</Text>
+      <Text style={[styles.emptySubtitle, { color: theme.textMuted }]}>{msgs[tab]?.sub}</Text>
     </View>
   );
 }
@@ -437,16 +437,16 @@ function fmtNum(n: number) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg },
-  content: { paddingBottom: 60 },
+  container: { flex: 1 },
+  content: { paddingBottom: 80 },
 
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SPACING.md, paddingVertical: 10,
-    backgroundColor: COLORS.white, borderBottomWidth: 1, borderBottomColor: COLORS.borderLight,
+    paddingHorizontal: SPACING.md, paddingVertical: 12,
+    borderBottomWidth: 0.5,
   },
-  topUsername: { fontSize: FONT.size.lg, fontWeight: FONT.weight.semibold, color: COLORS.text },
-  iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  topUsername: { fontSize: FONT.size.md, fontWeight: FONT.weight.bold, letterSpacing: -0.3 },
+  iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 
   coverWrap: { width: '100%', height: 120, position: 'relative', overflow: 'hidden' },
   heroSection: { alignItems: 'center', paddingTop: SPACING.md, paddingBottom: SPACING.lg, paddingHorizontal: SPACING.lg, gap: 10, marginTop: -30 },
@@ -456,61 +456,57 @@ const styles = StyleSheet.create({
   avatarFallback: {
     backgroundColor: COLORS.primaryBg, borderWidth: 3, borderColor: COLORS.white,
     alignItems: 'center', justifyContent: 'center',
+    shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3, shadowRadius: 12, elevation: 6,
   },
-  avatarText: { fontSize: 36, fontWeight: FONT.weight.bold, color: COLORS.primary },
+  avatarText: { fontSize: 38, fontWeight: FONT.weight.bold, color: COLORS.primary },
   cameraOverlay: {
-    position: 'absolute', bottom: 0, right: 0,
+    position: 'absolute', bottom: 2, right: 2,
     width: 26, height: 26, borderRadius: 13,
     backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: COLORS.white,
+    borderWidth: 2, borderColor: '#0B0B0B',
   },
   verifiedBadge: {
-    position: 'absolute', bottom: 0, left: 0,
+    position: 'absolute', bottom: 2, left: 2,
     width: 22, height: 22, borderRadius: 11,
     backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: COLORS.white,
+    borderWidth: 2, borderColor: '#0B0B0B',
   },
 
-  displayName: { fontSize: FONT.size.xxl, fontWeight: FONT.weight.bold, color: COLORS.text, letterSpacing: -0.3 },
-  bio: { fontSize: FONT.size.sm, color: COLORS.textMuted, textAlign: 'center', lineHeight: 20 },
+  displayName: { fontSize: FONT.size.xxl, fontWeight: FONT.weight.bold, letterSpacing: -0.5 },
+  bio: { fontSize: FONT.size.sm, textAlign: 'center', lineHeight: 20 },
 
   statsRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.lg, marginTop: 4 },
   statItem: { alignItems: 'center', gap: 2 },
-  statValue: { fontSize: FONT.size.xl, fontWeight: FONT.weight.bold, color: COLORS.text },
-  statLabel: { fontSize: FONT.size.xs, color: COLORS.textMuted },
-  statDivider: { width: 1, height: 28, backgroundColor: COLORS.border },
+  statValue: { fontSize: FONT.size.xl, fontWeight: FONT.weight.bold },
+  statLabel: { fontSize: FONT.size.xs },
+  statDivider: { width: 0.5, height: 28 },
 
   editBtn: {
-    borderWidth: 1.5, borderColor: COLORS.border, borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.lg, paddingVertical: 10, marginTop: 4,
+    borderWidth: 1, borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.xl, paddingVertical: 10, marginTop: 4,
   },
-  editBtnText: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold, color: COLORS.text },
+  editBtnText: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold, letterSpacing: 0.1 },
 
-  tabs: {
-    flexDirection: 'row', backgroundColor: COLORS.white,
-    borderBottomWidth: 1, borderBottomColor: COLORS.borderLight,
-  },
-  tab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
+  tabs: { flexDirection: 'row', borderBottomWidth: 0.5 },
+  tab: { flex: 1, paddingVertical: 13, alignItems: 'center' },
   tabActive: { borderBottomWidth: 2, borderBottomColor: COLORS.primary },
-  tabLabel: { fontSize: 12, fontWeight: FONT.weight.medium, color: COLORS.textMuted },
-  tabLabelActive: { color: COLORS.primary, fontWeight: FONT.weight.semibold },
+  tabLabel: { fontSize: 12, fontWeight: FONT.weight.medium },
+  tabLabelActive: { fontWeight: FONT.weight.bold },
 
-  subTabs: {
-    flexDirection: 'row', borderBottomWidth: 1,
-    paddingHorizontal: SPACING.md,
-  },
+  subTabs: { flexDirection: 'row', borderBottomWidth: 0.5, paddingHorizontal: SPACING.md },
   subTab: { paddingVertical: 9, paddingHorizontal: SPACING.sm, marginRight: 16 },
   subTabActive: { borderBottomWidth: 2, borderBottomColor: COLORS.primary },
-  subTabLabel: { fontSize: 13, fontWeight: FONT.weight.medium, color: COLORS.textMuted },
-  subTabLabelActive: { color: COLORS.primary, fontWeight: FONT.weight.semibold },
+  subTabLabel: { fontSize: 13, fontWeight: FONT.weight.medium },
+  subTabLabelActive: { fontWeight: FONT.weight.bold },
 
   gridRow: { gap: 1 },
   gridItem: { flex: 1 / 3, aspectRatio: 9 / 16, position: 'relative', margin: 0.5 },
   gridThumb: { width: '100%', height: '100%' },
-  gridThumbFallback: { backgroundColor: COLORS.primaryBg, alignItems: 'center', justifyContent: 'center' },
+  gridThumbFallback: { backgroundColor: '#001F12', alignItems: 'center', justifyContent: 'center' },
   gridOverlay: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    padding: 4, backgroundColor: 'rgba(0,0,0,0.35)',
+    padding: 5, backgroundColor: 'rgba(0,0,0,0.5)',
     flexDirection: 'row', alignItems: 'center', gap: 3,
   },
   gridViews: { fontSize: FONT.size.xs, color: COLORS.white },
@@ -520,14 +516,11 @@ const styles = StyleSheet.create({
     padding: 2,
   },
 
-  threadItem: {
-    backgroundColor: COLORS.white, padding: SPACING.md,
-    borderBottomWidth: 1, borderBottomColor: COLORS.borderLight,
-  },
-  threadContent: { fontSize: FONT.size.base, color: COLORS.text, lineHeight: 22 },
-  threadMeta: { fontSize: FONT.size.xs, color: COLORS.textMuted, marginTop: 6 },
+  threadItem: { padding: SPACING.md, borderBottomWidth: 0.5 },
+  threadContent: { fontSize: FONT.size.base, lineHeight: 22 },
+  threadMeta: { fontSize: FONT.size.xs, marginTop: 6 },
 
   emptyWrap: { alignItems: 'center', paddingVertical: 60, gap: 8 },
-  emptyTitle: { fontSize: FONT.size.lg, fontWeight: FONT.weight.semibold, color: COLORS.text },
-  emptySubtitle: { fontSize: FONT.size.sm, color: COLORS.textMuted, textAlign: 'center', paddingHorizontal: SPACING.xl },
+  emptyTitle: { fontSize: FONT.size.lg, fontWeight: FONT.weight.semibold },
+  emptySubtitle: { fontSize: FONT.size.sm, textAlign: 'center', paddingHorizontal: SPACING.xl },
 });

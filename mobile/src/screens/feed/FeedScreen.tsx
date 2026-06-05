@@ -672,7 +672,7 @@ function ThreadCard({ item, onUserPress, onPress, theme }: { item: ThreadItem; o
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
+  container: { flex: 1, backgroundColor: '#0B0B0B' },
   header: {
     position: 'absolute', top: 0, left: 0, right: 0,
     flexDirection: 'row', alignItems: 'center',
@@ -681,25 +681,21 @@ const styles = StyleSheet.create({
   tabsScroll: { flex: 1 },
   tabs: { flexDirection: 'row', gap: 22, paddingHorizontal: 6 },
   tabBtn: { alignItems: 'center', paddingBottom: 6, paddingHorizontal: 2 },
-  tabText: { fontSize: 15, fontWeight: '600', color: 'rgba(255,255,255,0.55)',
-    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
-  tabTextActive: { color: COLORS.white, fontWeight: '800', fontSize: 16 },
-  tabUnderline: {
-    position: 'absolute', bottom: 0, left: '10%', right: '10%',
-    height: 2.5, backgroundColor: COLORS.white, borderRadius: 2,
-  },
+  tabText: { fontSize: FONT.size.base, fontWeight: FONT.weight.medium, color: 'rgba(255,255,255,0.45)', letterSpacing: 0.1 },
+  tabTextActive: { color: '#FFFFFF', fontWeight: FONT.weight.bold },
+  tabUnderline: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, backgroundColor: '#00C26E', borderRadius: 1 },
   liveBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'rgba(255,59,48,0.25)', borderWidth: 1.5, borderColor: '#FF3B30',
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: 'rgba(255,59,48,0.15)', borderWidth: 1, borderColor: 'rgba(255,59,48,0.5)',
     alignItems: 'center', justifyContent: 'center', position: 'relative',
   },
   liveDot: {
-    position: 'absolute', top: 6, right: 6,
-    width: 7, height: 7, borderRadius: 4, backgroundColor: '#FF3B30',
-    borderWidth: 1.5, borderColor: '#000',
+    position: 'absolute', top: 7, right: 7,
+    width: 6, height: 6, borderRadius: 3, backgroundColor: '#FF3B30',
+    borderWidth: 1, borderColor: '#000',
   },
-  searchBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  searchBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   emptyWrap: { height: H, alignItems: 'center', justifyContent: 'center' },
-  emptyText: { color: COLORS.white, fontSize: FONT.size.base },
+  emptyText: { color: 'rgba(255,255,255,0.5)', fontSize: FONT.size.sm },
 });
 

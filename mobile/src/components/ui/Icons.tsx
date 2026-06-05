@@ -4,13 +4,14 @@
  * Import from here only.
  */
 import React from 'react';
+import { View } from 'react-native';
 import {
   Home, Compass, Plus, List, User, Users,
   Heart, MessageCircle, Share2, Bookmark, BookmarkCheck,
   Bell, Mail, Settings, Lock, Search, Play, Pause,
   Upload, Camera, Video, Image, Music, Film,
   ChevronLeft, ChevronRight, ChevronDown, X, Check, CheckCircle,
-  Edit, Edit3, MoreHorizontal, ArrowUp, RefreshCw,
+  Edit3, MoreHorizontal, RefreshCw,
   UserPlus, UserCheck, Eye, Clock, TrendingUp,
   Grid, BarChart2, Sliders, AlertCircle, Info, Trash2, Send,
   Star, Award, Shield, Zap, LogOut, HelpCircle,
@@ -37,11 +38,25 @@ function mk(
     <C
       size={size ?? def?.size ?? 22}
       color={color ?? def?.color ?? COLORS.textMuted}
-      strokeWidth={strokeWidth ?? def?.strokeWidth ?? 1.8}
+      strokeWidth={strokeWidth ?? def?.strokeWidth ?? 1.5}
       fill={fill ?? 'none'}
     />
   );
 }
+
+// ── Hamburger menu icon (3 thin horizontal lines — premium style) ─────────────
+export const IcMenu = ({ size = 22, color = COLORS.textMuted }: IconProps) => {
+  const barWidth = size;
+  const barHeight = 1.5;
+  const gap = size * 0.28;
+  return (
+    <View style={{ width: barWidth, height: size * 0.6, justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <View style={{ width: barWidth, height: barHeight, backgroundColor: color, borderRadius: 2 }} />
+      <View style={{ width: barWidth * 0.7, height: barHeight, backgroundColor: color, borderRadius: 2 }} />
+      <View style={{ width: barWidth * 0.85, height: barHeight, backgroundColor: color, borderRadius: 2 }} />
+    </View>
+  );
+};
 
 // ── Tab navigation ─────────────────────────────────────────────────────────────
 export const IcHome       = mk(Home);

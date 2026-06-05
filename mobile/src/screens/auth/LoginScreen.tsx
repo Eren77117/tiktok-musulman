@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, KeyboardAvoidingView, Platform, Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -95,7 +96,7 @@ export default function LoginScreen({ navigation }: Props) {
                 style={[styles.quickBtn, { backgroundColor: theme.card, borderColor: theme.border }, quickLoading === acc.email && styles.quickBtnLoading]}
                 onPress={() => handleQuickAccess(acc)}
                 disabled={!!quickLoading}
-                activeOpacity={0.8}
+                activeOpacity={0.75}
               >
                 <View style={[styles.quickAvatar, { backgroundColor: acc.gender === 'MALE' ? theme.primaryBg : COLORS.goldBg }]}>
                   <Text style={[styles.quickAvatarText, { color: acc.gender === 'MALE' ? theme.primary : COLORS.gold }]}>
@@ -106,7 +107,10 @@ export default function LoginScreen({ navigation }: Props) {
                   <Text style={[styles.quickName, { color: theme.text }]}>{acc.label}</Text>
                   <Text style={[styles.quickEmail, { color: theme.textMuted }]}>{acc.email}</Text>
                 </View>
-                <Text style={[styles.quickArrow, { color: theme.primary }]}>→</Text>
+                {quickLoading === acc.email
+                  ? <ActivityIndicator size="small" color={COLORS.primary} />
+                  : <Text style={[styles.quickArrow, { color: theme.primary }]}>›</Text>
+                }
               </TouchableOpacity>
             ))}
           </View>
@@ -141,7 +145,6 @@ export default function LoginScreen({ navigation }: Props) {
             returnKeyType="done"
             onSubmitEditing={handleLogin}
           />
-
           <Button
             label="Se connecter"
             onPress={handleLogin}

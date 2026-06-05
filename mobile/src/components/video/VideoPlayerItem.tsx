@@ -409,7 +409,6 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
             }
           }}
           onEnd={() => {
-            // Auto-replay: seek back to start
             videoRef.current?.seek(0);
             setProgress(0);
             setSeekTime(0);
@@ -834,11 +833,12 @@ const styles = StyleSheet.create({
 
   speedBadge: {
     position: 'absolute', top: '45%', alignSelf: 'center',
-    left: W / 2 - 32,
-    backgroundColor: 'rgba(0,0,0,0.65)', borderRadius: RADIUS.full,
-    paddingHorizontal: 18, paddingVertical: 8,
+    left: W / 2 - 36,
+    backgroundColor: 'rgba(0,194,110,0.15)', borderRadius: RADIUS.full,
+    paddingHorizontal: 20, paddingVertical: 9,
+    borderWidth: 1, borderColor: 'rgba(0,194,110,0.4)',
   },
-  speedText: { fontSize: 24, fontWeight: '800', color: COLORS.white },
+  speedText: { fontSize: 22, fontWeight: '800', color: '#00C26E', letterSpacing: 0.5 },
 
   floatingHeart: { position: 'absolute', width: 112, height: 112 },
 
@@ -874,26 +874,25 @@ const styles = StyleSheet.create({
   rightActions: { position: 'absolute', right: 10, bottom: 88, alignItems: 'center', gap: 20 },
   avatarWrap: { position: 'relative', marginBottom: 6 },
   avatar: {
-    width: 52, height: 52, borderRadius: 26,
-    borderWidth: 2, borderColor: COLORS.white,
+    width: 50, height: 50, borderRadius: 25,
+    borderWidth: 2, borderColor: '#00C26E',
   },
   avatarFallback: {
-    width: 52, height: 52, borderRadius: 26,
-    backgroundColor: COLORS.primaryBg, borderWidth: 2, borderColor: COLORS.white,
+    width: 50, height: 50, borderRadius: 25,
+    backgroundColor: '#001F12', borderWidth: 2, borderColor: '#00C26E',
     alignItems: 'center', justifyContent: 'center',
   },
-  avatarInitial: { fontSize: 20, fontWeight: FONT.weight.bold, color: COLORS.primary },
+  avatarInitial: { fontSize: 18, fontWeight: FONT.weight.bold, color: '#00C26E' },
   followDot: {
     position: 'absolute', bottom: -10, left: '50%',
-    transform: [{ translateX: -12 }],
-    width: 24, height: 24, borderRadius: 12,
-    backgroundColor: COLORS.error, alignItems: 'center', justifyContent: 'center',
+    transform: [{ translateX: -11 }],
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: '#00C26E', alignItems: 'center', justifyContent: 'center',
     borderWidth: 2, borderColor: '#000',
   },
-  followDotText: { color: COLORS.white, fontSize: 16, fontWeight: FONT.weight.bold, lineHeight: 22 },
-  actionBtn: { alignItems: 'center', gap: 5 },
-  actionCount: { fontSize: 13, fontWeight: FONT.weight.bold, color: COLORS.white,
-    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  followDotText: { color: '#fff', fontSize: 14, fontWeight: FONT.weight.bold, lineHeight: 20 },
+  actionBtn: { alignItems: 'center', gap: 4 },
+  actionCount: { fontSize: 12, fontWeight: FONT.weight.semibold, color: COLORS.white },
 
   // Vinyl disc
   vinylWrap: { alignItems: 'center', marginTop: 4 },
@@ -921,18 +920,20 @@ const styles = StyleSheet.create({
     height: 48, justifyContent: 'flex-end',
   },
   progressBg: {
-    height: 3, backgroundColor: 'rgba(255,255,255,0.22)',
-    position: 'relative', borderRadius: 99,
+    height: 2.5, backgroundColor: 'rgba(255,255,255,0.2)',
+    marginHorizontal: 0, position: 'relative',
   },
   progressFill: {
     position: 'absolute', top: 0, left: 0, height: '100%',
-    backgroundColor: COLORS.white, borderRadius: 99,
+    backgroundColor: '#00C26E',
+    shadowColor: '#00C26E', shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6, shadowRadius: 4,
   },
   progressThumb: {
-    position: 'absolute', top: -5.5, width: 14, height: 14,
-    borderRadius: 7, backgroundColor: COLORS.white,
-    marginLeft: -7, shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.4, shadowRadius: 3,
+    position: 'absolute', top: -5, width: 12, height: 12,
+    borderRadius: 6, backgroundColor: '#00C26E',
+    marginLeft: -6, shadowColor: '#00C26E', shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8, shadowRadius: 6,
   },
   seekTimeBubble: {
     position: 'absolute', bottom: 62, alignSelf: 'center',

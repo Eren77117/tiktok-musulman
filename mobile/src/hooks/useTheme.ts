@@ -1,56 +1,57 @@
 import { useMemo } from 'react';
 import { useThemeStore } from '../stores/themeStore';
 
-// ── LIGHT — clean & premium (cream + Islamic green) ───────────────────────────
+// ── LIGHT — white, clean, premium ─────────────────────────────────────────────
 const LIGHT = {
-  bg:              '#F7F7F8',
+  bg:              '#FFFFFF',
   surface:         '#FFFFFF',
-  card:            '#FFFFFF',
-  inputBg:         '#F0F0F2',
+  card:            '#F7F7F8',
+  inputBg:         '#F2F2F4',
   text:            '#0A0A0B',
-  textMuted:       '#60646C',
-  textSubtle:      '#9EA3AB',
-  textPlaceholder: '#B8BCC4',
-  border:          '#E8E8EC',
-  borderLight:     '#F0F0F4',
+  textMuted:       '#6B7280',
+  textSubtle:      '#9CA3AF',
+  textPlaceholder: '#C0C4CC',
+  border:          '#EBEBED',
+  borderLight:     '#F4F4F6',
   tabBg:           '#FFFFFF',
-  tabActive:       '#2D7A4F',
-  tabInactive:     '#9EA3AB',
-  navBorder:       '#EBEBEF',
-  primary:         '#2D7A4F',
-  primaryLight:    '#4CAF7A',
-  primaryBg:       '#EBF5EE',
+  tabActive:       '#00C26E',
+  tabInactive:     '#9CA3AF',
+  navBorder:       '#F0F0F2',
+  primary:         '#00C26E',
+  primaryLight:    '#1EE085',
+  primaryBg:       '#E6FFF4',
 };
 
-// ── DARK — true black + green accent (TikTok-style) ───────────────────────────
+// ── DARK — deep black + neon green (premium, futuristic) ──────────────────────
 const DARK = {
-  bg:              '#0A0A0A',
+  bg:              '#0B0B0B',
   surface:         '#111111',
-  card:            '#161616',
-  inputBg:         '#1C1C1C',
+  card:            '#121212',
+  inputBg:         '#1A1A1A',
   text:            '#F5F5F5',
-  textMuted:       '#A0A0A8',
-  textSubtle:      '#606068',
-  textPlaceholder: '#484850',
-  border:          '#222222',
-  borderLight:     '#1A1A1A',
-  tabBg:           '#0A0A0A',
-  tabActive:       '#4CAF7A',
-  tabInactive:     '#484850',
-  navBorder:       '#1A1A1A',
-  primary:         '#2D7A4F',
-  primaryLight:    '#4CAF7A',
-  primaryBg:       '#0F2018',
+  textMuted:       '#8A8A95',
+  textSubtle:      '#555560',
+  textPlaceholder: '#3A3A45',
+  border:          '#1E1E1E',
+  borderLight:     '#181818',
+  tabBg:           '#0B0B0B',
+  tabActive:       '#00C26E',
+  tabInactive:     '#555560',
+  navBorder:       '#181818',
+  primary:         '#00C26E',
+  primaryLight:    '#1EE085',
+  primaryBg:       '#001F12',
 };
 
-// Shared static colors
+// Shared static colors (never change between themes)
 const STATIC = {
   white:   '#FFFFFF',
   black:   '#000000',
   error:   '#EF4444',
   like:    '#FF3B5C',
-  gold:    '#C9A84C',
-  success: '#2D7A4F',
+  gold:    '#F5C542',
+  success: '#00C26E',
+  neon:    '#00C26E',
 };
 
 export type AppTheme = typeof LIGHT & typeof STATIC & { isDark: boolean };
