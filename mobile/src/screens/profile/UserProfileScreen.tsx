@@ -14,6 +14,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { api } from '../../api/client';
 import { COLORS, FONT, SPACING, RADIUS, SHADOW } from '../../constants/theme';
 import { IcBack, IcFollow, IcFollowing, IcMail, IcHeart, IcPlay, IcCheck, IcMore, IcShare, IcRepeat } from '../../components/ui/Icons';
+import { Skeleton } from '../../components/ui/Skeleton';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
 
@@ -172,8 +173,37 @@ export default function UserProfileScreen({ route, navigation }: Props) {
 
   if (isLoading) {
     return (
-      <View style={[styles.loading, { backgroundColor: theme.bg, paddingTop: insets.top }]}>
-        <ActivityIndicator color={COLORS.primary} size="large" />
+      <View style={[styles.container, { backgroundColor: theme.bg, paddingTop: insets.top }]}>
+        {/* Skeleton header */}
+        <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.borderLight }]}>
+          <Skeleton width={24} height={24} borderRadius={12} />
+          <Skeleton width={120} height={16} borderRadius={8} />
+          <Skeleton width={24} height={24} borderRadius={12} />
+        </View>
+        {/* Cover skeleton */}
+        <Skeleton width="100%" height={120} borderRadius={0} />
+        {/* Hero skeleton */}
+        <View style={[{ backgroundColor: theme.surface, padding: 16, gap: 12 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 12 }}>
+            <Skeleton width={80} height={80} borderRadius={40} />
+            <View style={{ flex: 1, gap: 8 }}>
+              <Skeleton width={140} height={18} borderRadius={9} />
+              <Skeleton width={100} height={13} borderRadius={7} />
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 20 }}>
+            <Skeleton width={60} height={32} borderRadius={8} />
+            <Skeleton width={60} height={32} borderRadius={8} />
+            <Skeleton width={60} height={32} borderRadius={8} />
+          </View>
+          <Skeleton width="100%" height={40} borderRadius={20} />
+        </View>
+        {/* Grid skeleton */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 1, marginTop: 1 }}>
+          {Array.from({ length: 9 }).map((_, i) => (
+            <Skeleton key={i} width={CELL} height={CELL * 1.5} borderRadius={0} />
+          ))}
+        </View>
       </View>
     );
   }
@@ -308,13 +338,17 @@ export default function UserProfileScreen({ route, navigation }: Props) {
           />
         )}
         ListEmptyComponent={
-          displayLoading
-            ? <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
-            : (
-              <View style={styles.empty}>
-                <Text style={[styles.emptyText, { color: theme.textMuted }]}>Aucune publication</Text>
-              </View>
-            )
+          displayLoading ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 1 }}>
+              {Array.from({ length: 9 }).map((_, i) => (
+                <Skeleton key={i} width={CELL} height={CELL * 1.5} borderRadius={0} />
+              ))}
+            </View>
+          ) : (
+            <View style={styles.empty}>
+              <Text style={[styles.emptyText, { color: theme.textMuted }]}>Aucune publication</Text>
+            </View>
+          )
         }
       />
     </View>
