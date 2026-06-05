@@ -124,8 +124,8 @@ export async function messageRoutes(app: FastifyInstance) {
       data: {
         user_id: request.requester_id,
         type: 'MESSAGE_REQUEST_ACCEPTED',
-        title: 'Request accepted',
-        body: 'Your message request was accepted',
+        title: 'Demande de contact acceptée',
+        body: 'Votre demande de contact a été acceptée',
         data: { conversation_id: conversation.id },
       },
     });

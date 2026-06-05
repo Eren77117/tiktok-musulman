@@ -386,14 +386,14 @@ export async function postRoutes(app: FastifyInstance) {
     ]);
 
     if (post.user_id !== userId) {
-      const liker = await prisma.user.findUnique({ where: { id: userId }, select: { display_name: true } });
+      const liker = await prisma.user.findUnique({ where: { id: userId }, select: { username: true, display_name: true } });
       await prisma.notification.create({
         data: {
           user_id: post.user_id,
           type: 'LIKE',
-          title: 'Nouveau like',
-          body: `${liker?.display_name ?? 'Quelqu\'un'} a aimé ta publication`,
-          data: { post_id: id, user_id: userId },
+          title: `@${liker?.username ?? 'quelqu\'un'} a aimé votre vidéo`,
+          body: liker?.display_name ? `${liker.display_name} a aimé votre publication` : 'Quelqu\'un a aimé votre publication',
+          data: { post_id: id, liker_id: userId },
         },
       }).catch(() => {});
     }
