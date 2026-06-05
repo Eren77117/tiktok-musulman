@@ -6,6 +6,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.0.0',
+    date: '2026-06-05 · 13h00',
+    changes: [
+      'Feed: 1 video plein ecran par page (pagingEnabled fix)',
+      'Explorer: grille trending fonctionnelle + theme uniforme',
+      'Profil: grille videos visible (filtres restrictifs retires)',
+      'Profil: stats dark mode lisibles, bouton Modifier visible',
+      'Sheet Creer: IcLive icon remplace emoji interdit',
+      'Seek bar: 4px + primaryLight + thumb 16px visible',
+      'Caption / actions remontees au-dessus seek bar',
+      'Messages: empty state centre verticalement',
+      'Upload: thumbnail_url Cloudinary auto a chaque upload',
+      'Backend: cover_url + following list + creator stats',
+    ],
+  },
+  {
     version: '1.9.0',
     date: '2026-06-04 · 11h00',
     changes: [
