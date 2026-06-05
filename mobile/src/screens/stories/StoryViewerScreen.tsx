@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, Image, TouchableOpacity, Animated,
   TextInput, KeyboardAvoidingView, Platform, FlatList, Modal, Pressable,
-  ActivityIndicator, Dimensions,
+  ActivityIndicator, Dimensions, Alert, Share, ActionSheetIOS,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,7 +10,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
 import { COLORS, FONT, RADIUS } from '../../constants/theme';
-import { IcBack, IcHeart, IcHeartFill, IcSend, IcEye } from '../../components/ui/Icons';
+import { IcBack, IcHeart, IcHeartFill, IcSend, IcEye, IcMore } from '../../components/ui/Icons';
 
 const { width: W, height: H } = Dimensions.get('window');
 const STORY_DURATION = 5000;
@@ -100,8 +100,48 @@ export default function StoryViewerScreen() {
 
   const { mutate: toggleLike, isPending: liking } = useMutation({
     mutationFn: () => api.post(`/stories/${story.id}/like`).then(r => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['stories-feed'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['stories-feed'] });
+      qc.invalidateQueries({ queryKey: ['stories-mine'] });
+    },
   });
+
+  const { mutate: deleteStory } = useMutation({
+    mutationFn: () => api.delete(`/stories/${story.id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['stories-mine'] });
+      qc.invalidateQueries({ queryKey: ['stories-feed'] });
+      nav.goBack();
+    },
+    onError: () => Alert.alert('Erreur', 'Impossible de supprimer la story.'),
+  });
+
+  const handleOptions = () => {
+    const shareUrl = `https://nour.app/story/${story.id}`;
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options: ['Partager', 'Supprimer', 'Annuler'], destructiveButtonIndex: 1, cancelButtonIndex: 2 },
+        (i) => {
+          if (i === 0) Share.share({ message: `Regarde ma story sur Nour ! ${shareUrl}` });
+          if (i === 1) Alert.alert('Supprimer', 'Supprimer cette story définitivement ?', [
+            { text: 'Annuler', style: 'cancel' },
+            { text: 'Supprimer', style: 'destructive', onPress: () => deleteStory() },
+          ]);
+        }
+      );
+    } else {
+      Alert.alert('Options', undefined, [
+        { text: '📤 Partager', onPress: () => Share.share({ message: `Regarde ma story sur Nour ! ${shareUrl}` }) },
+        { text: '🗑 Supprimer', style: 'destructive', onPress: () =>
+          Alert.alert('Supprimer', 'Supprimer cette story définitivement ?', [
+            { text: 'Annuler', style: 'cancel' },
+            { text: 'Supprimer', style: 'destructive', onPress: () => deleteStory() },
+          ])
+        },
+        { text: 'Annuler', style: 'cancel' },
+      ]);
+    }
+  };
 
   const { mutate: sendReply, isPending: replying } = useMutation({
     mutationFn: (content: string) => api.post(`/stories/${story.id}/reply`, { content }),
@@ -144,10 +184,15 @@ export default function StoryViewerScreen() {
           <Text style={styles.username}>{story.user.display_name}</Text>
         </View>
         {isOwnStory && (
-          <TouchableOpacity onPress={() => setShowViewers(true)} activeOpacity={0.8} style={styles.viewersBtn}>
-            <IcEye size={18} color="#fff" />
-            <Text style={styles.viewersCount}>{story.views_count}</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <TouchableOpacity onPress={() => setShowViewers(true)} activeOpacity={0.8} style={styles.viewersBtn}>
+              <IcEye size={18} color="#fff" />
+              <Text style={styles.viewersCount}>{story.views_count}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleOptions} activeOpacity={0.8} style={{ padding: 4 }}>
+              <IcMore size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
         )}
       </View>
 

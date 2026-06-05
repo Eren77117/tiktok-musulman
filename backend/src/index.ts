@@ -26,6 +26,7 @@ import { adminRoutes } from './routes/admin';
 import { supportRoutes } from './routes/support';
 import { threadRoutes } from './routes/threads';
 import { bookRoutes } from './routes/books';
+import { soundRoutes } from './routes/sounds';
 
 process.stdout.write(`[STARTUP] Node ${process.version}\n`);
 
@@ -74,6 +75,7 @@ async function bootstrap() {
   await app.register(supportRoutes, { prefix: '/api/support' });
   await app.register(threadRoutes, { prefix: '/api/threads' });
   await app.register(bookRoutes, { prefix: '/api/books' });
+  await app.register(soundRoutes, { prefix: '/api/sounds' });
 
   app.setErrorHandler((error, _req, reply) => {
     app.log.error(error);

@@ -74,6 +74,24 @@ export default function ProfileScreen() {
   const [coverLoading, setCoverLoading] = useState(false);
   const [coverError, setCoverError] = useState(false);
 
+  // Mes stories actives (pour l'anneau + viewer)
+  const { data: myStories = [] } = useQuery<any[]>({
+    queryKey: ['stories-mine', user?.id],
+    queryFn: () => api.get('/stories/mine').then(r => r.data).catch(() => []),
+    refetchInterval: 30_000,
+    enabled: !!user?.id,
+  });
+  const hasStory = myStories.length > 0;
+
+  const openMyStories = () => {
+    if (!hasStory) return;
+    const group = {
+      user: { id: user!.id, display_name: user!.display_name, avatar_url: user!.avatar_url, gender: user!.gender },
+      stories: myStories,
+    };
+    navigation.navigate('StoryViewer' as any, { groups: [group], initialGroupIndex: 0 });
+  };
+
   const { data: posts, isLoading: postsLoading, refetch: refetchPosts, isRefetching } = useQuery<{ items: Post[] }>({
     queryKey: ['user-posts', user?.id],
     queryFn: () => api.get(`/posts/user/${user?.id}`).then((r) => r.data),
@@ -228,7 +246,11 @@ export default function ProfileScreen() {
         {/* Hero */}
         <View style={[styles.heroSection, { backgroundColor: theme.bg }]}>
           <View style={styles.avatarContainer}>
-            <TouchableOpacity onPress={() => navigation.navigate('Stories' as any)} activeOpacity={0.85} style={styles.avatarWrap}>
+            {/* Anneau story actif */}
+            {hasStory && (
+              <View style={styles.storyRing} />
+            )}
+            <TouchableOpacity onPress={openMyStories} activeOpacity={0.85} style={[styles.avatarWrap, hasStory && styles.avatarWrapWithStory]}>
               {avatarLoading ? (
                 <View style={[styles.avatar, styles.avatarFallback]}>
                   <ActivityIndicator color={COLORS.primary} />
@@ -454,7 +476,13 @@ const styles = StyleSheet.create({
   heroSection: { alignItems: 'center', paddingTop: SPACING.md, paddingBottom: SPACING.lg, paddingHorizontal: SPACING.lg, gap: 10, marginTop: -30 },
 
   avatarContainer: { position: 'relative' },
-  avatarWrap: { position: 'relative' },
+  storyRing: {
+    position: 'absolute', width: 108, height: 108, borderRadius: 54,
+    borderWidth: 3, borderColor: COLORS.primary,
+    top: -6, left: -6, zIndex: 0,
+  },
+  avatarWrap: { position: 'relative', zIndex: 1 },
+  avatarWrapWithStory: { padding: 3 },
   avatar: { width: 90, height: 90, borderRadius: 45, borderWidth: 3, borderColor: COLORS.white },
   avatarFallback: {
     backgroundColor: COLORS.primaryBg, borderWidth: 3, borderColor: COLORS.white,

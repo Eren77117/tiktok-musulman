@@ -240716,53 +240716,80 @@ __d(function (global, _$$_REQUIRE, _$$_IMPORT_DEFAULT, _$$_IMPORT_ALL, module, e
       _useState8 = (0, _slicedToArray2.default)(_useState7, 2),
       avatarLoading = _useState8[0],
       setAvatarLoading = _useState8[1];
+
+    // Mes stories actives (pour l'anneau + viewer)
     var _useQuery = (0, _$$_REQUIRE(_dependencyMap[10], "@tanstack/react-query").useQuery)({
+        queryKey: ['stories-mine', user?.id],
+        queryFn: () => _$$_REQUIRE(_dependencyMap[11], "../../api/client").api.get('/stories/mine').then(r => r.data).catch(() => []),
+        refetchInterval: 30_000,
+        enabled: !!user?.id
+      }),
+      _useQuery$data = _useQuery.data,
+      myStories = _useQuery$data === void 0 ? [] : _useQuery$data;
+    var hasStory = myStories.length > 0;
+    var openMyStories = () => {
+      if (!hasStory) return;
+      var group = {
+        user: {
+          id: user.id,
+          display_name: user.display_name,
+          avatar_url: user.avatar_url,
+          gender: user.gender
+        },
+        stories: myStories
+      };
+      navigation.navigate('StoryViewer', {
+        groups: [group],
+        initialGroupIndex: 0
+      });
+    };
+    var _useQuery2 = (0, _$$_REQUIRE(_dependencyMap[10], "@tanstack/react-query").useQuery)({
         queryKey: ['user-posts', user?.id],
         queryFn: () => _$$_REQUIRE(_dependencyMap[11], "../../api/client").api.get(`/posts/user/${user?.id}`).then(r => r.data),
         enabled: !!user?.id,
         refetchOnWindowFocus: true,
         staleTime: 10_000
       }),
-      posts = _useQuery.data,
-      postsLoading = _useQuery.isLoading,
-      refetchPosts = _useQuery.refetch,
-      isRefetching = _useQuery.isRefetching;
-    var _useQuery2 = (0, _$$_REQUIRE(_dependencyMap[10], "@tanstack/react-query").useQuery)({
+      posts = _useQuery2.data,
+      postsLoading = _useQuery2.isLoading,
+      refetchPosts = _useQuery2.refetch,
+      isRefetching = _useQuery2.isRefetching;
+    var _useQuery3 = (0, _$$_REQUIRE(_dependencyMap[10], "@tanstack/react-query").useQuery)({
         queryKey: ['user-threads', user?.id],
         queryFn: () => _$$_REQUIRE(_dependencyMap[11], "../../api/client").api.get(`/threads?user_id=${user?.id}&limit=30`).then(r => r.data).catch(() => ({
           items: []
         })),
         enabled: !!user?.id && activeTab === 1
       }),
-      threads = _useQuery2.data,
-      threadsLoading = _useQuery2.isLoading;
-    var _useQuery3 = (0, _$$_REQUIRE(_dependencyMap[10], "@tanstack/react-query").useQuery)({
+      threads = _useQuery3.data,
+      threadsLoading = _useQuery3.isLoading;
+    var _useQuery4 = (0, _$$_REQUIRE(_dependencyMap[10], "@tanstack/react-query").useQuery)({
         queryKey: ['user-liked', user?.id],
         queryFn: () => _$$_REQUIRE(_dependencyMap[11], "../../api/client").api.get('/posts/liked').then(r => r.data).catch(() => ({
           items: []
         })),
         enabled: !!user?.id && activeTab === 2 && likeSubTab === 'Pour toi'
       }),
-      liked = _useQuery3.data,
-      likedLoading = _useQuery3.isLoading;
-    var _useQuery4 = (0, _$$_REQUIRE(_dependencyMap[10], "@tanstack/react-query").useQuery)({
+      liked = _useQuery4.data,
+      likedLoading = _useQuery4.isLoading;
+    var _useQuery5 = (0, _$$_REQUIRE(_dependencyMap[10], "@tanstack/react-query").useQuery)({
         queryKey: ['user-liked-threads', user?.id],
         queryFn: () => _$$_REQUIRE(_dependencyMap[11], "../../api/client").api.get('/threads/liked').then(r => r.data).catch(() => ({
           items: []
         })),
         enabled: !!user?.id && activeTab === 2 && likeSubTab === 'Fils'
       }),
-      likedThreads = _useQuery4.data,
-      likedThreadsLoading = _useQuery4.isLoading;
-    var _useQuery5 = (0, _$$_REQUIRE(_dependencyMap[10], "@tanstack/react-query").useQuery)({
+      likedThreads = _useQuery5.data,
+      likedThreadsLoading = _useQuery5.isLoading;
+    var _useQuery6 = (0, _$$_REQUIRE(_dependencyMap[10], "@tanstack/react-query").useQuery)({
         queryKey: ['favorites'],
         queryFn: () => _$$_REQUIRE(_dependencyMap[11], "../../api/client").api.get('/favorites').then(r => r.data).catch(() => ({
           items: []
         })),
         enabled: !!user?.id && activeTab === 3
       }),
-      favorites = _useQuery5.data,
-      favLoading = _useQuery5.isLoading;
+      favorites = _useQuery6.data,
+      favLoading = _useQuery6.isLoading;
     if (!user) return null;
     var handleAvatarPress = () => {
       var options = ['Prendre une photo', 'Choisir depuis la galerie', 'Annuler'];
@@ -240901,10 +240928,12 @@ __d(function (global, _$$_REQUIRE, _$$_IMPORT_DEFAULT, _$$_IMPORT_ALL, module, e
           }],
           children: [/*#__PURE__*/(0, _jsxRuntime.jsxs)(_reactNative.View, {
             style: styles.avatarContainer,
-            children: [/*#__PURE__*/(0, _jsxRuntime.jsxs)(_reactNative.TouchableOpacity, {
-              onPress: () => navigation.navigate('Stories'),
+            children: [hasStory && /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.View, {
+              style: styles.storyRing
+            }), /*#__PURE__*/(0, _jsxRuntime.jsxs)(_reactNative.TouchableOpacity, {
+              onPress: openMyStories,
               activeOpacity: 0.85,
-              style: styles.avatarWrap,
+              style: [styles.avatarWrap, hasStory && styles.avatarWrapWithStory],
               children: [avatarLoading ? /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.View, {
                 style: [styles.avatar, styles.avatarFallback],
                 children: /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.ActivityIndicator, {
@@ -241245,8 +241274,23 @@ __d(function (global, _$$_REQUIRE, _$$_IMPORT_DEFAULT, _$$_IMPORT_ALL, module, e
     avatarContainer: {
       position: 'relative'
     },
+    storyRing: {
+      position: 'absolute',
+      width: 108,
+      height: 108,
+      borderRadius: 54,
+      borderWidth: 3,
+      borderColor: _$$_REQUIRE(_dependencyMap[17], "../../constants/theme").COLORS.primary,
+      top: -6,
+      left: -6,
+      zIndex: 0
+    },
     avatarWrap: {
-      position: 'relative'
+      position: 'relative',
+      zIndex: 1
+    },
+    avatarWrapWithStory: {
+      padding: 3
     },
     avatar: {
       width: 96,
@@ -252636,13 +252680,20 @@ __d(function (global, _$$_REQUIRE, _$$_IMPORT_DEFAULT, _$$_IMPORT_ALL, module, e
   var _slicedToArray2 = _interopRequireDefault(_$$_REQUIRE(_dependencyMap[2], "@babel/runtime/helpers/slicedToArray"));
   var _react = _interopRequireWildcard(_$$_REQUIRE(_dependencyMap[3], "react"));
   var _reactNative = _$$_REQUIRE(_dependencyMap[4], "react-native");
-  var _jsxRuntime = _$$_REQUIRE(_dependencyMap[5], "react/jsx-runtime");
+  var _asyncStorage = _interopRequireDefault(_$$_REQUIRE(_dependencyMap[5], "@react-native-async-storage/async-storage"));
+  var _jsxRuntime = _$$_REQUIRE(_dependencyMap[6], "react/jsx-runtime");
   var _jsxFileName = "C:\\Users\\akars\\Nouveau dossier\\tiktok-musulman\\mobile\\src\\screens\\stories\\StoryCreateScreen.tsx";
   function _interopRequireWildcard(e, t) { if ("function" == typeof WeakMap) var r = new WeakMap(), n = new WeakMap(); return (_interopRequireWildcard = function (e, t) { if (!t && e && e.__esModule) return e; var o, i, f = { __proto__: null, default: e }; if (null === e || "object" != typeof e && "function" != typeof e) return f; if (o = t ? n : r) { if (o.has(e)) return o.get(e); o.set(e, f); } for (var _t in e) "default" !== _t && {}.hasOwnProperty.call(e, _t) && ((i = (o = Object.defineProperty) && Object.getOwnPropertyDescriptor(e, _t)) && (i.get || i.set) ? o(f, _t, i) : f[_t] = e[_t]); return f; })(e, t); }
+  var FAV_KEY = 'favorite_sounds_v1';
+  function fmtNum(n) {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+    return String(n ?? 0);
+  }
   function StoryCreateScreen() {
-    var nav = (0, _$$_REQUIRE(_dependencyMap[6], "@react-navigation/native").useNavigation)();
-    var insets = (0, _$$_REQUIRE(_dependencyMap[7], "react-native-safe-area-context").useSafeAreaInsets)();
-    var theme = (0, _$$_REQUIRE(_dependencyMap[8], "../../hooks/useTheme").useTheme)();
+    var nav = (0, _$$_REQUIRE(_dependencyMap[7], "@react-navigation/native").useNavigation)();
+    var insets = (0, _$$_REQUIRE(_dependencyMap[8], "react-native-safe-area-context").useSafeAreaInsets)();
+    var theme = (0, _$$_REQUIRE(_dependencyMap[9], "../../hooks/useTheme").useTheme)();
     var _useState = (0, _react.useState)(null),
       _useState2 = (0, _slicedToArray2.default)(_useState, 2),
       media = _useState2[0],
@@ -252651,57 +252702,119 @@ __d(function (global, _$$_REQUIRE, _$$_IMPORT_DEFAULT, _$$_IMPORT_ALL, module, e
       _useState4 = (0, _slicedToArray2.default)(_useState3, 2),
       uploading = _useState4[0],
       setUploading = _useState4[1];
-    var pickMedia = /*#__PURE__*/function () {
-      var _ref = (0, _asyncToGenerator2.default)(function* (src) {
-        var fn = src === 'camera' ? _$$_REQUIRE(_dependencyMap[9], "react-native-image-picker").launchCamera : _$$_REQUIRE(_dependencyMap[9], "react-native-image-picker").launchImageLibrary;
-        var result = yield fn({
-          mediaType: 'photo',
-          quality: 0.9,
-          maxWidth: 1080,
-          maxHeight: 1920
-        });
-        if (result.didCancel || !result.assets?.[0]?.uri) return;
-        setMedia({
-          uri: result.assets[0].uri,
-          type: 'image'
-        });
+    var _useState5 = (0, _react.useState)(null),
+      _useState6 = (0, _slicedToArray2.default)(_useState5, 2),
+      selectedSound = _useState6[0],
+      setSelectedSound = _useState6[1];
+    var _useState7 = (0, _react.useState)(false),
+      _useState8 = (0, _slicedToArray2.default)(_useState7, 2),
+      soundSheetVisible = _useState8[0],
+      setSoundSheetVisible = _useState8[1];
+    var _useState9 = (0, _react.useState)(''),
+      _useState0 = (0, _slicedToArray2.default)(_useState9, 2),
+      searchQ = _useState0[0],
+      setSearchQ = _useState0[1];
+    var _useState1 = (0, _react.useState)([]),
+      _useState10 = (0, _slicedToArray2.default)(_useState1, 2),
+      favIds = _useState10[0],
+      setFavIds = _useState10[1];
+
+    // Charger les favoris depuis AsyncStorage
+    (0, _react.useEffect)(() => {
+      _asyncStorage.default.getItem(FAV_KEY).then(v => {
+        if (v) setFavIds(JSON.parse(v));
       });
-      return function pickMedia(_x) {
+    }, []);
+    var saveFavIds = /*#__PURE__*/function () {
+      var _ref = (0, _asyncToGenerator2.default)(function* (ids) {
+        setFavIds(ids);
+        yield _asyncStorage.default.setItem(FAV_KEY, JSON.stringify(ids));
+      });
+      return function saveFavIds(_x) {
         return _ref.apply(this, arguments);
       };
     }();
+    var toggleFav = id => {
+      var next = favIds.includes(id) ? favIds.filter(x => x !== id) : [...favIds, id];
+      saveFavIds(next);
+    };
+
+    // Sons depuis le backend
+    var _useQuery = (0, _$$_REQUIRE(_dependencyMap[10], "@tanstack/react-query").useQuery)({
+        queryKey: ['sounds', searchQ],
+        queryFn: () => _$$_REQUIRE(_dependencyMap[11], "../../api/client").api.get(`/sounds${searchQ ? `?q=${encodeURIComponent(searchQ)}` : ''}`).then(r => r.data).catch(() => []),
+        enabled: soundSheetVisible
+      }),
+      _useQuery$data = _useQuery.data,
+      allSounds = _useQuery$data === void 0 ? [] : _useQuery$data;
+
+    // Sons triés : favoris en premier
+    var sortedSounds = [...allSounds.filter(s => favIds.includes(s.id)), ...allSounds.filter(s => !favIds.includes(s.id))];
+    var pickMedia = /*#__PURE__*/function () {
+      var _ref2 = (0, _asyncToGenerator2.default)(function* (src) {
+        var fn = src === 'camera' ? _$$_REQUIRE(_dependencyMap[12], "react-native-image-picker").launchCamera : _$$_REQUIRE(_dependencyMap[12], "react-native-image-picker").launchImageLibrary;
+        var result = yield fn({
+          mediaType: 'photo',
+          quality: 1,
+          maxWidth: 1080,
+          maxHeight: 1920
+        });
+        if (result.didCancel || !result.assets?.[0]) return;
+        var asset = result.assets[0];
+        if (!asset.uri) return;
+        setMedia({
+          uri: asset.uri,
+          type: 'image'
+        });
+      });
+      return function pickMedia(_x2) {
+        return _ref2.apply(this, arguments);
+      };
+    }();
     var publish = /*#__PURE__*/function () {
-      var _ref2 = (0, _asyncToGenerator2.default)(function* () {
+      var _ref3 = (0, _asyncToGenerator2.default)(function* () {
         if (!media) return;
         setUploading(true);
         try {
+          // Upload image
           var form = new FormData();
+          var fileName = media.uri.split('/').pop() ?? 'story.jpg';
+          var ext = fileName.split('.').pop()?.toLowerCase() ?? 'jpg';
+          var mimeType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
           form.append('file', {
             uri: media.uri,
-            type: 'image/jpeg',
-            name: 'story.jpg'
+            type: mimeType,
+            name: fileName
           });
-          var _yield$api$post = yield _$$_REQUIRE(_dependencyMap[10], "../../api/client").api.post('/upload/image', form, {
-              headers: {
-                'Content-Type': 'multipart/form-data'
-              }
-            }),
-            upload = _yield$api$post.data;
-          yield _$$_REQUIRE(_dependencyMap[10], "../../api/client").api.post('/stories', {
-            media_url: upload.url,
+          var uploadResp = yield _$$_REQUIRE(_dependencyMap[11], "../../api/client").api.post('/upload/image', form, {
+            headers: {
+              'Content-Type': 'multipart/form-data'
+            },
+            timeout: 30000
+          });
+          var mediaUrl = uploadResp.data?.url;
+          if (!mediaUrl) throw new Error('URL upload manquante');
+
+          // Créer la story
+          yield _$$_REQUIRE(_dependencyMap[11], "../../api/client").api.post('/stories', {
+            media_url: mediaUrl,
             media_type: 'image',
-            duration: 5
+            duration: 5,
+            ...(selectedSound ? {
+              sound_id: selectedSound.id
+            } : {})
           });
           _reactNative.Alert.alert('Story publiée !', 'Ta story est visible pendant 24h.');
           nav.goBack();
-        } catch {
-          _reactNative.Alert.alert('Erreur', 'Impossible de publier la story.');
+        } catch (e) {
+          var msg = e?.response?.data?.error ?? e?.message ?? 'Vérifier ta connexion internet.';
+          _reactNative.Alert.alert('Erreur publication', msg);
         } finally {
           setUploading(false);
         }
       });
       return function publish() {
-        return _ref2.apply(this, arguments);
+        return _ref3.apply(this, arguments);
       };
     }();
     return /*#__PURE__*/(0, _jsxRuntime.jsxs)(_reactNative.View, {
@@ -252717,7 +252830,7 @@ __d(function (global, _$$_REQUIRE, _$$_IMPORT_DEFAULT, _$$_IMPORT_ALL, module, e
           onPress: () => nav.goBack(),
           style: styles.backBtn,
           activeOpacity: 0.7,
-          children: /*#__PURE__*/(0, _jsxRuntime.jsx)(_$$_REQUIRE(_dependencyMap[11], "../../components/ui/Icons").IcBack, {
+          children: /*#__PURE__*/(0, _jsxRuntime.jsx)(_$$_REQUIRE(_dependencyMap[13], "../../components/ui/Icons").IcBack, {
             size: 24,
             color: theme.text
           })
@@ -252747,14 +252860,42 @@ __d(function (global, _$$_REQUIRE, _$$_IMPORT_DEFAULT, _$$_IMPORT_ALL, module, e
           },
           style: styles.previewImg,
           resizeMode: "cover"
-        }), /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.TouchableOpacity, {
-          style: styles.changeBtn,
-          onPress: () => setMedia(null),
-          activeOpacity: 0.8,
-          children: /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.Text, {
-            style: styles.changeBtnText,
-            children: "Changer"
-          })
+        }), selectedSound && /*#__PURE__*/(0, _jsxRuntime.jsxs)(_reactNative.View, {
+          style: styles.soundBadge,
+          children: [/*#__PURE__*/(0, _jsxRuntime.jsx)(_$$_REQUIRE(_dependencyMap[13], "../../components/ui/Icons").IcMusic, {
+            size: 13,
+            color: "#fff"
+          }), /*#__PURE__*/(0, _jsxRuntime.jsxs)(_reactNative.Text, {
+            style: styles.soundBadgeText,
+            numberOfLines: 1,
+            children: [selectedSound.title, selectedSound.artist ? ` · ${selectedSound.artist}` : '']
+          })]
+        }), /*#__PURE__*/(0, _jsxRuntime.jsxs)(_reactNative.View, {
+          style: styles.previewActions,
+          children: [/*#__PURE__*/(0, _jsxRuntime.jsxs)(_reactNative.TouchableOpacity, {
+            style: [styles.actionBtn, {
+              backgroundColor: theme.isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.5)'
+            }],
+            onPress: () => setSoundSheetVisible(true),
+            activeOpacity: 0.8,
+            children: [/*#__PURE__*/(0, _jsxRuntime.jsx)(_$$_REQUIRE(_dependencyMap[13], "../../components/ui/Icons").IcMusic, {
+              size: 18,
+              color: "#fff"
+            }), /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.Text, {
+              style: styles.actionBtnText,
+              children: selectedSound ? 'Changer le son' : 'Ajouter un son'
+            })]
+          }), /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.TouchableOpacity, {
+            style: [styles.actionBtn, {
+              backgroundColor: theme.isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.5)'
+            }],
+            onPress: () => setMedia(null),
+            activeOpacity: 0.8,
+            children: /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.Text, {
+              style: styles.actionBtnText,
+              children: "Changer la photo"
+            })
+          })]
         })]
       }) : /*#__PURE__*/(0, _jsxRuntime.jsxs)(_reactNative.View, {
         style: styles.pickZone,
@@ -252772,9 +252913,9 @@ __d(function (global, _$$_REQUIRE, _$$_IMPORT_DEFAULT, _$$_IMPORT_ALL, module, e
             }],
             onPress: () => pickMedia('camera'),
             activeOpacity: 0.8,
-            children: [/*#__PURE__*/(0, _jsxRuntime.jsx)(_$$_REQUIRE(_dependencyMap[11], "../../components/ui/Icons").IcCamera, {
+            children: [/*#__PURE__*/(0, _jsxRuntime.jsx)(_$$_REQUIRE(_dependencyMap[13], "../../components/ui/Icons").IcCamera, {
               size: 28,
-              color: _$$_REQUIRE(_dependencyMap[12], "../../constants/theme").COLORS.primary
+              color: _$$_REQUIRE(_dependencyMap[14], "../../constants/theme").COLORS.primary
             }), /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.Text, {
               style: [styles.pickBtnText, {
                 color: theme.text
@@ -252788,9 +252929,9 @@ __d(function (global, _$$_REQUIRE, _$$_IMPORT_DEFAULT, _$$_IMPORT_ALL, module, e
             }],
             onPress: () => pickMedia('library'),
             activeOpacity: 0.8,
-            children: [/*#__PURE__*/(0, _jsxRuntime.jsx)(_$$_REQUIRE(_dependencyMap[11], "../../components/ui/Icons").IcImage, {
+            children: [/*#__PURE__*/(0, _jsxRuntime.jsx)(_$$_REQUIRE(_dependencyMap[13], "../../components/ui/Icons").IcImage, {
               size: 28,
-              color: _$$_REQUIRE(_dependencyMap[12], "../../constants/theme").COLORS.primary
+              color: _$$_REQUIRE(_dependencyMap[14], "../../constants/theme").COLORS.primary
             }), /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.Text, {
               style: [styles.pickBtnText, {
                 color: theme.text
@@ -252799,6 +252940,162 @@ __d(function (global, _$$_REQUIRE, _$$_IMPORT_DEFAULT, _$$_IMPORT_ALL, module, e
             })]
           })]
         })]
+      }), /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.Modal, {
+        visible: soundSheetVisible,
+        transparent: true,
+        animationType: "slide",
+        onRequestClose: () => setSoundSheetVisible(false),
+        children: /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.Pressable, {
+          style: styles.sheetBackdrop,
+          onPress: () => setSoundSheetVisible(false),
+          children: /*#__PURE__*/(0, _jsxRuntime.jsxs)(_reactNative.Pressable, {
+            style: [styles.sheet, {
+              backgroundColor: theme.isDark ? '#161616' : '#fff'
+            }],
+            children: [/*#__PURE__*/(0, _jsxRuntime.jsxs)(_reactNative.View, {
+              style: styles.sheetTop,
+              children: [/*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.View, {
+                style: [styles.sheetHandle, {
+                  backgroundColor: theme.border
+                }]
+              }), /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.Text, {
+                style: [styles.sheetTitle, {
+                  color: theme.text
+                }],
+                children: "Sons"
+              })]
+            }), /*#__PURE__*/(0, _jsxRuntime.jsxs)(_reactNative.View, {
+              style: [styles.searchBar, {
+                backgroundColor: theme.inputBg,
+                borderColor: theme.border
+              }],
+              children: [/*#__PURE__*/(0, _jsxRuntime.jsx)(_$$_REQUIRE(_dependencyMap[13], "../../components/ui/Icons").IcSearch, {
+                size: 16,
+                color: theme.textMuted
+              }), /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.TextInput, {
+                style: [styles.searchInput, {
+                  color: theme.text
+                }],
+                placeholder: "Rechercher un son...",
+                placeholderTextColor: theme.textPlaceholder,
+                value: searchQ,
+                onChangeText: setSearchQ
+              })]
+            }), /*#__PURE__*/(0, _jsxRuntime.jsxs)(_reactNative.TouchableOpacity, {
+              style: [styles.soundRow, {
+                borderBottomColor: theme.borderLight
+              }, !selectedSound && {
+                backgroundColor: theme.isDark ? '#0D1F13' : '#F0FDF4'
+              }],
+              onPress: () => {
+                setSelectedSound(null);
+                setSoundSheetVisible(false);
+              },
+              activeOpacity: 0.75,
+              children: [/*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.View, {
+                style: [styles.soundIcon, {
+                  backgroundColor: theme.card
+                }],
+                children: /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.Text, {
+                  style: {
+                    fontSize: 18
+                  },
+                  children: "\uD83D\uDEAB"
+                })
+              }), /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.Text, {
+                style: [styles.soundName, {
+                  color: theme.text
+                }],
+                children: "Aucun son"
+              }), !selectedSound && /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.View, {
+                style: [styles.checkDot, {
+                  backgroundColor: _$$_REQUIRE(_dependencyMap[14], "../../constants/theme").COLORS.primary
+                }]
+              })]
+            }), sortedSounds.length === 0 ? /*#__PURE__*/(0, _jsxRuntime.jsxs)(_reactNative.View, {
+              style: styles.emptySound,
+              children: [/*#__PURE__*/(0, _jsxRuntime.jsx)(_$$_REQUIRE(_dependencyMap[13], "../../components/ui/Icons").IcMusic, {
+                size: 36,
+                color: theme.textSubtle
+              }), /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.Text, {
+                style: [styles.emptySoundText, {
+                  color: theme.textMuted
+                }],
+                children: searchQ ? 'Aucun son trouvé' : 'Aucun son disponible pour l\'instant'
+              })]
+            }) : /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.FlatList, {
+              data: sortedSounds,
+              keyExtractor: s => s.id,
+              showsVerticalScrollIndicator: false,
+              renderItem: ({
+                item: s
+              }) => {
+                var isFav = favIds.includes(s.id);
+                var isSelected = selectedSound?.id === s.id;
+                return /*#__PURE__*/(0, _jsxRuntime.jsxs)(_reactNative.TouchableOpacity, {
+                  style: [styles.soundRow, {
+                    borderBottomColor: theme.borderLight
+                  }, isSelected && {
+                    backgroundColor: theme.isDark ? '#0D1F13' : '#F0FDF4'
+                  }],
+                  onPress: () => {
+                    setSelectedSound(s);
+                    setSoundSheetVisible(false);
+                  },
+                  activeOpacity: 0.75,
+                  children: [/*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.View, {
+                    style: [styles.soundIcon, {
+                      backgroundColor: theme.isDark ? '#1F1F1F' : _$$_REQUIRE(_dependencyMap[14], "../../constants/theme").COLORS.primaryBg
+                    }],
+                    children: /*#__PURE__*/(0, _jsxRuntime.jsx)(_$$_REQUIRE(_dependencyMap[13], "../../components/ui/Icons").IcMusic, {
+                      size: 20,
+                      color: _$$_REQUIRE(_dependencyMap[14], "../../constants/theme").COLORS.primary
+                    })
+                  }), /*#__PURE__*/(0, _jsxRuntime.jsxs)(_reactNative.View, {
+                    style: styles.soundInfo,
+                    children: [/*#__PURE__*/(0, _jsxRuntime.jsxs)(_reactNative.View, {
+                      style: styles.soundTitleRow,
+                      children: [/*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.Text, {
+                        style: [styles.soundName, {
+                          color: theme.text
+                        }],
+                        numberOfLines: 1,
+                        children: s.title
+                      }), s.is_trending && /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.View, {
+                        style: styles.trendingBadge,
+                        children: /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.Text, {
+                          style: styles.trendingText,
+                          children: "\uD83D\uDD25"
+                        })
+                      })]
+                    }), /*#__PURE__*/(0, _jsxRuntime.jsxs)(_reactNative.Text, {
+                      style: [styles.soundArtist, {
+                        color: theme.textMuted
+                      }],
+                      numberOfLines: 1,
+                      children: [s.artist ?? 'Artiste inconnu', " \xB7 ", fmtNum(s.use_count), " vid\xE9os"]
+                    })]
+                  }), /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.TouchableOpacity, {
+                    onPress: () => toggleFav(s.id),
+                    style: styles.favBtn,
+                    activeOpacity: 0.7,
+                    children: isFav ? /*#__PURE__*/(0, _jsxRuntime.jsx)(_$$_REQUIRE(_dependencyMap[13], "../../components/ui/Icons").IcHeartFill, {
+                      size: 20,
+                      color: "#FF3B5C"
+                    }) : /*#__PURE__*/(0, _jsxRuntime.jsx)(_$$_REQUIRE(_dependencyMap[13], "../../components/ui/Icons").IcHeart, {
+                      size: 20,
+                      color: theme.textMuted
+                    })
+                  }), isSelected && /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.View, {
+                    style: [styles.checkDot, {
+                      backgroundColor: _$$_REQUIRE(_dependencyMap[14], "../../constants/theme").COLORS.primary
+                    }]
+                  })]
+                });
+              }
+            })]
+          })
+        })
       })]
     });
   }
@@ -252810,30 +253107,33 @@ __d(function (global, _$$_REQUIRE, _$$_IMPORT_DEFAULT, _$$_IMPORT_ALL, module, e
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: 16,
+      paddingHorizontal: _$$_REQUIRE(_dependencyMap[14], "../../constants/theme").SPACING.md,
       paddingVertical: 12,
       borderBottomWidth: 1
     },
     backBtn: {
-      padding: 4
+      padding: 4,
+      width: 40
     },
     title: {
-      fontSize: _$$_REQUIRE(_dependencyMap[12], "../../constants/theme").FONT.size.lg,
-      fontWeight: _$$_REQUIRE(_dependencyMap[12], "../../constants/theme").FONT.weight.semibold
+      fontSize: _$$_REQUIRE(_dependencyMap[14], "../../constants/theme").FONT.size.lg,
+      fontWeight: _$$_REQUIRE(_dependencyMap[14], "../../constants/theme").FONT.weight.semibold
     },
     publishBtn: {
-      backgroundColor: _$$_REQUIRE(_dependencyMap[12], "../../constants/theme").COLORS.primary,
-      borderRadius: _$$_REQUIRE(_dependencyMap[12], "../../constants/theme").RADIUS.md,
+      backgroundColor: _$$_REQUIRE(_dependencyMap[14], "../../constants/theme").COLORS.primary,
+      borderRadius: _$$_REQUIRE(_dependencyMap[14], "../../constants/theme").RADIUS.md,
       paddingHorizontal: 16,
-      paddingVertical: 8
+      paddingVertical: 8,
+      minWidth: 72,
+      alignItems: 'center'
     },
     publishBtnDisabled: {
       opacity: 0.4
     },
     publishText: {
       color: '#fff',
-      fontWeight: _$$_REQUIRE(_dependencyMap[12], "../../constants/theme").FONT.weight.semibold,
-      fontSize: _$$_REQUIRE(_dependencyMap[12], "../../constants/theme").FONT.size.sm
+      fontWeight: _$$_REQUIRE(_dependencyMap[14], "../../constants/theme").FONT.weight.semibold,
+      fontSize: _$$_REQUIRE(_dependencyMap[14], "../../constants/theme").FONT.size.sm
     },
     preview: {
       flex: 1,
@@ -252843,17 +253143,45 @@ __d(function (global, _$$_REQUIRE, _$$_IMPORT_DEFAULT, _$$_IMPORT_ALL, module, e
       flex: 1,
       width: '100%'
     },
-    changeBtn: {
+    soundBadge: {
       position: 'absolute',
-      bottom: 32,
+      top: 16,
       alignSelf: 'center',
-      backgroundColor: 'rgba(0,0,0,0.6)',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      backgroundColor: 'rgba(0,0,0,0.55)',
       borderRadius: 20,
-      paddingHorizontal: 20,
-      paddingVertical: 10
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      maxWidth: '80%'
     },
-    changeBtnText: {
+    soundBadgeText: {
       color: '#fff',
+      fontSize: 12,
+      fontWeight: '500',
+      flex: 1
+    },
+    previewActions: {
+      position: 'absolute',
+      bottom: 28,
+      width: '100%',
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: 12,
+      paddingHorizontal: 20
+    },
+    actionBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      borderRadius: 20,
+      paddingHorizontal: 16,
+      paddingVertical: 9
+    },
+    actionBtnText: {
+      color: '#fff',
+      fontSize: 13,
       fontWeight: '600'
     },
     pickZone: {
@@ -252864,12 +253192,13 @@ __d(function (global, _$$_REQUIRE, _$$_IMPORT_DEFAULT, _$$_IMPORT_ALL, module, e
       padding: 32
     },
     pickHint: {
-      fontSize: _$$_REQUIRE(_dependencyMap[12], "../../constants/theme").FONT.size.base,
+      fontSize: _$$_REQUIRE(_dependencyMap[14], "../../constants/theme").FONT.size.base,
       textAlign: 'center'
     },
     pickBtns: {
       flexDirection: 'row',
-      gap: 16
+      gap: 16,
+      width: '100%'
     },
     pickBtn: {
       flex: 1,
@@ -252877,16 +253206,117 @@ __d(function (global, _$$_REQUIRE, _$$_IMPORT_DEFAULT, _$$_IMPORT_ALL, module, e
       justifyContent: 'center',
       gap: 10,
       padding: 24,
-      borderRadius: _$$_REQUIRE(_dependencyMap[12], "../../constants/theme").RADIUS.lg,
+      borderRadius: _$$_REQUIRE(_dependencyMap[14], "../../constants/theme").RADIUS.lg,
       borderWidth: 1
     },
     pickBtnText: {
-      fontSize: _$$_REQUIRE(_dependencyMap[12], "../../constants/theme").FONT.size.sm,
+      fontSize: _$$_REQUIRE(_dependencyMap[14], "../../constants/theme").FONT.size.sm,
       fontWeight: '500',
+      textAlign: 'center'
+    },
+    // Sound sheet
+    sheetBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'flex-end'
+    },
+    sheet: {
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      maxHeight: '75%',
+      paddingBottom: 30
+    },
+    sheetTop: {
+      alignItems: 'center',
+      paddingTop: 12,
+      paddingBottom: 8,
+      paddingHorizontal: _$$_REQUIRE(_dependencyMap[14], "../../constants/theme").SPACING.md
+    },
+    sheetHandle: {
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      marginBottom: 12
+    },
+    sheetTitle: {
+      fontSize: _$$_REQUIRE(_dependencyMap[14], "../../constants/theme").FONT.size.lg,
+      fontWeight: '700'
+    },
+    searchBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginHorizontal: _$$_REQUIRE(_dependencyMap[14], "../../constants/theme").SPACING.md,
+      marginBottom: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: _$$_REQUIRE(_dependencyMap[14], "../../constants/theme").RADIUS.lg,
+      borderWidth: 1
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: _$$_REQUIRE(_dependencyMap[14], "../../constants/theme").FONT.size.sm,
+      padding: 0
+    },
+    soundRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: _$$_REQUIRE(_dependencyMap[14], "../../constants/theme").SPACING.md,
+      paddingVertical: 12,
+      borderBottomWidth: 0.5
+    },
+    soundIcon: {
+      width: 46,
+      height: 46,
+      borderRadius: 23,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0
+    },
+    soundInfo: {
+      flex: 1,
+      gap: 3
+    },
+    soundTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6
+    },
+    soundName: {
+      fontSize: _$$_REQUIRE(_dependencyMap[14], "../../constants/theme").FONT.size.sm,
+      fontWeight: '600',
+      flex: 1
+    },
+    soundArtist: {
+      fontSize: 12
+    },
+    trendingBadge: {
+      padding: 2
+    },
+    trendingText: {
+      fontSize: 12
+    },
+    favBtn: {
+      padding: 6
+    },
+    checkDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      flexShrink: 0
+    },
+    emptySound: {
+      alignItems: 'center',
+      padding: 40,
+      gap: 12
+    },
+    emptySoundText: {
+      fontSize: _$$_REQUIRE(_dependencyMap[14], "../../constants/theme").FONT.size.sm,
       textAlign: 'center'
     }
   });
-},2891,[1,178,14,71,2,182,2528,2514,2792,2827,2500,2523,2448],"src/screens/stories/StoryCreateScreen.tsx");
+},2891,[1,178,14,71,2,611,182,2528,2514,2792,2449,2500,2827,2523,2448],"src/screens/stories/StoryCreateScreen.tsx");
 __d(function (global, _$$_REQUIRE, _$$_IMPORT_DEFAULT, _$$_IMPORT_ALL, module, exports, _dependencyMap) {
   var _interopRequireDefault = _$$_REQUIRE(_dependencyMap[0], "@babel/runtime/helpers/interopRequireDefault");
   Object.defineProperty(exports, "__esModule", {
@@ -252982,13 +253412,75 @@ __d(function (global, _$$_REQUIRE, _$$_IMPORT_DEFAULT, _$$_IMPORT_ALL, module, e
     };
     var _useMutation = (0, _$$_REQUIRE(_dependencyMap[8], "@tanstack/react-query").useMutation)({
         mutationFn: () => _$$_REQUIRE(_dependencyMap[9], "../../api/client").api.post(`/stories/${story.id}/like`).then(r => r.data),
-        onSuccess: () => qc.invalidateQueries({
-          queryKey: ['stories-feed']
-        })
+        onSuccess: () => {
+          qc.invalidateQueries({
+            queryKey: ['stories-feed']
+          });
+          qc.invalidateQueries({
+            queryKey: ['stories-mine']
+          });
+        }
       }),
       toggleLike = _useMutation.mutate,
       liking = _useMutation.isPending;
     var _useMutation2 = (0, _$$_REQUIRE(_dependencyMap[8], "@tanstack/react-query").useMutation)({
+        mutationFn: () => _$$_REQUIRE(_dependencyMap[9], "../../api/client").api.delete(`/stories/${story.id}`),
+        onSuccess: () => {
+          qc.invalidateQueries({
+            queryKey: ['stories-mine']
+          });
+          qc.invalidateQueries({
+            queryKey: ['stories-feed']
+          });
+          nav.goBack();
+        },
+        onError: () => _reactNative.Alert.alert('Erreur', 'Impossible de supprimer la story.')
+      }),
+      deleteStory = _useMutation2.mutate;
+    var handleOptions = () => {
+      var shareUrl = `https://nour.app/story/${story.id}`;
+      if ("android" === 'ios') {
+        _reactNative.ActionSheetIOS.showActionSheetWithOptions({
+          options: ['Partager', 'Supprimer', 'Annuler'],
+          destructiveButtonIndex: 1,
+          cancelButtonIndex: 2
+        }, i => {
+          if (i === 0) _reactNative.Share.share({
+            message: `Regarde ma story sur Nour ! ${shareUrl}`
+          });
+          if (i === 1) _reactNative.Alert.alert('Supprimer', 'Supprimer cette story définitivement ?', [{
+            text: 'Annuler',
+            style: 'cancel'
+          }, {
+            text: 'Supprimer',
+            style: 'destructive',
+            onPress: () => deleteStory()
+          }]);
+        });
+      } else {
+        _reactNative.Alert.alert('Options', undefined, [{
+          text: '📤 Partager',
+          onPress: () => _reactNative.Share.share({
+            message: `Regarde ma story sur Nour ! ${shareUrl}`
+          })
+        }, {
+          text: '🗑 Supprimer',
+          style: 'destructive',
+          onPress: () => _reactNative.Alert.alert('Supprimer', 'Supprimer cette story définitivement ?', [{
+            text: 'Annuler',
+            style: 'cancel'
+          }, {
+            text: 'Supprimer',
+            style: 'destructive',
+            onPress: () => deleteStory()
+          }])
+        }, {
+          text: 'Annuler',
+          style: 'cancel'
+        }]);
+      }
+    };
+    var _useMutation3 = (0, _$$_REQUIRE(_dependencyMap[8], "@tanstack/react-query").useMutation)({
         mutationFn: content => _$$_REQUIRE(_dependencyMap[9], "../../api/client").api.post(`/stories/${story.id}/reply`, {
           content
         }),
@@ -252996,8 +253488,8 @@ __d(function (global, _$$_REQUIRE, _$$_IMPORT_DEFAULT, _$$_IMPORT_ALL, module, e
           setReplyText('');
         }
       }),
-      sendReply = _useMutation2.mutate,
-      replying = _useMutation2.isPending;
+      sendReply = _useMutation3.mutate,
+      replying = _useMutation3.isPending;
     var _useQuery = (0, _$$_REQUIRE(_dependencyMap[8], "@tanstack/react-query").useQuery)({
         queryKey: ['story-viewers', story?.id],
         queryFn: () => _$$_REQUIRE(_dependencyMap[9], "../../api/client").api.get(`/stories/${story.id}/views`).then(r => r.data),
@@ -253049,16 +253541,33 @@ __d(function (global, _$$_REQUIRE, _$$_IMPORT_DEFAULT, _$$_IMPORT_ALL, module, e
             style: styles.username,
             children: story.user.display_name
           })]
-        }), isOwnStory && /*#__PURE__*/(0, _jsxRuntime.jsxs)(_reactNative.TouchableOpacity, {
-          onPress: () => setShowViewers(true),
-          activeOpacity: 0.8,
-          style: styles.viewersBtn,
-          children: [/*#__PURE__*/(0, _jsxRuntime.jsx)(_$$_REQUIRE(_dependencyMap[10], "../../components/ui/Icons").IcEye, {
-            size: 18,
-            color: "#fff"
-          }), /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.Text, {
-            style: styles.viewersCount,
-            children: story.views_count
+        }), isOwnStory && /*#__PURE__*/(0, _jsxRuntime.jsxs)(_reactNative.View, {
+          style: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12
+          },
+          children: [/*#__PURE__*/(0, _jsxRuntime.jsxs)(_reactNative.TouchableOpacity, {
+            onPress: () => setShowViewers(true),
+            activeOpacity: 0.8,
+            style: styles.viewersBtn,
+            children: [/*#__PURE__*/(0, _jsxRuntime.jsx)(_$$_REQUIRE(_dependencyMap[10], "../../components/ui/Icons").IcEye, {
+              size: 18,
+              color: "#fff"
+            }), /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.Text, {
+              style: styles.viewersCount,
+              children: story.views_count
+            })]
+          }), /*#__PURE__*/(0, _jsxRuntime.jsx)(_reactNative.TouchableOpacity, {
+            onPress: handleOptions,
+            activeOpacity: 0.8,
+            style: {
+              padding: 4
+            },
+            children: /*#__PURE__*/(0, _jsxRuntime.jsx)(_$$_REQUIRE(_dependencyMap[10], "../../components/ui/Icons").IcMore, {
+              size: 20,
+              color: "#fff"
+            })
           })]
         })]
       }), /*#__PURE__*/(0, _jsxRuntime.jsxs)(_reactNative.TouchableOpacity, {

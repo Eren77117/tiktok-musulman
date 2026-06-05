@@ -13,6 +13,28 @@ const createStorySchema = z.object({
 const replySchema = z.object({ content: z.string().min(1).max(500) });
 
 export async function storyRoutes(app: FastifyInstance) {
+  // Mes stories actives (pour afficher l'anneau sur le profil)
+  app.get('/mine', { preHandler: authenticate }, async (req, reply) => {
+    const userId = req.currentUser!.id;
+    const stories = await prisma.story.findMany({
+      where: { user_id: userId, expires_at: { gt: new Date() }, archived: false },
+      include: {
+        user: { select: { id: true, username: true, display_name: true, avatar_url: true, gender: true } },
+        _count: { select: { views: true, likes: true, replies: true } },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+    return reply.send(stories.map(s => ({
+      ...s,
+      is_viewed: false,
+      is_liked: false,
+      views_count: s._count.views,
+      likes_count: s._count.likes,
+      replies_count: s._count.replies,
+      _count: undefined,
+    })));
+  });
+
   // Feed — stories des gens suivis + les siennes
   app.get('/feed', { preHandler: authenticate }, async (req, reply) => {
     const userId = req.currentUser!.id;
