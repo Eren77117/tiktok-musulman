@@ -272,14 +272,6 @@ export default function FeedScreen() {
           onEndReached={() => hasNextSuivis && !fetchingSuivis && fetchNextSuivis()}
           onEndReachedThreshold={2}
           getItemLayout={(_, i) => ({ length: ITEM_H, offset: ITEM_H * i, index: i })}
-          refreshControl={
-            <RefreshControl
-              refreshing={!!loadingSuivis}
-              onRefresh={() => { seenIds.current = []; refetchSuivis(); }}
-              tintColor={COLORS.primary}
-              colors={[COLORS.primary]}
-            />
-          }
           ListFooterComponent={fetchingSuivis ? <ActivityIndicator color={COLORS.primary} style={{ marginVertical: 20 }} /> : null}
           ListEmptyComponent={
             !loadingSuivis ? (
@@ -346,14 +338,6 @@ export default function FeedScreen() {
           onEndReached={() => hasNextFeed && !fetchingFeed && fetchNextFeed()}
           onEndReachedThreshold={3}
           getItemLayout={(_, index) => ({ length: ITEM_H, offset: ITEM_H * index, index })}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshingFeed}
-              onRefresh={() => { seenIds.current = []; refetchFeed(); }}
-              tintColor={COLORS.primary}
-              colors={[COLORS.primary]}
-            />
-          }
           ListFooterComponent={fetchingFeed ? <ActivityIndicator color={COLORS.primary} style={{ marginVertical: 20 }} /> : null}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>

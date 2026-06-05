@@ -324,7 +324,7 @@ export default function ProfileScreen() {
         {activeTab === 1 ? (
           <ThreadsTab threads={threads?.items} loading={threadsLoading} theme={theme} />
         ) : activeTab === 2 && likeSubTab === 'Fils' ? (
-          <ThreadsTab threads={likedThreads?.items} loading={likedThreadsLoading} />
+          <ThreadsTab threads={likedThreads?.items} loading={likedThreadsLoading} theme={theme} />
         ) : activeTab === 4 ? (
           repostsLoading ? (
             <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
@@ -342,7 +342,7 @@ export default function ProfileScreen() {
                   repostBadge
                 />
               )}
-              ListEmptyComponent={<EmptyTab tab={4} />}
+              ListEmptyComponent={<EmptyTab tab={4} theme={theme} />}
             />
           )
         ) : gridLoading ? (
