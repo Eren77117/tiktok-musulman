@@ -2,6 +2,9 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, Dimensions } from 'react-native';
 import { IcBrand } from './Icons';
 import { COLORS, FONT } from '../../constants/theme';
+import { CHANGELOG } from '../../constants/changelog';
+
+const APP_VERSION = CHANGELOG[0]?.version ?? '2.2.0';
 
 const { width: W } = Dimensions.get('window');
 
@@ -113,7 +116,7 @@ export function SplashScreen({ onDone }: Props) {
             <Animated.View key={i} style={[styles.dot, { opacity: d }]} />
           ))}
         </View>
-        <Text style={styles.version}>v2.2.0</Text>
+        <Text style={styles.version}>v{APP_VERSION}</Text>
       </Animated.View>
     </Animated.View>
   );

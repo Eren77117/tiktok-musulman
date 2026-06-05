@@ -6,6 +6,26 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.2.0',
+    date: '2026-06-05 · 22h00',
+    changes: [
+      'Swipe gauche sur vidéo → panel profil depuis la droite',
+      'Splash screen animé au lancement (logo, tagline, dots)',
+      'Écran erreur personnalisé (remplace l\'écran rouge)',
+      'Double-tap coeur : animation bounce + float (style TikTok)',
+      'Pull-to-refresh sur tous les feeds vidéo',
+      'Boutons actions : spring bounce au tap',
+      'Préchargement vidéos optimisé (démarrage 2× plus rapide)',
+      'Tabs header : Pour toi actif bold, underline 2.5px',
+      'Skeleton loading : profil utilisateur, grille posts, commentaires',
+      'Dark mode : Explore, Messages, PostDetail, Onboarding',
+      'Onboarding redesigné : icônes, dots animés, bouton pill',
+      'Notifications : filtre par onglet + mark-all read',
+      'Live : compteur viewers temps réel (Socket.IO)',
+      'Follow dot rouge (style TikTok)',
+    ],
+  },
+  {
     version: '2.1.0',
     date: '2026-06-05 · 15h00',
     changes: [

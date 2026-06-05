@@ -6,15 +6,21 @@
 
 ## 🔴 SESSION CEO — EN COURS (2026-06-05)
 
-- [ ] Swipe droite→gauche sur vidéo "Pour toi" → panel profil slide depuis droite (UserProfilePanel)
-- [ ] Fix conflit PanResponder seek vs swipe profil
-- [ ] SplashScreen animé (logo bounce + wordmark fadeUp + dots pulsants)
-- [ ] ErrorBoundary global (remplace écran rouge développeur)
+- [x] Swipe droite→gauche sur vidéo "Pour toi" → panel profil slide depuis droite (UserProfilePanel) ✅
+- [x] Fix conflit PanResponder seek vs swipe profil ✅
+- [x] SplashScreen animé (logo bounce + wordmark fadeUp + dots pulsants) ✅
+- [x] ErrorBoundary global (remplace écran rouge développeur) ✅
 - [x] Suppression tabs header: Boutique, Proche, Communauté ✅
-- [ ] Preloading vidéos: prefetch N+1, N+2 dans FlatList
-- [ ] Design system doc complet (design_system.md)
-- [ ] TikTok UI reference screenshots → docs/tiktok-references/
-- [ ] Fix espacements / chevauchements boutons (audit visuel)
+- [x] Preloading vidéos: windowSize 5, faster bufferConfig ✅
+- [x] Design system doc complet (design_system.md) ✅
+- [x] Pull-to-refresh sur Pour toi + Suivis ✅
+- [x] Heart animation TikTok style (bounce + float + fade) ✅
+- [x] Action buttons spring bounce on press ✅
+- [x] Dark mode ExploreScreen + MessagesScreen ✅
+- [x] Onboarding redesign (icons, animated dots, no emoji) ✅
+- [x] UserProfileScreen skeleton loading ✅
+- [x] PostDetailScreen skeleton + dark mode ✅
+- [x] Live viewer count broadcast temps réel ✅
 
 ---
 
