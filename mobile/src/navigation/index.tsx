@@ -238,34 +238,35 @@ export function AppNavigator() {
 
   return (
     <NavigationContainer>
-      <RootStack.Navigator screenOptions={{ headerShown: false }}>
+      <RootStack.Navigator screenOptions={{ headerShown: false, gestureEnabled: true, gestureDirection: 'horizontal' }}>
         {user ? (
           <>
             <RootStack.Screen name="Main" component={MainTabs} />
             <RootStack.Screen name="PostDetail" component={PostDetailScreen}
-              options={{ animation: 'slide_from_bottom' }} />
+              options={{ animation: 'slide_from_bottom', gestureDirection: 'vertical' }} />
             <RootStack.Screen name="UserProfile" component={UserProfileScreen}
-              options={{ animation: 'slide_from_right' }} />
+              options={{ animation: 'slide_from_right', gestureEnabled: true }} />
             <RootStack.Screen name="Conversation" component={ConversationScreen}
               options={{
                 headerShown: true,
-                headerStyle: { backgroundColor: COLORS.white },
+                headerStyle: { backgroundColor: COLORS.surface },
                 headerTintColor: COLORS.primary,
                 headerTitle: '',
                 headerShadowVisible: false,
+                gestureEnabled: true,
               }} />
             <RootStack.Screen name="Messages" component={MessagesScreen}
-              options={{ animation: 'slide_from_right' }} />
+              options={{ animation: 'slide_from_right', gestureEnabled: true }} />
             <RootStack.Screen name="Notifications" component={NotificationsScreen}
-              options={{ animation: 'slide_from_right' }} />
+              options={{ animation: 'slide_from_right', gestureEnabled: true }} />
             <RootStack.Screen name="Settings" component={SettingsScreen}
-              options={{ animation: 'slide_from_right' }} />
+              options={{ animation: 'slide_from_right', gestureEnabled: true }} />
             <RootStack.Screen name="ThreadComposer" component={ThreadComposerScreen}
-              options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
+              options={{ animation: 'slide_from_bottom', presentation: 'modal', gestureEnabled: true }} />
             <RootStack.Screen name="Sound" component={SoundScreen}
-              options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
+              options={{ animation: 'slide_from_bottom', presentation: 'modal', gestureEnabled: true }} />
             <RootStack.Screen name="VideoPlayer" component={VideoPlayerScreen}
-              options={{ animation: 'slide_from_bottom' }} />
+              options={{ animation: 'slide_from_bottom', gestureDirection: 'vertical', gestureEnabled: true }} />
             <RootStack.Screen name="ThreadDetail" component={ThreadDetailScreen}
               options={{ animation: 'slide_from_right' }} />
             <RootStack.Screen name="GoLive" component={GoLiveScreen}
