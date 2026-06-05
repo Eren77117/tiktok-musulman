@@ -8,8 +8,10 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../../navigation';
 import { api } from '../../api/client';
-import { COLORS, FONT, SPACING, RADIUS, SHADOW } from '../../constants/theme';
-import { IcBack, IcSend, IcHeartFill, IcHeart } from '../../components/ui/Icons';
+import { useTheme } from '../../hooks/useTheme';
+import { COLORS, FONT, SPACING, RADIUS } from '../../constants/theme';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { IcBack, IcSend, IcComment } from '../../components/ui/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PostDetail'>;
 
@@ -31,6 +33,7 @@ function fmtTime(iso: string) {
 
 export default function PostDetailScreen({ route, navigation }: Props) {
   const { postId } = route.params;
+  const theme = useTheme();
   const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
   const qc = useQueryClient();
@@ -53,30 +56,42 @@ export default function PostDetailScreen({ route, navigation }: Props) {
     addMutation.mutate(text.trim());
   };
 
+  const comments = data?.items ?? [];
+
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { paddingTop: insets.top }]}
+      style={[styles.container, { backgroundColor: theme.bg, paddingTop: insets.top }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
     >
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.borderLight }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.7}>
-          <IcBack size={24} color={COLORS.text} />
+          <IcBack size={24} color={theme.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Commentaires</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>
+          Commentaires{comments.length > 0 ? ` (${comments.length})` : ''}
+        </Text>
         <View style={{ width: 40 }} />
       </View>
 
       {isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={COLORS.primary} />
+        <View style={styles.skeletonList}>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <View key={i} style={styles.skeletonRow}>
+              <Skeleton width={36} height={36} borderRadius={18} />
+              <View style={{ flex: 1, gap: 6 }}>
+                <Skeleton width={100} height={12} borderRadius={6} />
+                <Skeleton width="80%" height={14} borderRadius={7} />
+              </View>
+            </View>
+          ))}
         </View>
       ) : (
         <FlatList
-          data={data?.items}
+          data={comments}
           keyExtractor={c => c.id}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { flexGrow: 1 }]}
           showsVerticalScrollIndicator={false}
           renderItem={({ item: c }) => (
             <View style={styles.comment}>
@@ -84,44 +99,45 @@ export default function PostDetailScreen({ route, navigation }: Props) {
                 {c.user.avatar_url ? (
                   <Image source={{ uri: c.user.avatar_url }} style={styles.avatarImg} />
                 ) : (
-                  <View style={[styles.avatarImg, styles.avatarFallback]}>
-                    <Text style={styles.avatarInitial}>{c.user.display_name[0]?.toUpperCase()}</Text>
+                  <View style={[styles.avatarImg, { backgroundColor: theme.primaryBg, alignItems: 'center', justifyContent: 'center' }]}>
+                    <Text style={[styles.avatarInitial, { color: theme.primary }]}>{c.user.display_name[0]?.toUpperCase()}</Text>
                   </View>
                 )}
               </View>
               <View style={styles.commentBody}>
-                <View style={styles.commentBubble}>
-                  <Text style={styles.commentUser}>@{c.user.username}</Text>
-                  <Text style={styles.commentText}>{c.content}</Text>
+                <View style={[styles.commentBubble, { backgroundColor: theme.card, borderColor: theme.borderLight }]}>
+                  <Text style={[styles.commentUser, { color: theme.primary }]}>@{c.user.username}</Text>
+                  <Text style={[styles.commentText, { color: theme.text }]}>{c.content}</Text>
                 </View>
-                <Text style={styles.commentTime}>{fmtTime(c.created_at)}</Text>
+                <Text style={[styles.commentTime, { color: theme.textSubtle }]}>{fmtTime(c.created_at)}</Text>
               </View>
             </View>
           )}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
-              <Text style={styles.emptyText}>Aucun commentaire pour l'instant.</Text>
-              <Text style={styles.emptySubText}>Soyez le premier à commenter !</Text>
+              <IcComment size={40} color={theme.textSubtle} strokeWidth={1.5} />
+              <Text style={[styles.emptyText, { color: theme.text }]}>Aucun commentaire</Text>
+              <Text style={[styles.emptySubText, { color: theme.textMuted }]}>Soyez le premier à commenter !</Text>
             </View>
           }
         />
       )}
 
       {/* Input */}
-      <View style={[styles.inputRow, { paddingBottom: insets.bottom + 8 }]}>
+      <View style={[styles.inputRow, { paddingBottom: insets.bottom + 8, backgroundColor: theme.surface, borderTopColor: theme.borderLight }]}>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
           value={text}
           onChangeText={setText}
           placeholder="Ajouter un commentaire..."
-          placeholderTextColor={COLORS.textPlaceholder}
+          placeholderTextColor={theme.textPlaceholder}
           multiline
           maxLength={500}
           returnKeyType="send"
           onSubmitEditing={handleSend}
         />
         <TouchableOpacity
-          style={[styles.sendBtn, (!text.trim() || addMutation.isPending) && styles.sendBtnDisabled]}
+          style={[styles.sendBtn, { backgroundColor: COLORS.primary }, (!text.trim() || addMutation.isPending) && styles.sendBtnDisabled]}
           onPress={handleSend}
           disabled={!text.trim() || addMutation.isPending}
           activeOpacity={0.8}
@@ -137,50 +153,45 @@ export default function PostDetailScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: SPACING.md, paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: COLORS.borderLight,
-    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
   },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: FONT.size.lg, fontWeight: FONT.weight.semibold, color: COLORS.text },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  list: { padding: SPACING.md, gap: 14, flexGrow: 1 },
+  headerTitle: { fontSize: FONT.size.lg, fontWeight: FONT.weight.semibold },
+  skeletonList: { padding: SPACING.md, gap: 18 },
+  skeletonRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  list: { padding: SPACING.md, gap: 14 },
 
   comment: { flexDirection: 'row', gap: 10 },
   commentAvatar: { width: 36, height: 36, borderRadius: 18, overflow: 'hidden', flexShrink: 0 },
   avatarImg: { width: 36, height: 36 },
-  avatarFallback: { backgroundColor: COLORS.primaryBg, alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { fontSize: 14, fontWeight: FONT.weight.bold, color: COLORS.primary },
+  avatarInitial: { fontSize: 14, fontWeight: FONT.weight.bold },
   commentBody: { flex: 1, gap: 4 },
   commentBubble: {
-    backgroundColor: COLORS.white, borderRadius: RADIUS.md,
-    padding: 10, borderWidth: 1, borderColor: COLORS.borderLight,
+    borderRadius: RADIUS.md, padding: 10, borderWidth: 1,
   },
-  commentUser: { fontSize: FONT.size.xs, fontWeight: FONT.weight.semibold, color: COLORS.primary, marginBottom: 2 },
-  commentText: { fontSize: FONT.size.sm, color: COLORS.text, lineHeight: 20 },
-  commentTime: { fontSize: FONT.size.xs, color: COLORS.textSubtle },
+  commentUser: { fontSize: FONT.size.xs, fontWeight: FONT.weight.semibold, marginBottom: 2 },
+  commentText: { fontSize: FONT.size.sm, lineHeight: 20 },
+  commentTime: { fontSize: FONT.size.xs },
 
-  emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 6 },
-  emptyText: { fontSize: FONT.size.base, fontWeight: FONT.weight.medium, color: COLORS.text },
-  emptySubText: { fontSize: FONT.size.sm, color: COLORS.textMuted },
+  emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 10 },
+  emptyText: { fontSize: FONT.size.base, fontWeight: FONT.weight.medium },
+  emptySubText: { fontSize: FONT.size.sm },
 
   inputRow: {
     flexDirection: 'row', gap: 8, padding: SPACING.md, paddingTop: 10,
-    borderTopWidth: 1, borderTopColor: COLORS.borderLight,
-    backgroundColor: COLORS.white, alignItems: 'flex-end',
+    borderTopWidth: 1, alignItems: 'flex-end',
   },
   input: {
-    flex: 1, backgroundColor: COLORS.inputBg,
-    borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10,
-    color: COLORS.text, fontSize: FONT.size.sm,
-    maxHeight: 100, borderWidth: 1, borderColor: COLORS.border,
+    flex: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10,
+    fontSize: FONT.size.sm, maxHeight: 100, borderWidth: 1,
   },
   sendBtn: {
     width: 40, height: 40, borderRadius: 20,
-    backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
   sendBtnDisabled: { opacity: 0.4 },
 });
