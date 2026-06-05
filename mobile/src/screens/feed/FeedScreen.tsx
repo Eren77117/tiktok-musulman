@@ -204,6 +204,7 @@ export default function FeedScreen() {
         <FlatList<FeedPost>
           data={suivisData?.pages.flatMap(p => p.items) ?? []}
           keyExtractor={p => p.id}
+          style={{ flex: 1 }}
           onLayout={e => setListHeight(e.nativeEvent.layout.height)}
           renderItem={({ item }) => (
             <VideoPlayerItem
@@ -214,7 +215,6 @@ export default function FeedScreen() {
             />
           )}
           pagingEnabled
-          snapToInterval={ITEM_H}
           decelerationRate="fast"
           showsVerticalScrollIndicator={false}
           onViewableItemsChanged={onViewableItemsChanged}
@@ -243,6 +243,7 @@ export default function FeedScreen() {
       {tab === 'pourtoi' && !loadingFeed && (
         <FlatList<FeedItem>
           data={posts}
+          style={{ flex: 1 }}
           onLayout={e => setListHeight(e.nativeEvent.layout.height)}
           keyExtractor={p =>
             p.type === 'video' ? p.data.id :
@@ -266,8 +267,6 @@ export default function FeedScreen() {
             );
           }}
           pagingEnabled
-          snapToInterval={ITEM_H}
-          snapToAlignment="start"
           decelerationRate="fast"
           showsVerticalScrollIndicator={false}
           onViewableItemsChanged={onViewableItemsChanged}

@@ -73,8 +73,6 @@ async function buildFeedItems(userId: string, seenIds: string[], poolSize = 80) 
 
   const posts = await prisma.post.findMany({
     where: {
-      status: 'ACTIVE',
-      is_public: true,
       video_url: { not: '' },
       NOT: seenIds.length > 0 ? { id: { in: seenIds } } : undefined,
     },
@@ -113,7 +111,7 @@ export async function postRoutes(app: FastifyInstance) {
     const posts = await prisma.post.findMany({
       where: {
         user_id: { in: ids },
-        status: 'ACTIVE', is_public: true, video_url: { not: '' },
+        video_url: { not: '' },
         ...(cursor ? { id: { lt: cursor } } : {}),
       },
       take: lim + 1,
@@ -357,7 +355,7 @@ export async function postRoutes(app: FastifyInstance) {
       where: {
         user_id: userId,
         post_id: { not: null },
-        post: { video_url: { not: '' }, status: 'ACTIVE' },
+        post: { video_url: { not: '' } },
       },
       take: parseInt(limit) + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -383,7 +381,7 @@ export async function postRoutes(app: FastifyInstance) {
     const { cursor, limit = '12' } = req.query as { cursor?: string; limit?: string };
 
     const posts = await prisma.post.findMany({
-      where: { user_id: userId, status: 'ACTIVE', is_public: true, video_url: { not: '' } },
+      where: { user_id: userId, video_url: { not: '' } },
       take: parseInt(limit) + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       orderBy: { created_at: 'desc' },
