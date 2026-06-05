@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, FONT, SPACING } from '../../constants/theme';
+import { useTheme } from '../../hooks/useTheme';
+import { FONT, SPACING } from '../../constants/theme';
 import { Button } from './Button';
 import {
   Video, Search, MessageSquare, User, Bell, Bookmark,
@@ -29,15 +30,16 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({ icon = 'help', title, subtitle, actionLabel, onAction }: EmptyStateProps) {
+  const theme = useTheme();
   const IconComp = ICON_MAP[icon] ?? HelpCircle;
 
   return (
     <View style={styles.container}>
-      <View style={styles.iconWrap}>
-        <IconComp size={32} color={COLORS.primary} strokeWidth={1.5} />
+      <View style={[styles.iconWrap, { backgroundColor: theme.primaryBg }]}>
+        <IconComp size={32} color={theme.primary} strokeWidth={1.5} />
       </View>
-      <Text style={styles.title}>{title}</Text>
-      {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+      <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
+      {subtitle && <Text style={[styles.subtitle, { color: theme.textMuted }]}>{subtitle}</Text>}
       {actionLabel && onAction && (
         <Button label={actionLabel} onPress={onAction} size="sm" style={{ marginTop: SPACING.lg } as any} />
       )}
@@ -49,10 +51,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.xl, gap: 12 },
   iconWrap: {
     width: 72, height: 72, borderRadius: 36,
-    backgroundColor: COLORS.primaryBg,
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 4,
   },
-  title: { fontSize: FONT.size.lg, fontWeight: FONT.weight.semibold, color: COLORS.text, textAlign: 'center' },
-  subtitle: { fontSize: FONT.size.base, color: COLORS.textMuted, textAlign: 'center', lineHeight: 22 },
+  title: { fontSize: FONT.size.lg, fontWeight: FONT.weight.semibold, textAlign: 'center' },
+  subtitle: { fontSize: FONT.size.base, textAlign: 'center', lineHeight: 22 },
 });

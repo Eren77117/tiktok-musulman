@@ -52,28 +52,34 @@ export async function searchRoutes(app: FastifyInstance) {
     }
 
     if (type === 'all' || type === 'categories') {
-      result.categories = await prisma.category.findMany({
+      const cats = await prisma.category.findMany({
         where: { name: { contains: q, mode: 'insensitive' } },
         take: lim,
         orderBy: { post_count: 'desc' },
       });
+      result.categories = cats;
+      result.hashtags = cats.map((c) => ({ tag: c.name, count: c.post_count ?? 0 }));
     }
 
     return reply.send(result);
   });
 
   app.get('/trending', { preHandler: authenticate }, async (req, reply) => {
-    const [sounds, categories] = await Promise.all([
-      prisma.sound.findMany({
-        where: { is_trending: true },
+    const [trendingUsers, categories] = await Promise.all([
+      prisma.user.findMany({
+        where: { is_banned: false },
         take: 10,
-        orderBy: { use_count: 'desc' },
+        orderBy: { follower_count: 'desc' },
+        select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true, follower_count: true },
       }),
       prisma.category.findMany({
-        take: 10,
+        take: 15,
         orderBy: { post_count: 'desc' },
       }),
     ]);
-    return reply.send({ sounds, categories });
+    return reply.send({
+      users: trendingUsers,
+      hashtags: categories.map((c) => ({ tag: c.name, count: c.post_count ?? 0 })),
+    });
   });
 }

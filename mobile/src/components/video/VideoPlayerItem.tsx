@@ -1,10 +1,11 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Dimensions,
-  Image, ActivityIndicator, Animated, Share, Pressable, PanResponder,
+  Image, ActivityIndicator, Animated, Pressable, PanResponder,
   Modal, Alert, Easing,
 } from 'react-native';
 import Video, { VideoRef } from 'react-native-video';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -14,8 +15,9 @@ import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, RADIUS } from '../../constants/theme';
 import {
   IcHeartFill, IcHeart, IcComment, IcShare, IcSave, IcSaveFill,
-  IcMusic, IcPlay, IcVolume, IcMute, IcCheck,
+  IcMusic, IcPlay, IcVolume, IcMute, IcCheck, IcMaximize, IcRepeat,
 } from '../ui/Icons';
+import ShareSheet from './ShareSheet';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -33,15 +35,17 @@ export interface FeedPost {
   is_saved?: boolean;
   user: {
     id: string; username: string; display_name: string;
-    avatar_url: string | null; is_verified: boolean;
+    avatar_url: string | null; is_verified: boolean; is_following?: boolean;
   };
   sound: { id: string; title: string; artist: string | null } | null;
+  reposted_by?: { id: string; username: string; avatar_url: string | null } | null;
 }
 
 interface Props {
   post: FeedPost;
   isVisible: boolean;
   onComment: () => void;
+  onNotInterested?: () => void;
   /** Height allocated for this item (screen H minus tab bar) */
   itemHeight?: number;
 }
@@ -58,7 +62,7 @@ function fmtDuration(s: number) {
   return `${m}:${sec.toString().padStart(2, '0')}`;
 }
 
-export function VideoPlayerItem({ post, isVisible, onComment, itemHeight }: Props) {
+export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, itemHeight }: Props) {
   const ITEM_H = itemHeight ?? H;
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const videoRef = useRef<VideoRef>(null);
@@ -67,6 +71,7 @@ export function VideoPlayerItem({ post, isVisible, onComment, itemHeight }: Prop
   const [liked, setLiked] = useState(post.is_liked);
   const [likeCount, setLikeCount] = useState(post.like_count);
   const [saved, setSaved] = useState(post.is_saved ?? false);
+  const [following, setFollowing] = useState(post.user.is_following ?? false);
   const [muted, setMuted] = useState(false);
   const [paused, setPaused] = useState(!isVisible);
   const [rate, setRate] = useState(1);
@@ -74,6 +79,8 @@ export function VideoPlayerItem({ post, isVisible, onComment, itemHeight }: Prop
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const [progress, setProgress] = useState(0); // 0–1
   const [soundSheetVisible, setSoundSheetVisible] = useState(false);
+  const [isHorizontal, setIsHorizontal] = useState(false);
+  const [shareSheetVisible, setShareSheetVisible] = useState(false);
 
   // Vinyl spinning animation
   const vinylRotation = useRef(new Animated.Value(0)).current;
@@ -196,6 +203,12 @@ export function VideoPlayerItem({ post, isVisible, onComment, itemHeight }: Prop
     onError: () => setSaved(post.is_saved ?? false),
   });
 
+  const followMutation = useMutation({
+    mutationFn: () => api.post(`/users/${post.user.id}/follow`),
+    onMutate: () => setFollowing(f => !f),
+    onError: () => setFollowing(post.user.is_following ?? false),
+  });
+
   // ── Heart animation (always plays on double-tap) ──────────────────────────
   const animateHeart = useCallback((x: number, y: number) => {
     setHeartPos({ x: x - 50, y: y - 80 });
@@ -213,6 +226,7 @@ export function VideoPlayerItem({ post, isVisible, onComment, itemHeight }: Prop
   // ── Trigger like (on double-tap) — single like per video ─────────────────
   const triggerLike = useCallback((x: number, y: number) => {
     animateHeart(x, y);
+    ReactNativeHapticFeedback.trigger('impactMedium', { enableVibrateFallback: true });
     // Only call API / update state if not already liked
     if (!likedRef.current) {
       setLiked(true);
@@ -302,6 +316,7 @@ export function VideoPlayerItem({ post, isVisible, onComment, itemHeight }: Prop
     setLiked(l => !l);
     setLikeCount(c => wasLiked ? c - 1 : c + 1);
     likedRef.current = !wasLiked;
+    ReactNativeHapticFeedback.trigger(wasLiked ? 'impactLight' : 'impactMedium', { enableVibrateFallback: true });
     likeMutation.mutate();
   }, [likeMutation]);
 
@@ -322,15 +337,18 @@ export function VideoPlayerItem({ post, isVisible, onComment, itemHeight }: Prop
           ref={videoRef}
           source={{ uri: post.video_url }}
           style={StyleSheet.absoluteFill}
-          resizeMode="cover"
+          resizeMode={isHorizontal ? 'contain' : 'cover'}
           repeat
           paused={paused}
           muted={muted}
           rate={rate}
           onBuffer={({ isBuffering }) => setBuffering(isBuffering)}
-          onLoad={({ duration }) => {
+          onLoad={({ duration, naturalSize }: any) => {
             setBuffering(false);
             if (duration > 0) totalDurationRef.current = duration;
+            if (naturalSize?.width && naturalSize?.height) {
+              setIsHorizontal(naturalSize.width > naturalSize.height);
+            }
           }}
           onError={() => { setBuffering(false); }}
           onProgress={({ currentTime, seekableDuration }) => {
@@ -430,6 +448,18 @@ export function VideoPlayerItem({ post, isVisible, onComment, itemHeight }: Prop
         </View>
       )}
 
+      {/* Plein écran — videos horizontales uniquement */}
+      {isHorizontal && (
+        <TouchableOpacity
+          style={styles.fullscreenBtn}
+          onPress={() => (videoRef.current as any)?.presentFullscreenPlayer?.()}
+          activeOpacity={0.85}
+        >
+          <IcMaximize size={14} color={COLORS.white} />
+          <Text style={styles.fullscreenText}>Plein écran</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Mute button */}
       <TouchableOpacity style={styles.muteBtn} onPress={() => setMuted(m => !m)} activeOpacity={0.8}>
         {muted ? <IcMute size={18} color={COLORS.white} /> : <IcVolume size={18} color={COLORS.white} />}
@@ -443,6 +473,21 @@ export function VideoPlayerItem({ post, isVisible, onComment, itemHeight }: Prop
         end={{ x: 0, y: 1 }}
         pointerEvents="none"
       />
+
+      {/* Repost indicator — bottom left, above username */}
+      {post.reposted_by && (
+        <View style={styles.repostBadge}>
+          <IcRepeat size={11} color={COLORS.white} />
+          {post.reposted_by.avatar_url ? (
+            <Image source={{ uri: post.reposted_by.avatar_url }} style={styles.repostAvatar} />
+          ) : (
+            <View style={[styles.repostAvatar, styles.repostAvatarFallback]}>
+              <Text style={styles.repostAvatarInitial}>{post.reposted_by.username[0]?.toUpperCase()}</Text>
+            </View>
+          )}
+          <Text style={styles.repostText}>@{post.reposted_by.username}</Text>
+        </View>
+      )}
 
       {/* Bottom left — username + caption */}
       <View style={styles.bottomLeft}>
@@ -486,9 +531,15 @@ export function VideoPlayerItem({ post, isVisible, onComment, itemHeight }: Prop
                 <Text style={styles.avatarInitial}>{post.user.display_name[0]?.toUpperCase()}</Text>
               </View>
           }
-          <View style={styles.followDot}>
-            <Text style={styles.followDotText}>+</Text>
-          </View>
+          {!following && (
+            <TouchableOpacity
+              style={styles.followDot}
+              onPress={() => { ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true }); followMutation.mutate(); }}
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+            >
+              <Text style={styles.followDotText}>+</Text>
+            </TouchableOpacity>
+          )}
         </TouchableOpacity>
 
         {/* Like */}
@@ -505,7 +556,7 @@ export function VideoPlayerItem({ post, isVisible, onComment, itemHeight }: Prop
         {/* Save */}
         <ActionBtn
           icon={saved ? <IcSaveFill size={28} color={COLORS.primary} /> : <IcSave size={28} color={COLORS.white} />}
-          count={fmt(0)}
+          count={''}
           onPress={() => saveMutation.mutate()}
         />
 
@@ -514,7 +565,8 @@ export function VideoPlayerItem({ post, isVisible, onComment, itemHeight }: Prop
           icon={<IcShare size={28} color={COLORS.white} />}
           count={fmt(post.share_count || 0)}
           onPress={() => {
-            Share.share({ message: `Regarde cette vidéo sur Nour\nhttps://nour.app/post/${post.id}` });
+            ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true, ignoreAndroidSystemSettings: false });
+            setShareSheetVisible(true);
           }}
         />
 
@@ -554,6 +606,13 @@ export function VideoPlayerItem({ post, isVisible, onComment, itemHeight }: Prop
           }}
         />
       )}
+      {/* Share Sheet */}
+      <ShareSheet
+        post={post}
+        visible={shareSheetVisible}
+        onClose={() => setShareSheetVisible(false)}
+        onNotInterested={onNotInterested}
+      />
     </Animated.View>
   );
 }
@@ -697,6 +756,16 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
+  repostBadge: {
+    position: 'absolute', bottom: 200, left: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 20,
+    paddingHorizontal: 8, paddingVertical: 4,
+  },
+  repostAvatar: { width: 16, height: 16, borderRadius: 8, overflow: 'hidden' },
+  repostAvatarFallback: { backgroundColor: COLORS.primaryBg, alignItems: 'center', justifyContent: 'center' },
+  repostAvatarInitial: { fontSize: 8, fontWeight: '700', color: COLORS.primary },
+  repostText: { fontSize: 11, color: 'rgba(255,255,255,0.9)', fontWeight: '600' },
   bottomLeft: { position: 'absolute', bottom: 72, left: 14, right: 88, gap: 6 },
   usernameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   username: { fontSize: FONT.size.base, fontWeight: FONT.weight.bold, color: COLORS.white },
@@ -774,4 +843,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 5,
   },
   seekTimeText: { fontSize: 12, color: COLORS.white, fontWeight: FONT.weight.semibold },
+
+  fullscreenBtn: {
+    position: 'absolute', bottom: 72, alignSelf: 'center',
+    left: W / 2 - 68,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.60)',
+    borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)',
+  },
+  fullscreenText: { fontSize: 13, fontWeight: '500', color: COLORS.white },
 });

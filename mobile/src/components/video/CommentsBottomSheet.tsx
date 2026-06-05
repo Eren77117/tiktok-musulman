@@ -5,11 +5,12 @@ import {
   Platform, ActivityIndicator, Image, Modal, Alert, ActionSheetIOS,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { api } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
 import { useTheme } from '../../hooks/useTheme';
 import { COLORS, FONT, SPACING, RADIUS } from '../../constants/theme';
-import { IcClose, IcSend, IcHeartFill, IcHeart, IcComment, IcMore } from '../ui/Icons';
+import { IcClose, IcSend, IcHeartFill, IcHeart, IcComment, IcMore, IcFilterSort } from '../ui/Icons';
 
 const { height: H } = Dimensions.get('window');
 const SHEET_HEIGHT = H * 0.55;
@@ -128,9 +129,12 @@ export function CommentsBottomSheet({ postId, onClose }: Props) {
           <View {...panResponder.panHandlers} style={styles.handleArea}>
             <View style={[styles.handle, { backgroundColor: theme.border }]} />
             <View style={styles.sheetHeader}>
-              <Text style={[styles.sheetTitle, { color: theme.text }]}>
-                Commentaires {data?.items?.length ? `(${data.items.length})` : ''}
-              </Text>
+              <View style={styles.sheetTitleRow}>
+                <Text style={[styles.sheetTitle, { color: theme.text }]}>
+                  {data?.items?.length ? `${data.items.length} commentaires` : 'Commentaires'}
+                </Text>
+                <IcFilterSort size={16} color={theme.textMuted} />
+              </View>
               <TouchableOpacity onPress={close} style={styles.closeBtn}>
                 <IcClose size={20} color={theme.textMuted} />
               </TouchableOpacity>
@@ -152,7 +156,7 @@ export function CommentsBottomSheet({ postId, onClose }: Props) {
                   comment={c}
                   theme={theme}
                   currentUserId={user?.id}
-                  onReply={() => setReplyTo({ id: c.id, username: c.user.username })}
+                  onReply={(username?: string) => setReplyTo({ id: c.id, username: username ?? c.user.username })}
                   onDelete={() => {
                     api.delete(`/comments/${c.id}`).then(() => {
                       qc.invalidateQueries({ queryKey: ['comments', postId] });
@@ -225,7 +229,7 @@ function CommentRow({
   comment: c, theme, currentUserId, onReply, onDelete, postId,
 }: {
   comment: Comment; theme: any; currentUserId?: string;
-  onReply: () => void; onDelete: () => void; postId: string;
+  onReply: (username?: string) => void; onDelete: () => void; postId: string;
 }) {
   const [liked, setLiked] = useState(c.is_liked ?? false);
   const [count, setCount] = useState(c.like_count);
@@ -242,6 +246,7 @@ function CommentRow({
     const wasLiked = liked;
     setLiked(l => !l);
     setCount(n => wasLiked ? n - 1 : n + 1);
+    ReactNativeHapticFeedback.trigger(wasLiked ? 'impactLight' : 'impactMedium', { enableVibrateFallback: true });
     api.post(`/comments/${c.id}/like`).catch(() => {
       setLiked(wasLiked);
       setCount(c.like_count);
@@ -288,10 +293,13 @@ function CommentRow({
         <Text style={[styles.commentText, { color: theme.text }]}>{c.content}</Text>
         <View style={styles.commentMeta}>
           <Text style={[styles.commentTime, { color: theme.textSubtle }]}>{fmtTime(c.created_at)}</Text>
+          <TouchableOpacity onPress={() => onReply()} activeOpacity={0.7}>
+            <Text style={[styles.commentTime, { color: theme.textMuted }]}>Répondre</Text>
+          </TouchableOpacity>
           {c.reply_count > 0 && (
-            <TouchableOpacity onPress={() => setShowReplies(v => !v)}>
+            <TouchableOpacity onPress={() => setShowReplies(v => !v)} activeOpacity={0.7}>
               <Text style={[styles.commentTime, { color: COLORS.primary }]}>
-                {showReplies ? 'Masquer' : `Voir ${c.reply_count} réponse${c.reply_count > 1 ? 's' : ''}`}
+                {showReplies ? 'Masquer' : `${c.reply_count} réponse${c.reply_count > 1 ? 's' : ''}`}
               </Text>
             </TouchableOpacity>
           )}
@@ -312,8 +320,19 @@ function CommentRow({
                     <View style={{ flex: 1, gap: 1 }}>
                       <Text style={[styles.commentUser, { color: COLORS.primary, fontSize: 11 }]}>@{r.user.username}</Text>
                       <Text style={[styles.commentText, { color: theme.text, fontSize: FONT.size.xs }]}>{r.content}</Text>
-                      <Text style={[styles.commentTime, { color: theme.textSubtle }]}>{fmtTime(r.created_at)}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2 }}>
+                        <Text style={[styles.commentTime, { color: theme.textSubtle }]}>{fmtTime(r.created_at)}</Text>
+                        <TouchableOpacity onPress={() => onReply(r.user.username)} activeOpacity={0.7}>
+                          <Text style={[styles.commentTime, { color: theme.textMuted }]}>Répondre</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
+                    {(r.like_count ?? 0) > 0 && (
+                      <View style={{ alignItems: 'center', gap: 2 }}>
+                        <IcHeart size={13} color={theme.textMuted} />
+                        <Text style={{ fontSize: 9, color: theme.textMuted }}>{r.like_count}</Text>
+                      </View>
+                    )}
                   </View>
                 ))
             }
@@ -346,6 +365,7 @@ const styles = StyleSheet.create({
   handleArea: { paddingTop: 10, paddingHorizontal: SPACING.md, paddingBottom: 4 },
   handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 10 },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  sheetTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   sheetTitle: { fontSize: FONT.size.base, fontWeight: FONT.weight.semibold },
   closeBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
 

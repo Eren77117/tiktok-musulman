@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, TextInput, Text, StyleSheet, TouchableOpacity, TextInputProps } from 'react-native';
+import { useTheme } from '../../hooks/useTheme';
 import { COLORS, RADIUS, FONT, SPACING } from '../../constants/theme';
 
 interface InputProps extends TextInputProps {
@@ -13,20 +14,26 @@ interface InputProps extends TextInputProps {
 export function Input({
   label, error, leftIcon, rightIcon, onRightIconPress, style, ...props
 }: InputProps) {
+  const theme = useTheme();
   const [focused, setFocused] = useState(false);
 
   return (
     <View style={styles.wrapper}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      {label && (
+        <Text style={[styles.label, { color: theme.textMuted }]}>{label}</Text>
+      )}
       <View style={[
         styles.container,
-        focused && styles.containerFocused,
-        !!error && styles.containerError,
+        {
+          backgroundColor: theme.inputBg,
+          borderColor: focused ? theme.primary : error ? COLORS.error : theme.border,
+        },
+        focused && { backgroundColor: theme.surface },
       ]}>
         {leftIcon && <View style={styles.iconLeft}>{leftIcon}</View>}
         <TextInput
-          style={[styles.input, leftIcon ? { paddingLeft: 0 } : undefined, style]}
-          placeholderTextColor={COLORS.textPlaceholder}
+          style={[styles.input, { color: theme.text }, leftIcon ? { paddingLeft: 0 } : undefined, style]}
+          placeholderTextColor={theme.textPlaceholder}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           {...props}
@@ -47,30 +54,19 @@ const styles = StyleSheet.create({
   label: {
     fontSize: FONT.size.sm,
     fontWeight: FONT.weight.medium,
-    color: COLORS.textMuted,
     marginLeft: 2,
   },
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.inputBg,
     borderRadius: RADIUS.md,
     borderWidth: 1.5,
-    borderColor: COLORS.border,
     minHeight: 50,
     paddingHorizontal: SPACING.md,
-  },
-  containerFocused: {
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.white,
-  },
-  containerError: {
-    borderColor: COLORS.error,
   },
   input: {
     flex: 1,
     fontSize: FONT.size.base,
-    color: COLORS.text,
     paddingVertical: 12,
   },
   iconLeft: { marginRight: 10 },

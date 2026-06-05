@@ -6,6 +6,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.1.0',
+    date: '2026-06-05 · 15h00',
+    changes: [
+      'Live : erreur 500 corrigée (migrations DB appliquées)',
+      'Partage : pop-up TikTok avec contacts, republier, apps externes',
+      'Republier : affiche le badge repost + avatar en bas à gauche',
+      'Pas intéressé(e) : retire le contenu du feed Pour toi',
+      'Ajouter à la Story : post visible 24h sur le profil',
+      'Signaler : formulaire envoyé directement au support admin',
+      'Isolation cache inter-comptes : données du compte précédent effacées',
+      'Video horizontale : bouton Plein écran + resizeMode auto',
+      'Commentaires : header N commentaires + icône filtre',
+      'Haptic feedback sur like, double-tap, partage',
+      'Version bump : 2.1.0 (build 4)',
+    ],
+  },
+  {
     version: '2.0.0',
     date: '2026-06-05 · 13h00',
     changes: [

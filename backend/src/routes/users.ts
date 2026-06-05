@@ -119,15 +119,16 @@ export async function userRoutes(app: FastifyInstance) {
       prisma.user.update({ where: { id }, data: { follower_count: { increment: 1 } } }),
     ]);
 
+    const follower = await prisma.user.findUnique({ where: { id: currentId }, select: { display_name: true, username: true } });
     await prisma.notification.create({
       data: {
         user_id: id,
         type: 'FOLLOW',
-        title: 'New follower',
-        body: `${(await prisma.user.findUnique({ where: { id: currentId }, select: { display_name: true } }))?.display_name} started following you`,
-        data: { follower_id: currentId },
+        title: 'Nouvel abonné',
+        body: `${follower?.display_name} (@${follower?.username}) s'est abonné à toi`,
+        data: { user_id: currentId },
       },
-    });
+    }).catch(() => {});
 
     return reply.send({ following: true });
   });

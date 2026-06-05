@@ -7,6 +7,7 @@ const createStorySchema = z.object({
   media_url: z.string().url(),
   media_type: z.enum(['image', 'video']).default('image'),
   duration: z.number().int().min(1).max(60).default(5),
+  linked_post_id: z.string().uuid().optional(),
 });
 
 export async function storyRoutes(app: FastifyInstance) {
@@ -54,6 +55,22 @@ export async function storyRoutes(app: FastifyInstance) {
     });
     await prisma.story.update({ where: { id }, data: { view_count: { increment: 1 } } });
     return reply.send({ success: true });
+  });
+
+  // Get stories for a specific user (for StoriesScreen viewer)
+  app.get('/', { preHandler: authenticate }, async (req, reply) => {
+    const { user_id } = req.query as { user_id?: string };
+    const targetId = user_id ?? req.currentUser!.id;
+    const stories = await prisma.story.findMany({
+      where: { user_id: targetId, expires_at: { gt: new Date() } },
+      include: {
+        user: { select: { id: true, username: true, display_name: true, avatar_url: true } },
+        views: { where: { viewer_id: req.currentUser!.id }, select: { id: true } },
+        linked_post: { select: { id: true, thumbnail_url: true, caption: true } },
+      },
+      orderBy: { created_at: 'asc' },
+    });
+    return reply.send(stories.map((s) => ({ ...s, is_viewed: s.views.length > 0, views: undefined })));
   });
 
   app.delete('/:id', { preHandler: authenticate }, async (req, reply) => {

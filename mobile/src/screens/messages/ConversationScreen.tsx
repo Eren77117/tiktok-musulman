@@ -50,9 +50,10 @@ export default function ConversationScreen({ route, navigation }: Props) {
   const flatRef = useRef<FlatList>(null);
   const inputRef = useRef<TextInput>(null);
 
-  const { isLoading, data: msgData } = useQuery<{ items: Message[] }>({
+  const { isLoading, isError, data: msgData } = useQuery<{ items: Message[] }>({
     queryKey: ['messages', conversationId],
-    queryFn: () => api.get(`/messages/conversations/${conversationId}/messages`).then(r => r.data),
+    queryFn: () => api.get(`/messages/conversations/${conversationId}/messages`).then(r => r.data).catch(() => ({ items: [] })),
+    retry: 1,
   });
 
   useEffect(() => {
@@ -253,7 +254,7 @@ export default function ConversationScreen({ route, navigation }: Props) {
             ))}
             {reactingTo?.sender.id === user?.id && (
               <TouchableOpacity style={styles.rxBtn} onPress={() => handleDelete(reactingTo!.id)} activeOpacity={0.7}>
-                <IcTrash size={18} color={COLORS.danger ?? '#FF3B30'} />
+                <IcTrash size={18} color="#FF3B30" />
               </TouchableOpacity>
             )}
           </View>
@@ -262,6 +263,12 @@ export default function ConversationScreen({ route, navigation }: Props) {
 
       {isLoading ? (
         <View style={styles.center}><ActivityIndicator color={COLORS.primary} /></View>
+      ) : isError ? (
+        <View style={styles.center}>
+          <Text style={{ color: COLORS.primary, fontSize: 15, fontWeight: '600', textAlign: 'center', paddingHorizontal: 32 }}>
+            Impossible de charger la conversation. Vérifie ta connexion.
+          </Text>
+        </View>
       ) : (
         <FlatList
           ref={flatRef}

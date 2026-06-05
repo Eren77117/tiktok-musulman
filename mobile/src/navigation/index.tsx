@@ -41,6 +41,11 @@ import ThreadDetailScreen from '../screens/threads/ThreadDetailScreen';
 import GoLiveScreen from '../screens/live/GoLiveScreen';
 import LiveViewerScreen from '../screens/live/LiveViewerScreen';
 import LiveListScreen from '../screens/live/LiveListScreen';
+import FollowersScreen from '../screens/profile/FollowersScreen';
+import HashtagScreen from '../screens/explore/HashtagScreen';
+import CreatorStatsScreen from '../screens/profile/CreatorStatsScreen';
+import StoriesScreen from '../screens/feed/StoriesScreen';
+import SearchScreen from '../screens/search/SearchScreen';
 
 export type RootStackParamList = {
   Auth: undefined;
@@ -58,6 +63,11 @@ export type RootStackParamList = {
   GoLive: undefined;
   LiveViewer: { sessionId: string; broadcasterId: string };
   LiveList: undefined;
+  Followers: { userId: string; username: string; type: 'followers' | 'following' };
+  Hashtag: { tag: string };
+  CreatorStats: undefined;
+  Stories: { userId: string };
+  Search: undefined;
 };
 
 export type AuthStackParamList = {
@@ -78,17 +88,17 @@ const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
 
 const TAB_LABELS: Record<string, string> = {
-  Home: 'Accueil', Explore: 'Explorer', Create: '', Messages: 'Boite', Profile: 'Profil',
+  Home: 'Accueil', Explore: 'Explorer', Create: '', Messages: 'Messages', Profile: 'Profil',
 };
 
 function TabIcon({ name, focused, theme }: { name: string; focused: boolean; theme: any }) {
   const color = focused ? theme.tabActive : theme.tabInactive;
-  const size = 22;
+  const size = 24;
   switch (name) {
-    case 'Home':     return <IcHome    size={size} color={color} />;
-    case 'Explore':  return <IcExplore size={size} color={color} />;
-    case 'Messages': return <IcMail    size={size} color={color} />;
-    case 'Profile':  return <IcProfile size={size} color={color} />;
+    case 'Home':     return <IcHome    size={size} color={color} strokeWidth={focused ? 2.2 : 1.8} />;
+    case 'Explore':  return <IcExplore size={size} color={color} strokeWidth={focused ? 2.2 : 1.8} />;
+    case 'Messages': return <IcMail    size={size} color={color} strokeWidth={focused ? 2.2 : 1.8} />;
+    case 'Profile':  return <IcProfile size={size} color={color} strokeWidth={focused ? 2.2 : 1.8} />;
     default:         return null;
   }
 }
@@ -181,7 +191,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
               <View style={{ position: 'relative' }}>
                 <TabIcon name={route.name} focused={isFocused} theme={theme} />
                 {showBadge && (
-                  <View style={styles.notifBadge}>
+                  <View style={[styles.notifBadge, { borderColor: theme.tabBg }]}>
                     <Text style={styles.notifBadgeText}>{unread > 99 ? '99+' : String(unread)}</Text>
                   </View>
                 )}
@@ -189,7 +199,6 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
               <Text style={[styles.tabLabel, { color: isFocused ? theme.tabActive : theme.tabInactive }, isFocused && styles.tabLabelActive]}>
                 {TAB_LABELS[route.name]}
               </Text>
-              {isFocused && <View style={[styles.tabDot, { backgroundColor: theme.tabActive }]} />}
             </TouchableOpacity>
           );
         })}
@@ -224,14 +233,15 @@ function AuthNavigator() {
 
 export function AppNavigator() {
   const { user, loading } = useAuthStore();
+  const theme = useTheme();
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <View style={styles.loadingLogo}>
-          <IcBrand size={32} color={COLORS.primary} />
+      <View style={[styles.loadingContainer, { backgroundColor: theme.bg }]}>
+        <View style={[styles.loadingLogo, { backgroundColor: theme.primaryBg, borderColor: theme.primaryLight }]}>
+          <IcBrand size={32} color={theme.primary} />
         </View>
-        <ActivityIndicator color={COLORS.primary} size="large" style={{ marginTop: 32 }} />
+        <ActivityIndicator color={theme.primary} size="large" style={{ marginTop: 32 }} />
       </View>
     );
   }
@@ -249,8 +259,8 @@ export function AppNavigator() {
             <RootStack.Screen name="Conversation" component={ConversationScreen}
               options={{
                 headerShown: true,
-                headerStyle: { backgroundColor: COLORS.surface },
-                headerTintColor: COLORS.primary,
+                headerStyle: { backgroundColor: theme.surface },
+                headerTintColor: theme.primary,
                 headerTitle: '',
                 headerShadowVisible: false,
                 gestureEnabled: true,
@@ -275,6 +285,16 @@ export function AppNavigator() {
               options={{ animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
             <RootStack.Screen name="LiveList" component={LiveListScreen}
               options={{ animation: 'slide_from_right' }} />
+            <RootStack.Screen name="Followers" component={FollowersScreen}
+              options={{ animation: 'slide_from_right', gestureEnabled: true }} />
+            <RootStack.Screen name="Hashtag" component={HashtagScreen}
+              options={{ animation: 'slide_from_right', gestureEnabled: true }} />
+            <RootStack.Screen name="CreatorStats" component={CreatorStatsScreen}
+              options={{ animation: 'slide_from_right', gestureEnabled: true }} />
+            <RootStack.Screen name="Stories" component={StoriesScreen}
+              options={{ animation: 'fade', presentation: 'fullScreenModal', gestureEnabled: false }} />
+            <RootStack.Screen name="Search" component={SearchScreen}
+              options={{ animation: 'slide_from_right', gestureEnabled: true }} />
           </>
         ) : (
           <RootStack.Screen name="Auth" component={AuthNavigator} />
@@ -286,13 +306,12 @@ export function AppNavigator() {
 
 const styles = StyleSheet.create({
   loadingContainer: {
-    flex: 1, backgroundColor: COLORS.bg, alignItems: 'center', justifyContent: 'center',
+    flex: 1, alignItems: 'center', justifyContent: 'center',
   },
   loadingLogo: {
     width: 80, height: 80, borderRadius: 40,
-    backgroundColor: COLORS.primaryBg,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: COLORS.primaryLight,
+    borderWidth: 2,
   },
   tabBar: {
     flexDirection: 'row',
@@ -303,16 +322,12 @@ const styles = StyleSheet.create({
     position: 'absolute', top: -4, right: -6,
     minWidth: 16, height: 16, borderRadius: 8,
     backgroundColor: '#FF3B30', alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 3, borderWidth: 1.5, borderColor: COLORS.black,
+    paddingHorizontal: 3, borderWidth: 1.5,
   },
   notifBadgeText: { fontSize: 9, fontWeight: FONT.weight.bold, color: COLORS.white },
   tabItem: { flex: 1, alignItems: 'center', gap: 2, position: 'relative', paddingVertical: 4 },
   tabLabel: { fontSize: 10, fontWeight: FONT.weight.medium },
   tabLabelActive: { fontWeight: FONT.weight.semibold },
-  tabDot: {
-    position: 'absolute', bottom: -2, width: 4, height: 4,
-    borderRadius: 2,
-  },
   createBtn: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   createInner: {
     width: 52, height: 52, borderRadius: 26, // circle like the design

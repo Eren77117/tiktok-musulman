@@ -7,6 +7,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthStackParamList } from '../../navigation';
 import { useAuthStore } from '../../stores/authStore';
+import { useTheme } from '../../hooks/useTheme';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { COLORS, FONT, SPACING, RADIUS, SHADOW } from '../../constants/theme';
@@ -21,6 +22,7 @@ const QUICK_ACCOUNTS = [
 
 export default function LoginScreen({ navigation }: Props) {
   const { login, register } = useAuthStore();
+  const theme = useTheme();
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -63,48 +65,48 @@ export default function LoginScreen({ navigation }: Props) {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <KeyboardAvoidingView style={[styles.flex, { backgroundColor: theme.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView
-        style={[styles.container, { paddingTop: insets.top + 20 }]}
+        style={[styles.container, { backgroundColor: theme.bg, paddingTop: insets.top + 20 }]}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         {/* Logo */}
         <View style={styles.logoSection}>
-          <View style={styles.logoCircle}>
-            <IcBrand size={36} color={COLORS.primary} />
+          <View style={[styles.logoCircle, { backgroundColor: theme.primaryBg, borderColor: theme.primary }]}>
+            <IcBrand size={36} color={theme.primary} />
           </View>
-          <Text style={styles.appName}>Nour</Text>
-          <Text style={styles.tagline}>Partage, inspire, élève.</Text>
+          <Text style={[styles.appName, { color: theme.primary }]}>Nour</Text>
+          <Text style={[styles.tagline, { color: theme.textMuted }]}>Partage, inspire, élève.</Text>
         </View>
 
         {/* Quick Access */}
         <View style={styles.quickSection}>
           <View style={styles.quickHeader}>
-            <View style={styles.quickLine} />
-            <Text style={styles.quickLabel}>Accès rapide test</Text>
-            <View style={styles.quickLine} />
+            <View style={[styles.quickLine, { backgroundColor: theme.border }]} />
+            <Text style={[styles.quickLabel, { color: theme.textSubtle }]}>Accès rapide test</Text>
+            <View style={[styles.quickLine, { backgroundColor: theme.border }]} />
           </View>
           <View style={styles.quickRow}>
             {QUICK_ACCOUNTS.map((acc) => (
               <TouchableOpacity
                 key={acc.email}
-                style={[styles.quickBtn, quickLoading === acc.email && styles.quickBtnLoading]}
+                style={[styles.quickBtn, { backgroundColor: theme.card, borderColor: theme.border }, quickLoading === acc.email && styles.quickBtnLoading]}
                 onPress={() => handleQuickAccess(acc)}
                 disabled={!!quickLoading}
                 activeOpacity={0.8}
               >
-                <View style={[styles.quickAvatar, { backgroundColor: acc.gender === 'MALE' ? COLORS.primaryBg : COLORS.goldBg }]}>
-                  <Text style={[styles.quickAvatarText, { color: acc.gender === 'MALE' ? COLORS.primary : COLORS.gold }]}>
+                <View style={[styles.quickAvatar, { backgroundColor: acc.gender === 'MALE' ? theme.primaryBg : COLORS.goldBg }]}>
+                  <Text style={[styles.quickAvatarText, { color: acc.gender === 'MALE' ? theme.primary : COLORS.gold }]}>
                     {acc.gender === 'MALE' ? 'H' : 'F'}
                   </Text>
                 </View>
                 <View style={styles.quickInfo}>
-                  <Text style={styles.quickName}>{acc.label}</Text>
-                  <Text style={styles.quickEmail}>{acc.email}</Text>
+                  <Text style={[styles.quickName, { color: theme.text }]}>{acc.label}</Text>
+                  <Text style={[styles.quickEmail, { color: theme.textMuted }]}>{acc.email}</Text>
                 </View>
-                <Text style={styles.quickArrow}>→</Text>
+                <Text style={[styles.quickArrow, { color: theme.primary }]}>→</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -112,9 +114,9 @@ export default function LoginScreen({ navigation }: Props) {
 
         {/* Divider */}
         <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>ou connectez-vous</Text>
-          <View style={styles.dividerLine} />
+          <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+          <Text style={[styles.dividerText, { color: theme.textMuted }]}>ou connectez-vous</Text>
+          <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
         </View>
 
         {/* Form */}
@@ -152,9 +154,9 @@ export default function LoginScreen({ navigation }: Props) {
 
         {/* Register link */}
         <TouchableOpacity onPress={() => navigation.navigate('Register')} style={styles.registerLink}>
-          <Text style={styles.registerText}>
+          <Text style={[styles.registerText, { color: theme.textMuted }]}>
             Pas de compte ?{' '}
-            <Text style={styles.registerBold}>Créer un compte</Text>
+            <Text style={[styles.registerBold, { color: theme.primary }]}>Créer un compte</Text>
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -163,52 +165,43 @@ export default function LoginScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: COLORS.bg },
-  container: { flex: 1, backgroundColor: COLORS.bg },
+  flex: { flex: 1 },
+  container: { flex: 1 },
   content: { flexGrow: 1, paddingHorizontal: SPACING.lg, paddingBottom: 40 },
 
-  // Logo
   logoSection: { alignItems: 'center', marginBottom: SPACING.xl, gap: 10 },
   logoCircle: {
     width: 80, height: 80, borderRadius: 40,
-    backgroundColor: COLORS.primaryBg,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: COLORS.primary,
-    ...SHADOW.green,
+    borderWidth: 2, ...SHADOW.green,
   },
-  logoEmoji: { fontSize: 32, fontWeight: '700', color: COLORS.primary },
-  appName: { fontSize: FONT.size.xxxl, fontWeight: FONT.weight.bold, color: COLORS.primary, letterSpacing: -0.5 },
-  tagline: { fontSize: FONT.size.base, color: COLORS.textMuted },
+  appName: { fontSize: FONT.size.xxxl, fontWeight: FONT.weight.bold, letterSpacing: -0.5 },
+  tagline: { fontSize: FONT.size.base },
 
-  // Quick access
   quickSection: { marginBottom: SPACING.lg, gap: 12 },
   quickHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  quickLine: { flex: 1, height: 1, backgroundColor: COLORS.border },
-  quickLabel: { fontSize: FONT.size.xs, color: COLORS.textSubtle, fontWeight: FONT.weight.medium },
+  quickLine: { flex: 1, height: 1 },
+  quickLabel: { fontSize: FONT.size.xs, fontWeight: FONT.weight.medium },
   quickRow: { gap: 8 },
   quickBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: COLORS.white, borderRadius: RADIUS.md,
-    padding: 12, borderWidth: 1, borderColor: COLORS.border, ...SHADOW.sm,
+    borderRadius: RADIUS.md, padding: 12, borderWidth: 1, ...SHADOW.sm,
   },
   quickBtnLoading: { opacity: 0.6 },
   quickAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   quickAvatarText: { fontSize: 20, fontWeight: FONT.weight.bold },
   quickInfo: { flex: 1 },
-  quickName: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold, color: COLORS.text },
-  quickEmail: { fontSize: FONT.size.xs, color: COLORS.textMuted, marginTop: 1 },
-  quickArrow: { fontSize: 16, color: COLORS.primary },
+  quickName: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold },
+  quickEmail: { fontSize: FONT.size.xs, marginTop: 1 },
+  quickArrow: { fontSize: 16 },
 
-  // Divider
   divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: SPACING.lg },
-  dividerLine: { flex: 1, height: 1, backgroundColor: COLORS.border },
-  dividerText: { fontSize: FONT.size.sm, color: COLORS.textMuted },
+  dividerLine: { flex: 1, height: 1 },
+  dividerText: { fontSize: FONT.size.sm },
 
-  // Form
   form: { gap: SPACING.md, marginBottom: SPACING.lg },
 
-  // Register
   registerLink: { alignItems: 'center', paddingVertical: SPACING.sm },
-  registerText: { fontSize: FONT.size.base, color: COLORS.textMuted },
-  registerBold: { color: COLORS.primary, fontWeight: FONT.weight.semibold },
+  registerText: { fontSize: FONT.size.base },
+  registerBold: { fontWeight: FONT.weight.semibold },
 });

@@ -16,7 +16,8 @@ import {
   Star, Award, Shield, Zap, LogOut, HelpCircle,
   Globe, Volume2, VolumeX, Moon, Sun, FileText,
   AtSign, Hash, Repeat2, ThumbsUp, Smile, Flag,
-  Radio, PenLine,
+  Radio, PenLine, Maximize2, SlidersHorizontal, CornerUpLeft,
+  Download, Link, Copy,
 } from 'lucide-react-native';
 import { COLORS } from '../../constants/theme';
 
@@ -123,6 +124,12 @@ export const IcSmile      = mk(Smile);
 // ── Live / Radio ──────────────────────────────────────────────────────────────
 export const IcLive       = mk(Radio);
 export const IcPen        = mk(PenLine);
+export const IcMaximize    = mk(Maximize2);
+export const IcFilterSort  = mk(SlidersHorizontal);
+export const IcCornerUpLeft = mk(CornerUpLeft);
+export const IcDownload    = mk(Download);
+export const IcLink        = mk(Link);
+export const IcCopy        = mk(Copy);
 
 // ── Brand icon (moon = symbole islamique propre) ──────────────────────────────
 export const IcBrand = ({ size = 32, color = COLORS.primary }: IconProps) =>

@@ -101,6 +101,8 @@ model User {
   reports_against   Report[]          @relation("reported_user")
   audit_logs        AuditLog[]
   support_tickets   SupportTicket[]
+  reposts           Repost[]
+  not_interested    NotInterested[]
 
   @@index([username])
   @@index([email])
@@ -148,6 +150,9 @@ model Post {
   reports     Report[]
   post_views  PostView[]
   post_categories PostCategory[]
+  reposts        Repost[]
+  not_interested NotInterested[]
+  linked_stories Story[]         @relation("StoryLinkedPost")
 
   @@index([user_id])
   @@index([created_at])
@@ -192,17 +197,19 @@ model PostCategory {
 }
 
 model Story {
-  id         String   @id @default(uuid())
-  user_id    String
-  media_url  String
-  media_type String   @default("image")
-  duration   Int      @default(5)
-  view_count Int      @default(0)
-  expires_at DateTime
-  created_at DateTime @default(now())
+  id             String   @id @default(uuid())
+  user_id        String
+  media_url      String
+  media_type     String   @default("image")
+  duration       Int      @default(5)
+  view_count     Int      @default(0)
+  expires_at     DateTime
+  created_at     DateTime @default(now())
+  linked_post_id String?
 
-  user  User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  views StoryView[]
+  user        User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  views       StoryView[]
+  linked_post Post?        @relation("StoryLinkedPost", fields: [linked_post_id], references: [id], onDelete: SetNull)
 
   @@index([user_id])
   @@index([expires_at])
@@ -506,4 +513,31 @@ model SupportTicket {
 
   @@index([user_id])
   @@index([status])
+}
+
+model Repost {
+  id         String   @id @default(uuid())
+  user_id    String
+  post_id    String
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [post_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, post_id])
+  @@index([user_id])
+  @@index([post_id])
+}
+
+model NotInterested {
+  id         String   @id @default(uuid())
+  user_id    String
+  post_id    String
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [post_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, post_id])
+  @@index([user_id])
 }

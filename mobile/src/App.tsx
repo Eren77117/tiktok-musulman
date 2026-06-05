@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -12,7 +12,8 @@ import OnboardingScreen, { ONBOARDING_KEY } from './screens/onboarding/Onboardin
 import { api } from './api/client';
 
 // ── QueryClient global — stale 30s, retry 2× ────────────────────────────────
-const queryClient = new QueryClient({
+// Exported so cache can be cleared on logout from anywhere
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: { staleTime: 30_000, retry: 2, refetchOnWindowFocus: true },
     mutations: { retry: 0 },
@@ -68,6 +69,7 @@ function AppRoot() {
   const { loadTheme, syncSystem } = useThemeStore();
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
   const [booted, setBooted] = useState(false);
+  const prevUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -80,6 +82,19 @@ function AppRoot() {
     const sub = Appearance.addChangeListener(() => syncSystem());
     return () => sub.remove();
   }, []);
+
+  // Isolation cache par compte — vide tout au changement d'utilisateur
+  useEffect(() => {
+    const currentId = user?.id ?? null;
+    if (currentId === prevUserIdRef.current) return;
+    // L'utilisateur a changé (login, logout, switch de compte)
+    queryClient.clear();
+    prevUserIdRef.current = currentId;
+    if (currentId !== null) {
+      // Nouveau compte — relancer le prefetch
+      setBooted(false);
+    }
+  }, [user?.id]);
 
   // Lance le prefetch dès que l'user est connu (authentifié)
   useEffect(() => {

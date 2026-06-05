@@ -233,7 +233,7 @@
       "id": "20",
       "title": "Backend — threads avec media_url + media_type",
       "description": "Migration Prisma : ajouter media_url String? + media_type String? à la table threads. Endpoint POST /threads accepte ces champs",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "category": "backend",
       "tags": [

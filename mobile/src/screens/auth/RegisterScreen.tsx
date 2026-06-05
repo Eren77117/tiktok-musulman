@@ -7,14 +7,16 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthStackParamList } from '../../navigation';
 import { useAuthStore } from '../../stores/authStore';
+import { useTheme } from '../../hooks/useTheme';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
-import { COLORS, FONT, SPACING, RADIUS, SHADOW } from '../../constants/theme';
+import { COLORS, FONT, SPACING, RADIUS } from '../../constants/theme';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
 export default function RegisterScreen({ navigation }: Props) {
   const { register } = useAuthStore();
+  const theme = useTheme();
   const insets = useSafeAreaInsets();
   const [form, setForm] = useState({
     username: '', email: '', password: '',
@@ -46,40 +48,48 @@ export default function RegisterScreen({ navigation }: Props) {
   const isValid = form.username && form.email && form.password.length >= 8 && form.display_name && form.gender;
 
   return (
-    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <KeyboardAvoidingView style={[styles.flex, { backgroundColor: theme.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView
-        style={[styles.container, { paddingTop: insets.top + 20 }]}
+        style={[styles.container, { backgroundColor: theme.bg, paddingTop: insets.top + 20 }]}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backIcon}>←</Text>
+          <Text style={[styles.backIcon, { color: theme.primary }]}>←</Text>
         </TouchableOpacity>
 
         <View style={styles.header}>
-          <Text style={styles.title}>Créer un compte</Text>
-          <Text style={styles.subtitle}>Rejoignez la communauté Nour</Text>
+          <Text style={[styles.title, { color: theme.text }]}>Créer un compte</Text>
+          <Text style={[styles.subtitle, { color: theme.textMuted }]}>Rejoignez la communauté Nour</Text>
         </View>
 
         {/* Genre — OBLIGATOIRE en premier */}
         <View style={styles.genderSection}>
-          <Text style={styles.genderLabel}>Genre <Text style={styles.required}>*</Text></Text>
-          <Text style={styles.genderHint}>Requis pour les règles de messagerie respectueuses</Text>
+          <Text style={[styles.genderLabel, { color: theme.text }]}>Genre <Text style={styles.required}>*</Text></Text>
+          <Text style={[styles.genderHint, { color: theme.textMuted }]}>Requis pour les règles de messagerie respectueuses</Text>
           <View style={styles.genderRow}>
             {(['MALE', 'FEMALE'] as const).map(g => (
               <TouchableOpacity
                 key={g}
-                style={[styles.genderBtn, form.gender === g && styles.genderBtnActive]}
+                style={[
+                  styles.genderBtn,
+                  { backgroundColor: theme.card, borderColor: theme.border },
+                  form.gender === g && { borderColor: theme.primary, backgroundColor: theme.primaryBg },
+                ]}
                 onPress={() => update('gender', g)}
                 activeOpacity={0.8}
               >
                 <Text style={styles.genderEmoji}>{g === 'MALE' ? 'H' : 'F'}</Text>
-                <Text style={[styles.genderText, form.gender === g && styles.genderTextActive]}>
+                <Text style={[styles.genderText, { color: theme.textMuted }, form.gender === g && { color: theme.primary }]}>
                   {g === 'MALE' ? 'Homme' : 'Femme'}
                 </Text>
-                {form.gender === g && <View style={styles.genderCheck}><Text style={styles.checkmark}>✓</Text></View>}
+                {form.gender === g && (
+                  <View style={[styles.genderCheck, { backgroundColor: theme.primary }]}>
+                    <Text style={styles.checkmark}>✓</Text>
+                  </View>
+                )}
               </TouchableOpacity>
             ))}
           </View>
@@ -102,8 +112,8 @@ export default function RegisterScreen({ navigation }: Props) {
         />
 
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.loginLink}>
-          <Text style={styles.loginText}>
-            Déjà un compte ? <Text style={styles.loginBold}>Se connecter</Text>
+          <Text style={[styles.loginText, { color: theme.textMuted }]}>
+            Déjà un compte ? <Text style={[styles.loginBold, { color: theme.primary }]}>Se connecter</Text>
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -112,35 +122,32 @@ export default function RegisterScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: COLORS.bg },
-  container: { flex: 1, backgroundColor: COLORS.bg },
+  flex: { flex: 1 },
+  container: { flex: 1 },
   content: { flexGrow: 1, paddingHorizontal: SPACING.lg, paddingBottom: 40 },
   backBtn: { marginBottom: SPACING.md },
-  backIcon: { fontSize: 24, color: COLORS.primary },
+  backIcon: { fontSize: 24 },
   header: { marginBottom: SPACING.xl, gap: 6 },
-  title: { fontSize: FONT.size.xxxl, fontWeight: FONT.weight.bold, color: COLORS.text, letterSpacing: -0.5 },
-  subtitle: { fontSize: FONT.size.base, color: COLORS.textMuted },
+  title: { fontSize: FONT.size.xxxl, fontWeight: FONT.weight.bold, letterSpacing: -0.5 },
+  subtitle: { fontSize: FONT.size.base },
   required: { color: COLORS.error },
 
   genderSection: { marginBottom: SPACING.lg, gap: 6 },
-  genderLabel: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold, color: COLORS.text },
-  genderHint: { fontSize: FONT.size.xs, color: COLORS.textMuted, marginBottom: 4 },
+  genderLabel: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold },
+  genderHint: { fontSize: FONT.size.xs, marginBottom: 4 },
   genderRow: { flexDirection: 'row', gap: 12 },
   genderBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingVertical: 14, paddingHorizontal: 16,
-    borderRadius: RADIUS.md, borderWidth: 1.5, borderColor: COLORS.border,
-    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.md, borderWidth: 1.5,
   },
-  genderBtnActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primaryBg },
   genderEmoji: { fontSize: 20 },
-  genderText: { fontSize: FONT.size.base, fontWeight: FONT.weight.medium, color: COLORS.textMuted, flex: 1 },
-  genderTextActive: { color: COLORS.primary },
-  genderCheck: { width: 20, height: 20, borderRadius: 10, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
+  genderText: { fontSize: FONT.size.base, fontWeight: FONT.weight.medium, flex: 1 },
+  genderCheck: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   checkmark: { color: COLORS.white, fontSize: 11, fontWeight: FONT.weight.bold },
 
   form: { gap: SPACING.md, marginBottom: SPACING.lg },
   loginLink: { alignItems: 'center', paddingVertical: SPACING.md },
-  loginText: { fontSize: FONT.size.base, color: COLORS.textMuted },
-  loginBold: { color: COLORS.primary, fontWeight: FONT.weight.semibold },
+  loginText: { fontSize: FONT.size.base },
+  loginBold: { fontWeight: FONT.weight.semibold },
 });

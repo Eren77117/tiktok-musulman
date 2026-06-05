@@ -13,7 +13,7 @@ const createThreadSchema = z.object({
 export async function threadRoutes(app: FastifyInstance) {
   // GET /threads — paginated feed
   app.get('/', { preHandler: authenticate }, async (req, reply) => {
-    const { cursor, limit = '15' } = req.query as { cursor?: string; limit?: string };
+    const { cursor, limit = '15', user_id } = req.query as { cursor?: string; limit?: string; user_id?: string };
     const lim = parseInt(limit);
 
     const threads = await prisma.post.findMany({
@@ -22,6 +22,7 @@ export async function threadRoutes(app: FastifyInstance) {
         is_public: true,
         video_url: { equals: '' },
         caption: { not: null },
+        ...(user_id ? { user_id } : {}),
       },
       take: lim + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),

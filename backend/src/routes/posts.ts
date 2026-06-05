@@ -74,7 +74,10 @@ async function buildFeedItems(userId: string, seenIds: string[], poolSize = 80) 
   const posts = await prisma.post.findMany({
     where: {
       video_url: { not: '' },
-      NOT: seenIds.length > 0 ? { id: { in: seenIds } } : undefined,
+      NOT: [
+        ...(seenIds.length > 0 ? [{ id: { in: seenIds } }] : []),
+        { not_interested: { some: { user_id: userId } } },
+      ],
     },
     take: poolSize,
     orderBy: { created_at: 'desc' },
@@ -125,16 +128,24 @@ export async function postRoutes(app: FastifyInstance) {
     const hasMore = posts.length > lim;
     const items = hasMore ? posts.slice(0, lim) : posts;
 
-    const likedIds = await prisma.like.findMany({
-      where: { user_id: userId, post_id: { in: items.map(p => p.id) } },
-      select: { post_id: true },
-    });
+    const [likedIds, savedIds] = await Promise.all([
+      prisma.like.findMany({
+        where: { user_id: userId, post_id: { in: items.map(p => p.id) } },
+        select: { post_id: true },
+      }),
+      prisma.favorite.findMany({
+        where: { user_id: userId, post_id: { in: items.map(p => p.id) } },
+        select: { post_id: true },
+      }),
+    ]);
     const likedSet = new Set(likedIds.map(l => l.post_id));
+    const savedSet = new Set(savedIds.map(s => s.post_id));
 
     return reply.send({
       items: items.map(p => ({
-        ...p, is_liked: likedSet.has(p.id),
+        ...p, is_liked: likedSet.has(p.id), is_saved: savedSet.has(p.id),
         like_count: p.like_count, comment_count: p.comment_count,
+        user: { ...p.user, is_following: true },
       })),
       next_cursor: hasMore ? items[items.length - 1].id : null,
     });
@@ -161,19 +172,34 @@ export async function postRoutes(app: FastifyInstance) {
     const hasMore = page.length > lim;
     const items = hasMore ? page.slice(0, lim) : page;
 
-    const likedIds = await prisma.like.findMany({
-      where: { user_id: req.currentUser!.id, post_id: { in: items.map(p => p.id) } },
-      select: { post_id: true },
-    });
+    const userIds = [...new Set(items.map(p => p.user.id))];
+    const [likedIds, savedIds, followedIds] = await Promise.all([
+      prisma.like.findMany({
+        where: { user_id: req.currentUser!.id, post_id: { in: items.map(p => p.id) } },
+        select: { post_id: true },
+      }),
+      prisma.favorite.findMany({
+        where: { user_id: req.currentUser!.id, post_id: { in: items.map(p => p.id) } },
+        select: { post_id: true },
+      }),
+      prisma.follow.findMany({
+        where: { follower_id: req.currentUser!.id, following_id: { in: userIds } },
+        select: { following_id: true },
+      }),
+    ]);
     const likedSet = new Set(likedIds.map(l => l.post_id));
+    const savedSet = new Set(savedIds.map(s => s.post_id));
+    const followedSet = new Set(followedIds.map(f => f.following_id));
 
     const result = items.map(p => ({
       ...p,
       like_count: p.like_count,
       comment_count: p.comment_count,
       is_liked: likedSet.has(p.id),
+      is_saved: savedSet.has(p.id),
       categories: p.post_categories.map(pc => pc.category),
       post_categories: undefined,
+      user: { ...p.user, is_following: followedSet.has(p.user.id) },
     }));
 
     return reply.send({ items: result, next_cursor: hasMore ? items[items.length - 1].id : null });
@@ -181,39 +207,62 @@ export async function postRoutes(app: FastifyInstance) {
 
   // ── TRENDING ────────────────────────────────────────────────────────
   app.get('/trending', { preHandler: authenticate }, async (req, reply) => {
-    const { category, limit = '20' } = req.query as { category?: string; limit?: string };
+    const { category, limit = '10', cursor } = req.query as { category?: string; limit?: string; cursor?: string };
     const lim = parseInt(limit);
+    const userId = req.currentUser!.id;
 
-    const where: Record<string, unknown> = { video_url: { not: '' } };
+    const where: Record<string, unknown> = {
+      video_url: { not: '' }, status: 'ACTIVE', is_public: true,
+      NOT: { not_interested: { some: { user_id: userId } } },
+    };
 
     if (category && category !== 'all') {
       const cat = await prisma.category.findFirst({ where: { slug: category } });
-      if (cat) {
-        where.post_categories = { some: { category_id: cat.id } };
-      }
+      if (cat) where.post_categories = { some: { category_id: cat.id } };
     }
 
     const posts = await prisma.post.findMany({
       where,
-      take: lim * 3,
-      orderBy: { created_at: 'desc' },
-      include: {
-        user: { select: { id: true, username: true, display_name: true } },
-        post_categories: { include: { category: { select: { id: true, name: true, slug: true } } } },
-      },
+      take: lim * 5,
+      orderBy: { view_count: 'desc' },
+      include: { ...POST_INCLUDE, _count: { select: { likes: true, comments: true } } },
     });
 
     const scored = posts
       .map(p => ({ post: p, score: engagementScore(p) }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, lim);
+      .sort((a, b) => b.score - a.score);
+
+    // Apply cursor-based pagination on scored list
+    let startIdx = 0;
+    if (cursor) {
+      const idx = scored.findIndex(s => s.post.id === cursor);
+      startIdx = idx >= 0 ? idx + 1 : 0;
+    }
+    const page = scored.slice(startIdx, startIdx + lim + 1);
+    const hasMore = page.length > lim;
+    const items = hasMore ? page.slice(0, lim) : page;
+
+    const itemPosts = items.map(s => s.post);
+    const userIds = [...new Set(itemPosts.map(p => p.user.id))];
+    const [likedIds, savedIds, followedIds] = await Promise.all([
+      prisma.like.findMany({ where: { user_id: userId, post_id: { in: itemPosts.map(p => p.id) } }, select: { post_id: true } }),
+      prisma.favorite.findMany({ where: { user_id: userId, post_id: { in: itemPosts.map(p => p.id) } }, select: { post_id: true } }),
+      prisma.follow.findMany({ where: { follower_id: userId, following_id: { in: userIds } }, select: { following_id: true } }),
+    ]);
+    const likedSet = new Set(likedIds.map(l => l.post_id));
+    const savedSet = new Set(savedIds.map(s => s.post_id));
+    const followedSet = new Set(followedIds.map(f => f.following_id));
 
     return reply.send({
-      items: scored.map(s => ({
-        ...s.post,
-        categories: s.post.post_categories.map(pc => pc.category),
+      items: itemPosts.map(p => ({
+        ...p,
+        is_liked: likedSet.has(p.id),
+        is_saved: savedSet.has(p.id),
+        categories: p.post_categories.map(pc => pc.category),
         post_categories: undefined,
+        user: { ...p.user, is_following: followedSet.has(p.user.id) },
       })),
+      next_cursor: hasMore ? items[items.length - 1].post.id : null,
     });
   });
 
@@ -278,13 +327,19 @@ export async function postRoutes(app: FastifyInstance) {
 
     await prisma.post.update({ where: { id }, data: { view_count: { increment: 1 } } });
 
-    const isLiked = await prisma.like.findUnique({
-      where: { user_id_post_id: { user_id: req.currentUser!.id, post_id: id } },
-    });
+    const [isLiked, isSaved] = await Promise.all([
+      prisma.like.findUnique({
+        where: { user_id_post_id: { user_id: req.currentUser!.id, post_id: id } },
+      }),
+      prisma.favorite.findUnique({
+        where: { user_id_post_id: { user_id: req.currentUser!.id, post_id: id } },
+      }),
+    ]);
 
     return reply.send({
       ...post,
       is_liked: !!isLiked,
+      is_saved: !!isSaved,
       categories: post.post_categories.map(pc => pc.category),
       post_categories: undefined,
     });
@@ -331,15 +386,16 @@ export async function postRoutes(app: FastifyInstance) {
     ]);
 
     if (post.user_id !== userId) {
+      const liker = await prisma.user.findUnique({ where: { id: userId }, select: { display_name: true } });
       await prisma.notification.create({
         data: {
           user_id: post.user_id,
           type: 'LIKE',
           title: 'Nouveau like',
-          body: 'Quelqu\'un a aimé votre publication',
-          data: { post_id: id, liker_id: userId },
+          body: `${liker?.display_name ?? 'Quelqu\'un'} a aimé ta publication`,
+          data: { post_id: id, user_id: userId },
         },
-      });
+      }).catch(() => {});
     }
 
     return reply.send({ liked: true });
@@ -375,6 +431,36 @@ export async function postRoutes(app: FastifyInstance) {
     });
   });
 
+  // ── HASHTAG POSTS ──────────────────────────────────────────────────────
+  app.get('/hashtag/:tag', { preHandler: authenticate }, async (req, reply) => {
+    const { tag } = req.params as { tag: string };
+    const { cursor, limit = '18' } = req.query as { cursor?: string; limit?: string };
+    const lim = parseInt(limit);
+
+    const category = await prisma.category.findFirst({ where: { name: { equals: tag, mode: 'insensitive' } } });
+    const categoryId = category?.id;
+
+    const where = categoryId
+      ? { status: 'ACTIVE' as const, is_public: true, post_categories: { some: { category_id: categoryId } } }
+      : { status: 'ACTIVE' as const, is_public: true, caption: { contains: `#${tag}`, mode: 'insensitive' as const } };
+
+    const posts = await prisma.post.findMany({
+      where,
+      take: lim + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      orderBy: { view_count: 'desc' },
+      select: {
+        id: true, thumbnail_url: true, video_url: true,
+        view_count: true, like_count: true, comment_count: true, caption: true,
+        user: { select: { id: true, username: true, display_name: true, avatar_url: true } },
+      },
+    });
+
+    const hasMore = posts.length > lim;
+    const items = hasMore ? posts.slice(0, -1) : posts;
+    return reply.send({ items, total: category?.post_count ?? items.length, next_cursor: hasMore ? items[items.length - 1].id : null });
+  });
+
   // ── USER POSTS ──────────────────────────────────────────────────────
   app.get('/user/:userId', { preHandler: authenticate }, async (req, reply) => {
     const { userId } = req.params as { userId: string };
@@ -394,5 +480,78 @@ export async function postRoutes(app: FastifyInstance) {
     const hasMore = posts.length > parseInt(limit);
     const items = hasMore ? posts.slice(0, -1) : posts;
     return reply.send({ items, next_cursor: hasMore ? items[items.length - 1].id : null });
+  });
+
+  // ── REPOST ──────────────────────────────────────────────────────────
+  app.post('/:id/repost', { preHandler: authenticate }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const userId = req.currentUser!.id;
+    const post = await prisma.post.findUnique({ where: { id } });
+    if (!post) return reply.status(404).send({ error: 'Not found' });
+
+    const existing = await prisma.repost.findUnique({ where: { user_id_post_id: { user_id: userId, post_id: id } } });
+    if (existing) {
+      await prisma.repost.delete({ where: { id: existing.id } });
+      await prisma.post.update({ where: { id }, data: { share_count: { decrement: 1 } } });
+      return reply.send({ reposted: false });
+    }
+    await prisma.repost.create({ data: { user_id: userId, post_id: id } });
+    await prisma.post.update({ where: { id }, data: { share_count: { increment: 1 } } });
+    return reply.send({ reposted: true });
+  });
+
+  app.get('/user/:userId/reposts', { preHandler: authenticate }, async (req, reply) => {
+    const { userId } = req.params as { userId: string };
+    const { cursor, limit = '12' } = req.query as { cursor?: string; limit?: string };
+    const reposts = await prisma.repost.findMany({
+      where: { user_id: userId },
+      take: parseInt(limit) + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      orderBy: { created_at: 'desc' },
+      include: {
+        post: {
+          select: { id: true, thumbnail_url: true, video_url: true, view_count: true, like_count: true, comment_count: true },
+        },
+        user: { select: { id: true, username: true, display_name: true, avatar_url: true } },
+      },
+    });
+    const hasMore = reposts.length > parseInt(limit);
+    const items = hasMore ? reposts.slice(0, -1) : reposts;
+    return reply.send({ items, next_cursor: hasMore ? items[items.length - 1].id : null });
+  });
+
+  // ── NOT INTERESTED ──────────────────────────────────────────────────
+  app.post('/:id/not-interested', { preHandler: authenticate }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const userId = req.currentUser!.id;
+    await prisma.notInterested.upsert({
+      where: { user_id_post_id: { user_id: userId, post_id: id } },
+      create: { user_id: userId, post_id: id },
+      update: {},
+    });
+    return reply.send({ success: true });
+  });
+
+  // ── SHARE CONTACTS ──────────────────────────────────────────────────
+  app.get('/share-contacts', { preHandler: authenticate }, async (req, reply) => {
+    const userId = req.currentUser!.id;
+    const requests = await prisma.conversationRequest.findMany({
+      where: {
+        status: 'ACCEPTED',
+        OR: [{ requester_id: userId }, { recipient_id: userId }],
+      },
+      orderBy: { updated_at: 'desc' },
+      take: 20,
+      include: {
+        requester: { select: { id: true, username: true, display_name: true, avatar_url: true } },
+        recipient: { select: { id: true, username: true, display_name: true, avatar_url: true } },
+        conversation: { select: { id: true } },
+      },
+    });
+    const contacts = requests.map(r => {
+      const other = r.requester_id === userId ? r.recipient : r.requester;
+      return { ...other, conversation_id: r.conversation?.id ?? null };
+    });
+    return reply.send({ items: contacts });
   });
 }

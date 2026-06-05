@@ -13,7 +13,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { useTheme } from '../../hooks/useTheme';
 import { api } from '../../api/client';
 import { COLORS, FONT, SPACING, RADIUS, SHADOW } from '../../constants/theme';
-import { IcBack, IcFollow, IcFollowing, IcMail, IcHeart, IcPlay, IcCheck, IcMore, IcShare } from '../../components/ui/Icons';
+import { IcBack, IcFollow, IcFollowing, IcMail, IcHeart, IcPlay, IcCheck, IcMore, IcShare, IcRepeat } from '../../components/ui/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
 
@@ -69,6 +69,8 @@ export default function UserProfileScreen({ route, navigation }: Props) {
   const theme = useTheme();
   const qc = useQueryClient();
 
+  const [activeTab, setActiveTab] = useState<0 | 1>(0);
+
   const { data: profile, isLoading } = useQuery<Profile>({
     queryKey: ['profile', username],
     queryFn: () => api.get(`/users/${username}`).then(r => r.data),
@@ -79,6 +81,12 @@ export default function UserProfileScreen({ route, navigation }: Props) {
     queryKey: ['user-posts-public', userId || profile?.id],
     queryFn: () => api.get(`/posts/user/${userId || profile?.id}`).then(r => r.data).catch(() => ({ items: [] })),
     enabled: !!(userId || profile?.id),
+  });
+
+  const { data: repostsData, isLoading: repostsLoading } = useQuery<{ items: (Post & { _repostedBy?: any })[] }>({
+    queryKey: ['user-reposts-public', userId || profile?.id],
+    queryFn: () => api.get(`/posts/user/${userId || profile?.id}/reposts`).then(r => r.data).catch(() => ({ items: [] })),
+    enabled: !!(userId || profile?.id) && activeTab === 1,
   });
 
   const followMutation = useMutation({
@@ -173,6 +181,9 @@ export default function UserProfileScreen({ route, navigation }: Props) {
   if (!profile) return null;
   const isOwnProfile = user?.id === profile.id;
   const posts = postsData?.items ?? [];
+  const reposts = repostsData?.items ?? [];
+  const displayPosts = activeTab === 0 ? posts : reposts;
+  const displayLoading = activeTab === 0 ? postsLoading : repostsLoading;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bg, paddingTop: insets.top }]}>
@@ -195,7 +206,7 @@ export default function UserProfileScreen({ route, navigation }: Props) {
       </View>
 
       <FlatList
-        data={posts}
+        data={displayPosts}
         keyExtractor={p => p.id}
         numColumns={3}
         showsVerticalScrollIndicator={false}
@@ -269,10 +280,22 @@ export default function UserProfileScreen({ route, navigation }: Props) {
               </View>
             )}
 
-            {/* Grid header */}
-            <View style={[styles.gridHeader, { borderTopColor: theme.borderLight }]}>
-              <IcPlay size={16} color={COLORS.primary} />
-              <Text style={[styles.gridHeaderText, { color: theme.text }]}>Vidéos ({profile.post_count})</Text>
+            {/* Tabs */}
+            <View style={[styles.tabsRow, { borderTopColor: theme.borderLight }]}>
+              <TouchableOpacity
+                style={[styles.tabItem, activeTab === 0 && { borderBottomColor: COLORS.primary }]}
+                onPress={() => setActiveTab(0)} activeOpacity={0.8}
+              >
+                <IcPlay size={15} color={activeTab === 0 ? COLORS.primary : theme.textMuted} />
+                <Text style={[styles.tabItemText, { color: activeTab === 0 ? COLORS.primary : theme.textMuted }]}>Vidéos</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tabItem, activeTab === 1 && { borderBottomColor: COLORS.primary }]}
+                onPress={() => setActiveTab(1)} activeOpacity={0.8}
+              >
+                <IcRepeat size={15} color={activeTab === 1 ? COLORS.primary : theme.textMuted} />
+                <Text style={[styles.tabItemText, { color: activeTab === 1 ? COLORS.primary : theme.textMuted }]}>Reposts</Text>
+              </TouchableOpacity>
             </View>
           </View>
         }
@@ -280,11 +303,12 @@ export default function UserProfileScreen({ route, navigation }: Props) {
           <LazyVideoCell
             post={p}
             theme={theme}
+            showRepostBadge={activeTab === 1}
             onPress={() => navigation.navigate('VideoPlayer', { postId: p.id })}
           />
         )}
         ListEmptyComponent={
-          postsLoading
+          displayLoading
             ? <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
             : (
               <View style={styles.empty}>
@@ -299,7 +323,7 @@ export default function UserProfileScreen({ route, navigation }: Props) {
 
 const USER_THUMB_CACHE = new Map<string, string>();
 
-function LazyVideoCell({ post: p, theme, onPress }: { post: Post; theme: any; onPress: () => void }) {
+function LazyVideoCell({ post: p, theme, onPress, showRepostBadge }: { post: Post; theme: any; onPress: () => void; showRepostBadge?: boolean }) {
   const precomputed = getThumbUrl(p);
   const [thumb, setThumb] = useState<string | null>(precomputed ?? USER_THUMB_CACHE.get(p.id) ?? null);
   const [loading, setLoading] = useState(!thumb && !!p.video_url);
@@ -330,6 +354,11 @@ function LazyVideoCell({ post: p, theme, onPress }: { post: Post; theme: any; on
         <IcPlay size={10} color={COLORS.white} />
         <Text style={styles.cellCount}>{fmtNum(p.view_count)}</Text>
       </View>
+      {showRepostBadge && (
+        <View style={styles.repostMini}>
+          <IcRepeat size={11} color={COLORS.white} />
+        </View>
+      )}
     </TouchableOpacity>
   );
 }
@@ -427,12 +456,18 @@ const styles = StyleSheet.create({
   },
   messageBtnText: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold },
 
-  gridHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    width: '100%', paddingTop: SPACING.md, marginTop: 4,
-    borderTopWidth: 1,
+  tabsRow: {
+    flexDirection: 'row', width: '100%', marginTop: 4, borderTopWidth: 1,
   },
-  gridHeaderText: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold },
+  tabItem: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: 'transparent',
+  },
+  tabItemText: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold },
+  repostMini: {
+    position: 'absolute', top: 4, left: 4,
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 6, padding: 2,
+  },
 
   cell: { width: CELL, height: CELL * (16 / 9) },
   cellImg: { width: '100%', height: '100%' },

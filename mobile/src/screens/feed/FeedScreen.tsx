@@ -1,9 +1,10 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
   View, FlatList, StyleSheet, Text, TouchableOpacity,
-  StatusBar, Dimensions, ViewToken,
+  StatusBar, Dimensions, ViewToken, ScrollView, Image,
+  RefreshControl, Alert, TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,14 +14,16 @@ import { RootStackParamList } from '../../navigation';
 import { VideoPlayerItem, FeedPost } from '../../components/video/VideoPlayerItem';
 import { CommentsBottomSheet } from '../../components/video/CommentsBottomSheet';
 import { BookCard, BookItem } from '../../components/books/BookCard';
-import { COLORS, FONT } from '../../constants/theme';
-import { IcFilm, IcUsers, IcSearch } from '../../components/ui/Icons';
+import { COLORS, FONT, SPACING, RADIUS, SHADOW } from '../../constants/theme';
+import { IcFilm, IcUsers, IcSearch, IcLive, IcHeartFill, IcHeart, IcComment, IcShare, IcClose, IcPlus } from '../../components/ui/Icons';
+import { useAuthStore } from '../../stores/authStore';
+import { useTheme } from '../../hooks/useTheme';
 import { Skeleton } from '../../components/ui/Skeleton';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 const { height: H } = Dimensions.get('window');
 
-type FeedTab = 'suivis' | 'pourtoi' | 'fils';
+type FeedTab = 'communaute' | 'proche' | 'suivis' | 'boutique' | 'pourtoi' | 'fils';
 
 interface LiveSession {
   id: string;
@@ -49,6 +52,8 @@ export default function FeedScreen() {
   const [tab, setTab] = useState<FeedTab>('pourtoi');
   const [visibleId, setVisibleId] = useState<string | null>(null);
   const [commentsPostId, setCommentsPostId] = useState<string | null>(null);
+  const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
+  const hidePost = useCallback((id: string) => setHiddenPostIds(prev => new Set([...prev, id])), []);
 
   // Height = actual FlatList rendered height (measured via onLayout — avoids calculation bugs)
   const tabBarHeight = useBottomTabBarHeight();
@@ -56,7 +61,7 @@ export default function FeedScreen() {
   const ITEM_H = listHeight > 100 ? listHeight : H - tabBarHeight;
 
   // Pause all videos when leaving this screen
-  const effectiveVisibleId = isFocused && (tab === 'pourtoi' || tab === 'suivis') ? visibleId : null;
+  const effectiveVisibleId = isFocused && (tab === 'pourtoi' || tab === 'suivis' || tab === 'communaute') ? visibleId : null;
   const seenIds = useRef<string[]>([]);
 
   // ── Pour Toi (video feed) ────────────────────────────────────────────────────
@@ -118,6 +123,22 @@ export default function FeedScreen() {
   });
   const books = booksData?.pages.flatMap(p => p.items) ?? [];
 
+  // Communauté — trending posts
+  const {
+    data: communauteData, fetchNextPage: fetchNextCommunaute,
+    hasNextPage: hasNextCommunaute, isFetchingNextPage: fetchingCommunaute,
+    isLoading: loadingCommunaute, refetch: refetchCommunaute,
+  } = useInfiniteQuery({
+    queryKey: ['trending-feed'],
+    queryFn: ({ pageParam }) =>
+      api.get('/posts/trending', { params: { cursor: pageParam, limit: 8 } })
+        .then(r => r.data as { items: FeedPost[]; next_cursor: string | null })
+        .catch(() => ({ items: [], next_cursor: null })),
+    initialPageParam: null as string | null,
+    getNextPageParam: last => last.next_cursor,
+    enabled: tab === 'communaute',
+  });
+
   // Active lives (refreshes every 30s)
   const { data: livesData } = useQuery<{ items: LiveSession[] }>({
     queryKey: ['feed-live-active'],
@@ -176,25 +197,44 @@ export default function FeedScreen() {
 
       {/* Header overlay */}
       <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
-        <View style={{ width: 40 }} />
+        {/* Live button */}
+        <TouchableOpacity
+          style={styles.liveBtn}
+          onPress={() => nav.navigate('LiveList' as any)}
+          activeOpacity={0.8}
+        >
+          <IcLive size={14} color="#FF3B30" />
+          {lives.length > 0 && <View style={styles.liveDot} />}
+        </TouchableOpacity>
 
-        <View style={styles.tabs}>
-          <TouchableOpacity onPress={() => setTab('suivis')} style={styles.tabBtn} activeOpacity={0.8}>
-            <Text style={[styles.tabText, tab === 'suivis' && styles.tabTextActive]}>Suivis</Text>
-            {tab === 'suivis' && <View style={styles.tabUnderline} />}
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handlePourToiPress} style={styles.tabBtn} activeOpacity={0.8}>
-            <Text style={[styles.tabText, tab === 'pourtoi' && styles.tabTextActive]}>Pour toi</Text>
-            {tab === 'pourtoi' && <View style={styles.tabUnderline} />}
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setTab('fils')} style={styles.tabBtn} activeOpacity={0.8}>
-            <Text style={[styles.tabText, tab === 'fils' && styles.tabTextActive]}>Fils</Text>
-            {tab === 'fils' && <View style={styles.tabUnderline} />}
-          </TouchableOpacity>
-        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabs}
+          style={styles.tabsScroll}
+        >
+          {([
+            ['communaute', 'Communauté'],
+            ['proche', 'Proche'],
+            ['suivis', 'Suivis'],
+            ['boutique', 'Boutique'],
+            ['pourtoi', 'Pour toi'],
+            ['fils', 'Fils'],
+          ] as [FeedTab, string][]).map(([key, label]) => (
+            <TouchableOpacity
+              key={key}
+              onPress={key === 'pourtoi' ? handlePourToiPress : () => setTab(key)}
+              style={styles.tabBtn}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.tabText, tab === key && styles.tabTextActive]}>{label}</Text>
+              {tab === key && <View style={styles.tabUnderline} />}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
 
         {/* Search icon — top right */}
-        <TouchableOpacity style={styles.searchBtn} onPress={() => nav.navigate('Explore' as any)} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.searchBtn} onPress={() => nav.navigate('Search')} activeOpacity={0.8}>
           <IcSearch size={22} color={COLORS.white} />
         </TouchableOpacity>
       </View>
@@ -202,7 +242,7 @@ export default function FeedScreen() {
       {/* ── SUIVIS — feed comptes suivis ── */}
       {tab === 'suivis' && (
         <FlatList<FeedPost>
-          data={suivisData?.pages.flatMap(p => p.items) ?? []}
+          data={(suivisData?.pages.flatMap(p => p.items) ?? []).filter(p => !hiddenPostIds.has(p.id))}
           keyExtractor={p => p.id}
           style={{ flex: 1 }}
           onLayout={e => setListHeight(e.nativeEvent.layout.height)}
@@ -211,6 +251,7 @@ export default function FeedScreen() {
               post={item}
               isVisible={effectiveVisibleId === item.id}
               onComment={() => setCommentsPostId(item.id)}
+              onNotInterested={() => hidePost(item.id)}
               itemHeight={ITEM_H}
             />
           )}
@@ -219,6 +260,10 @@ export default function FeedScreen() {
           showsVerticalScrollIndicator={false}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig.current}
+          windowSize={3}
+          maxToRenderPerBatch={2}
+          initialNumToRender={1}
+          removeClippedSubviews
           onEndReached={() => hasNextSuivis && !fetchingSuivis && fetchNextSuivis()}
           onEndReachedThreshold={2}
           getItemLayout={(_, i) => ({ length: ITEM_H, offset: ITEM_H * i, index: i })}
@@ -242,7 +287,7 @@ export default function FeedScreen() {
       )}
       {tab === 'pourtoi' && !loadingFeed && (
         <FlatList<FeedItem>
-          data={posts}
+          data={posts.filter(p => p.type !== 'video' || !hiddenPostIds.has(p.data.id))}
           style={{ flex: 1 }}
           onLayout={e => setListHeight(e.nativeEvent.layout.height)}
           keyExtractor={p =>
@@ -262,6 +307,7 @@ export default function FeedScreen() {
                 post={item.data}
                 isVisible={effectiveVisibleId === item.data.id}
                 onComment={() => setCommentsPostId(item.data.id)}
+                onNotInterested={() => hidePost(item.data.id)}
                 itemHeight={ITEM_H}
               />
             );
@@ -271,6 +317,10 @@ export default function FeedScreen() {
           showsVerticalScrollIndicator={false}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig.current}
+          windowSize={3}
+          maxToRenderPerBatch={2}
+          initialNumToRender={1}
+          removeClippedSubviews
           onEndReached={() => hasNextFeed && !fetchingFeed && fetchNextFeed()}
           onEndReachedThreshold={2}
           getItemLayout={(_, index) => ({ length: ITEM_H, offset: ITEM_H * index, index })}
@@ -280,6 +330,51 @@ export default function FeedScreen() {
             </View>
           }
         />
+      )}
+
+      {/* ── COMMUNAUTÉ — trending videos ── */}
+      {tab === 'communaute' && (
+        <FlatList<FeedPost>
+          data={(communauteData?.pages.flatMap(p => p.items) ?? []).filter(p => !hiddenPostIds.has(p.id))}
+          keyExtractor={p => p.id}
+          style={{ flex: 1 }}
+          onLayout={e => setListHeight(e.nativeEvent.layout.height)}
+          renderItem={({ item }) => (
+            <VideoPlayerItem
+              post={item}
+              isVisible={effectiveVisibleId === item.id}
+              onComment={() => setCommentsPostId(item.id)}
+              onNotInterested={() => hidePost(item.id)}
+              itemHeight={ITEM_H}
+            />
+          )}
+          pagingEnabled
+          decelerationRate="fast"
+          showsVerticalScrollIndicator={false}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig.current}
+          windowSize={3}
+          maxToRenderPerBatch={2}
+          initialNumToRender={1}
+          removeClippedSubviews
+          onEndReached={() => hasNextCommunaute && !fetchingCommunaute && fetchNextCommunaute()}
+          onEndReachedThreshold={2}
+          getItemLayout={(_, i) => ({ length: ITEM_H, offset: ITEM_H * i, index: i })}
+          ListEmptyComponent={
+            !loadingCommunaute ? (
+              <View style={styles.emptyWrap}>
+                <Text style={[styles.emptyText, { textAlign: 'center' }]}>Aucune vidéo tendance</Text>
+              </View>
+            ) : null
+          }
+        />
+      )}
+
+      {/* Placeholder tabs */}
+      {(tab === 'proche' || tab === 'boutique') && (
+        <View style={styles.emptyWrap}>
+          <Text style={[styles.emptyText, { opacity: 0.5 }]}>Bientôt disponible</Text>
+        </View>
       )}
 
       {/* Comments bottom sheet */}
@@ -327,7 +422,6 @@ function VideoSkeleton({ height }: { height: number }) {
 }
 
 // ── Live card in feed ────────────────────────────────────────────────────────────
-import { Image } from 'react-native';
 
 function FeedLiveCard({ live, onPress }: { live: LiveSession; onPress: () => void }) {
   const { height: H2 } = Dimensions.get('window');
@@ -373,14 +467,6 @@ function FeedLiveCard({ live, onPress }: { live: LiveSession; onPress: () => voi
 }
 
 // ── Fils sub-component ──────────────────────────────────────────────────────────
-import {
-  ScrollView, RefreshControl, Alert, TextInput, KeyboardAvoidingView, Platform,
-} from 'react-native';
-import { useMutation } from '@tanstack/react-query';
-import { SPACING, RADIUS, SHADOW } from '../../constants/theme';
-import { IcHeartFill, IcHeart, IcComment, IcShare, IcClose, IcPlus } from '../../components/ui/Icons';
-import { useAuthStore } from '../../stores/authStore';
-import { useTheme } from '../../hooks/useTheme';
 
 function fmtTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -558,11 +644,12 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   header: {
     position: 'absolute', top: 0, left: 0, right: 0,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingBottom: 10, zIndex: 10,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 10, paddingBottom: 10, zIndex: 10,
   },
-  tabs: { flexDirection: 'row', gap: 24 },
-  tabBtn: { alignItems: 'center', paddingBottom: 4 },
+  tabsScroll: { flex: 1 },
+  tabs: { flexDirection: 'row', gap: 20, paddingHorizontal: 6 },
+  tabBtn: { alignItems: 'center', paddingBottom: 4, paddingHorizontal: 2 },
   tabText: { fontSize: FONT.size.base, fontWeight: FONT.weight.semibold, color: 'rgba(255,255,255,0.6)' },
   tabTextActive: { color: COLORS.white },
   tabUnderline: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, backgroundColor: COLORS.white, borderRadius: 1 },

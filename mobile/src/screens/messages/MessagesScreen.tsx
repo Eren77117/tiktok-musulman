@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity, Image,
-  ActivityIndicator, RefreshControl,
+  ActivityIndicator, RefreshControl, ScrollView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -10,7 +10,7 @@ import { api } from '../../api/client';
 import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, SPACING, RADIUS } from '../../constants/theme';
 import { useTheme } from '../../hooks/useTheme';
-import { IcBell } from '../../components/ui/Icons';
+import { IcSearch, IcBell, IcPlus } from '../../components/ui/Icons';
 import { useQuery } from '@tanstack/react-query';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -32,6 +32,20 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
 }
 
+function AvatarCircle({ user, size = 56 }: { user: { display_name: string; avatar_url: string | null }; size?: number }) {
+  const theme = useTheme();
+  if (user.avatar_url) {
+    return <Image source={{ uri: user.avatar_url }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
+  }
+  return (
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: theme.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ fontSize: size * 0.35, fontWeight: FONT.weight.bold, color: COLORS.primary }}>
+        {user.display_name[0]?.toUpperCase()}
+      </Text>
+    </View>
+  );
+}
+
 export default function MessagesScreen() {
   const navigation = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
@@ -46,27 +60,36 @@ export default function MessagesScreen() {
   const { data, isLoading, refetch, isRefetching } = useQuery<Conversation[]>({
     queryKey: ['conversations'],
     queryFn: () => api.get('/messages/conversations').then(r => r.data).catch(() => []),
-    refetchInterval: 8_000,  // real-time polling
+    refetchInterval: 8_000,
     refetchOnWindowFocus: true,
   });
 
   const conversations = data ?? [];
 
+  const goToConversation = (c: Conversation) =>
+    navigation.navigate('Conversation', { conversationId: c.id, otherUser: c.other_user });
+
   return (
     <View style={[styles.container, { backgroundColor: theme.bg, paddingTop: insets.top }]}>
+      {/* Header */}
       <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.borderLight }]}>
         <Text style={[styles.title, { color: theme.text }]}>Messages</Text>
-        <TouchableOpacity style={styles.newBtn} activeOpacity={0.7}
-          onPress={() => navigation.navigate('Notifications')}>
-          <IcBell size={22} color={COLORS.primary} />
-          {(notifCount?.count ?? 0) > 0 && (
-            <View style={styles.notifBadge}>
-              <Text style={styles.notifBadgeText}>
-                {(notifCount?.count ?? 0) > 9 ? '9+' : notifCount?.count}
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7}
+            onPress={() => navigation.navigate('Notifications')}>
+            <IcBell size={22} color={theme.text} />
+            {(notifCount?.count ?? 0) > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>
+                  {(notifCount?.count ?? 0) > 9 ? '9+' : notifCount?.count}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7}>
+            <IcSearch size={22} color={theme.text} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {isLoading ? (
@@ -79,23 +102,43 @@ export default function MessagesScreen() {
           keyExtractor={c => c.id}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={COLORS.primary} />}
+          ListHeaderComponent={
+            conversations.length > 0 ? (
+              <View style={[styles.storySection, { backgroundColor: theme.surface, borderBottomColor: theme.borderLight }]}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storyRow}>
+                  {/* Créer */}
+                  <View style={styles.storyItem}>
+                    <View style={[styles.storyCreateCircle, { backgroundColor: theme.primaryBg, borderColor: COLORS.primaryLight }]}>
+                      <IcPlus size={22} color={COLORS.primary} />
+                    </View>
+                    <Text style={[styles.storyLabel, { color: theme.textMuted }]} numberOfLines={1}>Créer</Text>
+                  </View>
+                  {/* Conversations actives */}
+                  {conversations.slice(0, 8).map(c => (
+                    <TouchableOpacity key={c.id} style={styles.storyItem} onPress={() => goToConversation(c)} activeOpacity={0.8}>
+                      <View style={[styles.storyCircle, (c.unread_count ?? 0) > 0 && { borderColor: COLORS.primary, borderWidth: 2.5 }]}>
+                        <AvatarCircle user={c.other_user} size={52} />
+                      </View>
+                      <Text style={[styles.storyLabel, { color: theme.text }]} numberOfLines={1}>
+                        {c.other_user.display_name.split(' ')[0]}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            ) : null
+          }
           renderItem={({ item: c }) => {
             const unread = (c.unread_count ?? 0) > 0;
             return (
               <TouchableOpacity
-                style={[styles.row, { borderBottomColor: theme.borderLight }]}
-                onPress={() => navigation.navigate('Conversation', { conversationId: c.id, otherUser: c.other_user })}
+                style={[styles.row, { borderBottomColor: theme.borderLight, backgroundColor: theme.surface }]}
+                onPress={() => goToConversation(c)}
                 activeOpacity={0.7}
               >
                 <View style={styles.avatarWrap}>
-                  {c.other_user.avatar_url ? (
-                    <Image source={{ uri: c.other_user.avatar_url }} style={styles.avatar} />
-                  ) : (
-                    <View style={[styles.avatar, { backgroundColor: theme.primaryBg }]}>
-                      <Text style={styles.avatarText}>{c.other_user.display_name[0]?.toUpperCase()}</Text>
-                    </View>
-                  )}
-                  <View style={styles.onlineDot} />
+                  <AvatarCircle user={c.other_user} size={52} />
+                  <View style={[styles.onlineDot, { borderColor: theme.surface }]} />
                 </View>
                 <View style={styles.rowInfo}>
                   <View style={styles.rowTop}>
@@ -110,7 +153,10 @@ export default function MessagesScreen() {
                     <Text style={[styles.rowLast, { color: unread ? theme.text : theme.textMuted }, unread && styles.rowLastUnread]} numberOfLines={1}>
                       {c.last_message?.content ?? 'Aucun message'}
                     </Text>
-                    {unread && <View style={styles.badge}><Text style={styles.badgeText}>{c.unread_count}</Text></View>}
+                    {unread
+                      ? <View style={styles.badge}><Text style={styles.badgeText}>{c.unread_count}</Text></View>
+                      : null
+                    }
                   </View>
                 </View>
               </TouchableOpacity>
@@ -132,31 +178,46 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SPACING.md, paddingVertical: 14,
+    paddingHorizontal: SPACING.md, paddingVertical: 12,
     borderBottomWidth: 1,
   },
   title: { fontSize: 22, fontWeight: '700' },
-  newBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   notifBadge: {
-    position: 'absolute', top: 0, right: 0,
-    minWidth: 18, height: 18, borderRadius: 9,
+    position: 'absolute', top: 4, right: 4,
+    minWidth: 16, height: 16, borderRadius: 8,
     backgroundColor: '#FF3B5C', alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 3, borderWidth: 1.5, borderColor: COLORS.white,
   },
   notifBadgeText: { color: COLORS.white, fontSize: 10, fontWeight: '700' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
+  storySection: { paddingVertical: 12, borderBottomWidth: 1 },
+  storyRow: { paddingHorizontal: SPACING.md, gap: 16 },
+  storyItem: { alignItems: 'center', gap: 6, width: 62 },
+  storyCreateCircle: {
+    width: 56, height: 56, borderRadius: 28,
+    borderWidth: 1.5, borderStyle: 'dashed',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  storyCircle: {
+    width: 58, height: 58, borderRadius: 29,
+    borderWidth: 0, overflow: 'hidden',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  storyLabel: { fontSize: 11, fontWeight: FONT.weight.medium, textAlign: 'center' },
+
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingHorizontal: SPACING.md, paddingVertical: 12,
     borderBottomWidth: 0.5,
   },
   avatarWrap: { position: 'relative' },
-  avatar: { width: 52, height: 52, borderRadius: 26 },
-  avatarText: { fontSize: 18, fontWeight: '700', color: COLORS.primary },
   onlineDot: {
     position: 'absolute', bottom: 1, right: 1,
     width: 12, height: 12, borderRadius: 6,
-    backgroundColor: '#22C55E', borderWidth: 2, borderColor: COLORS.white,
+    backgroundColor: '#22C55E', borderWidth: 2,
   },
   rowInfo: { flex: 1, gap: 3 },
   rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

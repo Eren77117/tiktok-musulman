@@ -10,11 +10,11 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { useAuthStore } from '../../stores/authStore';
-import { api } from '../../api/client';
+import { api, getTokens } from '../../api/client';
 import { RootStackParamList } from '../../navigation';
-import { COLORS, FONT, SPACING, RADIUS, SHADOW } from '../../constants/theme';
+import { COLORS, FONT, SPACING, RADIUS, SHADOW, API_BASE_URL } from '../../constants/theme';
 import { useTheme } from '../../hooks/useTheme';
-import { IcSettings, IcSave, IcCheck, IcHeart, IcGrid, IcEdit, IcCamera, IcChart, IcPlay } from '../../components/ui/Icons';
+import { IcSettings, IcSave, IcCheck, IcHeart, IcGrid, IcEdit, IcCamera, IcChart, IcPlay, IcRepeat } from '../../components/ui/Icons';
 import { EditProfileScreen } from './EditProfileScreen';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -48,7 +48,7 @@ interface Thread {
   created_at: string;
 }
 
-const TABS = ['Vidéos', 'Fils', "J'aime", 'Favoris'];
+const TABS = ['Vidéos', 'Fils', "J'aime", 'Favoris', 'Reposts'];
 const LIKE_SUBTABS = ['Pour toi', 'Fils'] as const;
 type LikeSubTab = typeof LIKE_SUBTABS[number];
 
@@ -72,6 +72,7 @@ export default function ProfileScreen() {
   const [editVisible, setEditVisible] = useState(false);
   const [avatarLoading, setAvatarLoading] = useState(false);
   const [coverLoading, setCoverLoading] = useState(false);
+  const [coverError, setCoverError] = useState(false);
 
   const { data: posts, isLoading: postsLoading, refetch: refetchPosts, isRefetching } = useQuery<{ items: Post[] }>({
     queryKey: ['user-posts', user?.id],
@@ -105,6 +106,12 @@ export default function ProfileScreen() {
     enabled: !!user?.id && activeTab === 3,
   });
 
+  const { data: reposts, isLoading: repostsLoading } = useQuery<{ items: { post: Post; user: { id: string; username: string; display_name: string; avatar_url: string | null } }[] }>({
+    queryKey: ['user-reposts', user?.id],
+    queryFn: () => api.get(`/posts/user/${user?.id}/reposts`).then((r) => r.data).catch(() => ({ items: [] })),
+    enabled: !!user?.id && activeTab === 4,
+  });
+
   if (!user) return null;
 
   const handleAvatarPress = () => {
@@ -131,14 +138,12 @@ export default function ProfileScreen() {
     setAvatarLoading(true);
     try {
       const asset = result.assets[0];
-      const tokens = await import('../../api/client').then(m => m.getTokens());
+      const tokens = await getTokens();
       if (!tokens) throw new Error('Non authentifié');
 
-      // Use native fetch (more reliable than axios for multipart on iOS)
       const formData = new FormData();
-      formData.append('file', { uri: asset.uri, type: 'image/jpeg', name: 'avatar.jpg' } as any);
+      formData.append('file', { uri: asset.uri, type: asset.type ?? 'image/jpeg', name: 'avatar.jpg' } as any);
 
-      const { API_BASE_URL } = await import('../../constants/theme');
       const uploadRes = await fetch(`${API_BASE_URL}/upload/image`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${tokens.access}` },
@@ -201,6 +206,25 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Cover photo */}
+        <View style={styles.coverWrap}>
+          {(user as any).cover_url && !coverError ? (
+            <Image
+              source={{ uri: (user as any).cover_url }}
+              style={StyleSheet.absoluteFill}
+              resizeMode="cover"
+              onError={() => setCoverError(true)}
+            />
+          ) : (
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: COLORS.primaryBg }]} />
+          )}
+          {coverLoading && (
+            <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.3)' }]}>
+              <ActivityIndicator color={COLORS.white} />
+            </View>
+          )}
+        </View>
+
         {/* Hero */}
         <View style={[styles.heroSection, { backgroundColor: theme.surface }]}>
           <TouchableOpacity onPress={handleAvatarPress} activeOpacity={0.85} style={styles.avatarWrap}>
@@ -229,9 +253,13 @@ export default function ProfileScreen() {
           {user.bio ? <Text style={[styles.bio, { color: theme.textMuted }]}>{user.bio}</Text> : null}
 
           <View style={styles.statsRow}>
-            <StatItem label="Abonnements" value={user.following_count ?? 0} theme={theme} />
+            <TouchableOpacity onPress={() => navigation.navigate('Followers', { userId: user.id, username: user.username, type: 'following' })} activeOpacity={0.7}>
+              <StatItem label="Abonnements" value={user.following_count ?? 0} theme={theme} />
+            </TouchableOpacity>
             <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-            <StatItem label="Abonnés" value={user.follower_count ?? 0} theme={theme} />
+            <TouchableOpacity onPress={() => navigation.navigate('Followers', { userId: user.id, username: user.username, type: 'followers' })} activeOpacity={0.7}>
+              <StatItem label="Abonnés" value={user.follower_count ?? 0} theme={theme} />
+            </TouchableOpacity>
             <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
             <StatItem label="Publications" value={user.post_count ?? 0} theme={theme} />
           </View>
@@ -273,6 +301,26 @@ export default function ProfileScreen() {
           <ThreadsTab threads={threads?.items} loading={threadsLoading} />
         ) : activeTab === 2 && likeSubTab === 'Fils' ? (
           <ThreadsTab threads={likedThreads?.items} loading={likedThreadsLoading} />
+        ) : activeTab === 4 ? (
+          repostsLoading ? (
+            <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
+          ) : (
+            <FlatList
+              data={(reposts?.items ?? []).map(r => ({ ...r.post, _repostedBy: r.user }))}
+              numColumns={3}
+              keyExtractor={(p) => `repost-${p.id}`}
+              scrollEnabled={false}
+              columnWrapperStyle={styles.gridRow}
+              renderItem={({ item }) => (
+                <GridItem
+                  item={item}
+                  onPress={() => navigation.navigate('VideoPlayer', { postId: item.id })}
+                  repostBadge
+                />
+              )}
+              ListEmptyComponent={<EmptyTab tab={4} />}
+            />
+          )
         ) : gridLoading ? (
           <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
         ) : (
@@ -294,7 +342,7 @@ export default function ProfileScreen() {
 // In-memory thumbnail cache (persists for app session)
 const THUMB_CACHE = new Map<string, string>();
 
-function GridItem({ item, onPress }: { item: Post; onPress: () => void }) {
+function GridItem({ item, onPress, repostBadge }: { item: Post & { _repostedBy?: any }; onPress: () => void; repostBadge?: boolean }) {
   const precomputed = getThumbUrl(item);
   const [thumb, setThumb] = useState<string | null>(precomputed ?? THUMB_CACHE.get(item.id) ?? null);
   const [loading, setLoading] = useState(!thumb && !!item.video_url);
@@ -331,9 +379,14 @@ function GridItem({ item, onPress }: { item: Post; onPress: () => void }) {
         </View>
       )}
       <View style={styles.gridOverlay}>
-        <IcHeart size={11} color={COLORS.white} />
+        {repostBadge ? <IcPlay size={11} color={COLORS.white} /> : <IcHeart size={11} color={COLORS.white} />}
         <Text style={styles.gridViews}>{fmtNum(item.view_count)}</Text>
       </View>
+      {repostBadge && (
+        <View style={styles.repostMini}>
+          <IcRepeat size={9} color={COLORS.white} />
+        </View>
+      )}
     </TouchableOpacity>
   );
 }
@@ -395,12 +448,13 @@ const styles = StyleSheet.create({
   topUsername: { fontSize: FONT.size.lg, fontWeight: FONT.weight.semibold, color: COLORS.text },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
 
-  heroSection: { alignItems: 'center', paddingVertical: SPACING.lg, paddingHorizontal: SPACING.lg, gap: 10 },
+  coverWrap: { width: '100%', height: 120, position: 'relative', overflow: 'hidden' },
+  heroSection: { alignItems: 'center', paddingTop: SPACING.md, paddingBottom: SPACING.lg, paddingHorizontal: SPACING.lg, gap: 10, marginTop: -30 },
 
   avatarWrap: { position: 'relative' },
-  avatar: { width: 90, height: 90, borderRadius: 45 },
+  avatar: { width: 90, height: 90, borderRadius: 45, borderWidth: 3, borderColor: COLORS.white },
   avatarFallback: {
-    backgroundColor: COLORS.primaryBg, borderWidth: 2, borderColor: COLORS.primary,
+    backgroundColor: COLORS.primaryBg, borderWidth: 3, borderColor: COLORS.white,
     alignItems: 'center', justifyContent: 'center',
   },
   avatarText: { fontSize: 36, fontWeight: FONT.weight.bold, color: COLORS.primary },
@@ -460,6 +514,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 3,
   },
   gridViews: { fontSize: FONT.size.xs, color: COLORS.white },
+  repostMini: {
+    position: 'absolute', top: 4, left: 4,
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 6,
+    padding: 2,
+  },
 
   threadItem: {
     backgroundColor: COLORS.white, padding: SPACING.md,

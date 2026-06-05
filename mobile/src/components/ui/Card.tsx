@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
-import { COLORS, RADIUS, SHADOW } from '../../constants/theme';
+import { useTheme } from '../../hooks/useTheme';
+import { RADIUS, SHADOW } from '../../constants/theme';
 
 interface CardProps {
   children: React.ReactNode;
@@ -10,9 +11,12 @@ interface CardProps {
 }
 
 export function Card({ children, style, shadow = 'sm', padding = 16 }: CardProps) {
+  const theme = useTheme();
+
   return (
     <View style={[
       styles.card,
+      { backgroundColor: theme.card, borderColor: theme.border },
       shadow !== 'none' && SHADOW[shadow],
       { padding },
       style,
@@ -24,9 +28,7 @@ export function Card({ children, style, shadow = 'sm', padding = 16 }: CardProps
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: COLORS.card,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.border,
   },
 });
