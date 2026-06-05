@@ -246,19 +246,31 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
     onError: () => setFollowing(post.user.is_following ?? false),
   });
 
-  // ── Heart animation (always plays on double-tap) ──────────────────────────
+  // ── Heart animation (always plays on double-tap) — TikTok style ──────────
+  const heartY = useRef(new Animated.Value(0)).current;
   const animateHeart = useCallback((x: number, y: number) => {
-    setHeartPos({ x: x - 50, y: y - 80 });
+    setHeartPos({ x: x - 56, y: y - 100 });
     heartAnim.setValue(1);
-    heartScale.setValue(0.3);
+    heartScale.setValue(0.1);
+    heartY.setValue(0);
     Animated.parallel([
-      Animated.spring(heartScale, { toValue: 1, useNativeDriver: true, tension: 60, friction: 5 }),
+      // Bounce scale: 0.1 → 1.2 → 1.0
       Animated.sequence([
-        Animated.delay(600),
-        Animated.timing(heartAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
+        Animated.spring(heartScale, { toValue: 1.25, useNativeDriver: true, tension: 180, friction: 6 }),
+        Animated.spring(heartScale, { toValue: 1.0, useNativeDriver: true, tension: 200, friction: 8 }),
+      ]),
+      // Float up slightly
+      Animated.sequence([
+        Animated.delay(400),
+        Animated.timing(heartY, { toValue: -30, duration: 500, useNativeDriver: true, easing: Easing.out(Easing.ease) }),
+      ]),
+      // Fade out after 600ms
+      Animated.sequence([
+        Animated.delay(550),
+        Animated.timing(heartAnim, { toValue: 0, duration: 350, useNativeDriver: true }),
       ]),
     ]).start();
-  }, [heartAnim, heartScale]);
+  }, [heartAnim, heartScale, heartY]);
 
   // ── Trigger like (on double-tap) — single like per video ─────────────────
   const triggerLike = useCallback((x: number, y: number) => {
@@ -403,7 +415,7 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
           ignoreSilentSwitch="ignore"
           playInBackground={false}
           playWhenInactive={false}
-          bufferConfig={{ minBufferMs: 2500, maxBufferMs: 15000, bufferForPlaybackMs: 1000, bufferForPlaybackAfterRebufferMs: 2000 }}
+          bufferConfig={{ minBufferMs: 1500, maxBufferMs: 10000, bufferForPlaybackMs: 500, bufferForPlaybackAfterRebufferMs: 1000 }}
         />
       )}
 
@@ -459,12 +471,16 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
         <Text style={styles.speedText}>2x</Text>
       </Animated.View>
 
-      {/* Floating heart on double-tap */}
+      {/* Floating heart on double-tap — TikTok bounce */}
       <Animated.View
         pointerEvents="none"
-        style={[styles.floatingHeart, { left: heartPos.x, top: heartPos.y, opacity: heartAnim, transform: [{ scale: heartScale }] }]}
+        style={[styles.floatingHeart, {
+          left: heartPos.x, top: heartPos.y,
+          opacity: heartAnim,
+          transform: [{ scale: heartScale }, { translateY: heartY }],
+        }]}
       >
-        <IcHeartFill size={100} color="#FF3B5C" />
+        <IcHeartFill size={112} color="#FF3B5C" />
       </Animated.View>
 
       {/* Seekable progress bar — interactive, above tab bar */}
@@ -765,10 +781,22 @@ function CaptionText({ text, expanded }: { text: string; expanded: boolean }) {
 function ActionBtn({
   icon, count, onPress, countColor = COLORS.white,
 }: { icon: React.ReactNode; count?: string; onPress: () => void; countColor?: string }) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const handlePress = () => {
+    Animated.sequence([
+      Animated.timing(scaleAnim, { toValue: 0.82, duration: 80, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, tension: 300, friction: 10 }),
+    ]).start();
+    onPress();
+  };
   return (
-    <TouchableOpacity style={styles.actionBtn} onPress={onPress} activeOpacity={0.8}>
-      {icon}
-      {count !== undefined && <Text style={[styles.actionCount, { color: countColor }]}>{count}</Text>}
+    <TouchableOpacity style={styles.actionBtn} onPress={handlePress} activeOpacity={1}>
+      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+        {icon}
+      </Animated.View>
+      {count !== undefined && count !== '' && (
+        <Text style={[styles.actionCount, { color: countColor }]}>{count}</Text>
+      )}
     </TouchableOpacity>
   );
 }
@@ -810,7 +838,7 @@ const styles = StyleSheet.create({
   },
   speedText: { fontSize: 24, fontWeight: '800', color: COLORS.white },
 
-  floatingHeart: { position: 'absolute', width: 100, height: 100 },
+  floatingHeart: { position: 'absolute', width: 112, height: 112 },
 
   muteBtn: {
     position: 'absolute', top: 54, right: 14,
@@ -829,7 +857,7 @@ const styles = StyleSheet.create({
   repostAvatarFallback: { backgroundColor: COLORS.primaryBg, alignItems: 'center', justifyContent: 'center' },
   repostAvatarInitial: { fontSize: 8, fontWeight: '700', color: COLORS.primary },
   repostText: { fontSize: 11, color: 'rgba(255,255,255,0.9)', fontWeight: '600' },
-  bottomLeft: { position: 'absolute', bottom: 72, left: 14, right: 88, gap: 6 },
+  bottomLeft: { position: 'absolute', bottom: 56, left: 14, right: 90, gap: 5 },
   usernameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   username: { fontSize: FONT.size.base, fontWeight: FONT.weight.bold, color: COLORS.white },
   verifiedBadge: {
@@ -841,28 +869,29 @@ const styles = StyleSheet.create({
   soundRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   soundText: { fontSize: FONT.size.xs, color: 'rgba(255,255,255,0.85)', flexShrink: 1 },
 
-  rightActions: { position: 'absolute', right: 10, bottom: 76, alignItems: 'center', gap: 24 },
-  avatarWrap: { position: 'relative', marginBottom: 4 },
+  rightActions: { position: 'absolute', right: 10, bottom: 88, alignItems: 'center', gap: 20 },
+  avatarWrap: { position: 'relative', marginBottom: 6 },
   avatar: {
-    width: 50, height: 50, borderRadius: 25,
-    borderWidth: 2.5, borderColor: COLORS.primary, // green ring like the design
+    width: 52, height: 52, borderRadius: 26,
+    borderWidth: 2, borderColor: COLORS.white,
   },
   avatarFallback: {
-    width: 50, height: 50, borderRadius: 25,
-    backgroundColor: COLORS.primaryBg, borderWidth: 2.5, borderColor: COLORS.primary,
+    width: 52, height: 52, borderRadius: 26,
+    backgroundColor: COLORS.primaryBg, borderWidth: 2, borderColor: COLORS.white,
     alignItems: 'center', justifyContent: 'center',
   },
-  avatarInitial: { fontSize: 18, fontWeight: FONT.weight.bold, color: COLORS.primary },
+  avatarInitial: { fontSize: 20, fontWeight: FONT.weight.bold, color: COLORS.primary },
   followDot: {
     position: 'absolute', bottom: -10, left: '50%',
-    transform: [{ translateX: -11 }],
-    width: 22, height: 22, borderRadius: 11,
-    backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center',
+    transform: [{ translateX: -12 }],
+    width: 24, height: 24, borderRadius: 12,
+    backgroundColor: COLORS.error, alignItems: 'center', justifyContent: 'center',
     borderWidth: 2, borderColor: '#000',
   },
-  followDotText: { color: COLORS.white, fontSize: 14, fontWeight: FONT.weight.bold, lineHeight: 20 },
-  actionBtn: { alignItems: 'center', gap: 4 },
-  actionCount: { fontSize: 12, fontWeight: FONT.weight.semibold, color: COLORS.white },
+  followDotText: { color: COLORS.white, fontSize: 16, fontWeight: FONT.weight.bold, lineHeight: 22 },
+  actionBtn: { alignItems: 'center', gap: 5 },
+  actionCount: { fontSize: 13, fontWeight: FONT.weight.bold, color: COLORS.white,
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
 
   // Vinyl disc
   vinylWrap: { alignItems: 'center', marginTop: 4 },
@@ -884,21 +913,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#000', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
   },
 
-  // Seek bar — 16px above bottom, 44px touch zone, 4px bar
+  // Seek bar — 20px above bottom, 48px touch zone, 3px bar
   seekBarHit: {
-    position: 'absolute', bottom: 16, left: 0, right: 0,
-    height: 44, justifyContent: 'center',
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    height: 48, justifyContent: 'flex-end',
   },
   progressBg: {
-    height: 4, backgroundColor: 'rgba(255,255,255,0.30)',
-    marginHorizontal: 0, position: 'relative', borderRadius: 2,
+    height: 3, backgroundColor: 'rgba(255,255,255,0.22)',
+    position: 'relative', borderRadius: 99,
   },
-  progressFill: { position: 'absolute', top: 0, left: 0, height: '100%', backgroundColor: COLORS.primaryLight, borderRadius: 2 },
+  progressFill: {
+    position: 'absolute', top: 0, left: 0, height: '100%',
+    backgroundColor: COLORS.white, borderRadius: 99,
+  },
   progressThumb: {
-    position: 'absolute', top: -7, width: 16, height: 16,
-    borderRadius: 8, backgroundColor: COLORS.white,
-    marginLeft: -8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.6, shadowRadius: 4,
+    position: 'absolute', top: -5.5, width: 14, height: 14,
+    borderRadius: 7, backgroundColor: COLORS.white,
+    marginLeft: -7, shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.4, shadowRadius: 3,
   },
   seekTimeBubble: {
     position: 'absolute', bottom: 62, alignSelf: 'center',

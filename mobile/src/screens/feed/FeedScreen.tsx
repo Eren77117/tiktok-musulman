@@ -83,7 +83,7 @@ export default function FeedScreen() {
   const {
     data: suivisData, fetchNextPage: fetchNextSuivis,
     hasNextPage: hasNextSuivis, isFetchingNextPage: fetchingSuivis,
-    isLoading: loadingSuivis, refetch: refetchSuivis,
+    isLoading: loadingSuivis, refetch: refetchSuivis, isRefetching: refreshingSuivis,
   } = useInfiniteQuery({
     queryKey: ['following-feed'],
     queryFn: ({ pageParam }) =>
@@ -243,6 +243,14 @@ export default function FeedScreen() {
           keyExtractor={p => p.id}
           style={{ flex: 1 }}
           onLayout={e => setListHeight(e.nativeEvent.layout.height)}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshingSuivis}
+              onRefresh={() => refetchSuivis()}
+              tintColor={COLORS.primary}
+              colors={[COLORS.primary]}
+            />
+          }
           renderItem={({ item }) => (
             <VideoPlayerItem
               post={item}
@@ -292,6 +300,14 @@ export default function FeedScreen() {
             p.type === 'book' ? `book-${p.data.id}` :
             `live-${p.data.id}`
           }
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshingFeed}
+              onRefresh={() => { seenIds.current = []; refetchFeed(); }}
+              tintColor={COLORS.primary}
+              colors={[COLORS.primary]}
+            />
+          }
           renderItem={({ item }) => {
             if (item.type === 'book') {
               return <BookCard book={item.data} isVisible={false} />;
@@ -314,12 +330,12 @@ export default function FeedScreen() {
           showsVerticalScrollIndicator={false}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig.current}
-          windowSize={3}
-          maxToRenderPerBatch={2}
-          initialNumToRender={1}
+          windowSize={5}
+          maxToRenderPerBatch={3}
+          initialNumToRender={2}
           removeClippedSubviews
           onEndReached={() => hasNextFeed && !fetchingFeed && fetchNextFeed()}
-          onEndReachedThreshold={2}
+          onEndReachedThreshold={3}
           getItemLayout={(_, index) => ({ length: ITEM_H, offset: ITEM_H * index, index })}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
@@ -645,11 +661,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10, paddingBottom: 10, zIndex: 10,
   },
   tabsScroll: { flex: 1 },
-  tabs: { flexDirection: 'row', gap: 20, paddingHorizontal: 6 },
-  tabBtn: { alignItems: 'center', paddingBottom: 4, paddingHorizontal: 2 },
-  tabText: { fontSize: FONT.size.base, fontWeight: FONT.weight.semibold, color: 'rgba(255,255,255,0.6)' },
-  tabTextActive: { color: COLORS.white },
-  tabUnderline: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, backgroundColor: COLORS.white, borderRadius: 1 },
+  tabs: { flexDirection: 'row', gap: 22, paddingHorizontal: 6 },
+  tabBtn: { alignItems: 'center', paddingBottom: 6, paddingHorizontal: 2 },
+  tabText: { fontSize: 15, fontWeight: '600', color: 'rgba(255,255,255,0.55)',
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  tabTextActive: { color: COLORS.white, fontWeight: '800', fontSize: 16 },
+  tabUnderline: {
+    position: 'absolute', bottom: 0, left: '10%', right: '10%',
+    height: 2.5, backgroundColor: COLORS.white, borderRadius: 2,
+  },
   liveBtn: {
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: 'rgba(255,59,48,0.25)', borderWidth: 1.5, borderColor: '#FF3B30',
