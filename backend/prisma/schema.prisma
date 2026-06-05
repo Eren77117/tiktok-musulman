@@ -103,6 +103,9 @@ model User {
   support_tickets   SupportTicket[]
   reposts           Repost[]
   not_interested    NotInterested[]
+  story_views       StoryView[]
+  story_likes       StoryLike[]
+  story_replies     StoryReply[]  @relation("StoryReplySender")
 
   @@index([username])
   @@index([email])
@@ -203,12 +206,16 @@ model Story {
   media_type     String   @default("image")
   duration       Int      @default(5)
   view_count     Int      @default(0)
+  like_count     Int      @default(0)
+  archived       Boolean  @default(false)
   expires_at     DateTime
   created_at     DateTime @default(now())
   linked_post_id String?
 
   user        User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
   views       StoryView[]
+  likes       StoryLike[]
+  replies     StoryReply[]
   linked_post Post?        @relation("StoryLinkedPost", fields: [linked_post_id], references: [id], onDelete: SetNull)
 
   @@index([user_id])
@@ -221,9 +228,33 @@ model StoryView {
   viewer_id  String
   created_at DateTime @default(now())
 
-  story Story @relation(fields: [story_id], references: [id], onDelete: Cascade)
+  story  Story @relation(fields: [story_id], references: [id], onDelete: Cascade)
+  viewer User  @relation(fields: [viewer_id], references: [id], onDelete: Cascade)
 
   @@unique([story_id, viewer_id])
+}
+
+model StoryLike {
+  id         String   @id @default(uuid())
+  story_id   String
+  user_id    String
+  created_at DateTime @default(now())
+
+  story Story @relation(fields: [story_id], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([story_id, user_id])
+}
+
+model StoryReply {
+  id         String   @id @default(uuid())
+  story_id   String
+  sender_id  String
+  content    String
+  created_at DateTime @default(now())
+
+  story  Story @relation(fields: [story_id], references: [id], onDelete: Cascade)
+  sender User  @relation("StoryReplySender", fields: [sender_id], references: [id], onDelete: Cascade)
 }
 
 model Comment {

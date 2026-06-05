@@ -46,6 +46,9 @@ import HashtagScreen from '../screens/explore/HashtagScreen';
 import CreatorStatsScreen from '../screens/profile/CreatorStatsScreen';
 import StoriesScreen from '../screens/feed/StoriesScreen';
 import SearchScreen from '../screens/search/SearchScreen';
+import StoryCreateScreen from '../screens/stories/StoryCreateScreen';
+import StoryViewerScreen from '../screens/stories/StoryViewerScreen';
+import StoryArchiveScreen from '../screens/stories/StoryArchiveScreen';
 
 export type RootStackParamList = {
   Auth: undefined;
@@ -68,6 +71,9 @@ export type RootStackParamList = {
   CreatorStats: undefined;
   Stories: { userId: string };
   Search: undefined;
+  StoryCreate: undefined;
+  StoryViewer: { groups: any[]; initialGroupIndex?: number };
+  StoryArchive: undefined;
 };
 
 export type AuthStackParamList = {
@@ -323,6 +329,12 @@ export function AppNavigator() {
               options={{ animation: 'fade', presentation: 'fullScreenModal', gestureEnabled: false }} />
             <RootStack.Screen name="Search" component={SearchScreen}
               options={{ animation: 'slide_from_right', gestureEnabled: true }} />
+            <RootStack.Screen name="StoryCreate" component={StoryCreateScreen}
+              options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
+            <RootStack.Screen name="StoryViewer" component={StoryViewerScreen}
+              options={{ animation: 'fade', presentation: 'fullScreenModal', headerShown: false }} />
+            <RootStack.Screen name="StoryArchive" component={StoryArchiveScreen}
+              options={{ animation: 'slide_from_right' }} />
           </>
         ) : (
           <RootStack.Screen name="Auth" component={AuthNavigator} />

@@ -519,6 +519,7 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
         {muted ? <IcMute size={18} color={COLORS.white} /> : <IcVolume size={18} color={COLORS.white} />}
       </TouchableOpacity>
 
+
       {/* Bottom gradient */}
       <LinearGradient
         colors={['transparent', 'rgba(0,0,0,0.85)']}

@@ -214,7 +214,7 @@ export default function FeedScreen() {
           style={styles.tabsScroll}
         >
           {([
-            ['suivis', 'Suivis'],
+            ['suivis', 'Communauté'],
             ['pourtoi', 'Pour toi'],
             ['fils', 'Fils'],
           ] as [FeedTab, string][]).map(([key, label]) => (

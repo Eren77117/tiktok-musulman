@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createThumbnail } from 'react-native-create-thumbnail';
 import {
-  View, Text, StyleSheet, Image, TouchableOpacity,
+  View, Text, StyleSheet, Image, TouchableOpacity, Modal, Pressable,
   FlatList, ActivityIndicator, Alert, Dimensions, ActionSheetIOS, Platform,
   Share, Linking,
 } from 'react-native';
@@ -135,15 +135,39 @@ export default function UserProfileScreen({ route, navigation }: Props) {
     }
   };
 
+  const [verseModalVisible, setVerseModalVisible] = useState(false);
+  const [optionsVisible, setOptionsVisible] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
+
+  const handleBlock = async () => {
+    if (!profile) return;
+    try {
+      if (isBlocked) {
+        await api.delete(`/users/${profile.id}/block`).catch(() =>
+          api.post(`/users/${profile.id}/unblock`));
+        setIsBlocked(false);
+        qc.invalidateQueries({ queryKey: ['user-posts-public', profile.id] });
+      } else {
+        await api.post(`/users/${profile.id}/block`);
+        setIsBlocked(true);
+        qc.invalidateQueries({ queryKey: ['user-posts-public', profile.id] });
+      }
+    } catch {}
+    setOptionsVisible(false);
+  };
+
+  const handleShareProfile = () => {
+    if (!profile) return;
+    setOptionsVisible(false);
+    Share.share({
+      message: `Découvre @${profile.username} sur Nour !\nhttps://nour.app/u/${profile.username}`,
+    });
+  };
+
   const handleMessage = async () => {
     if (!user || !profile) return;
-    // Cross-gender blocked by backend; same gender goes through directly
     if (user.gender !== profile.gender) {
-      Alert.alert(
-        'Messagerie restreinte',
-        'La messagerie directe entre hommes et femmes non mahrams n\'est pas autorisée sur Nour.',
-        [{ text: 'Compris' }],
-      );
+      setVerseModalVisible(true);
       return;
     }
     try {
@@ -210,8 +234,8 @@ export default function UserProfileScreen({ route, navigation }: Props) {
 
   if (!profile) return null;
   const isOwnProfile = user?.id === profile.id;
-  const posts = postsData?.items ?? [];
-  const reposts = repostsData?.items ?? [];
+  const posts = isBlocked ? [] : (postsData?.items ?? []);
+  const reposts = isBlocked ? [] : (repostsData?.items ?? []);
   const displayPosts = activeTab === 0 ? posts : reposts;
   const displayLoading = activeTab === 0 ? postsLoading : repostsLoading;
 
@@ -223,16 +247,11 @@ export default function UserProfileScreen({ route, navigation }: Props) {
           <IcBack size={24} color={theme.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.text }]}>@{profile.username}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <TouchableOpacity onPress={handleShare} style={styles.backBtn} activeOpacity={0.7}>
-            <IcShare size={20} color={theme.text} />
+        {!isOwnProfile && (
+          <TouchableOpacity onPress={() => setOptionsVisible(true)} style={styles.backBtn} activeOpacity={0.7}>
+            <IcMore size={22} color={theme.text} />
           </TouchableOpacity>
-          {!isOwnProfile && (
-            <TouchableOpacity onPress={handleOptions} style={styles.backBtn} activeOpacity={0.7}>
-              <IcMore size={22} color={theme.text} />
-            </TouchableOpacity>
-          )}
-        </View>
+        )}
       </View>
 
       <FlatList
@@ -351,6 +370,79 @@ export default function UserProfileScreen({ route, navigation }: Props) {
           )
         }
       />
+
+      {/* Modal options profil */}
+      <Modal visible={optionsVisible} transparent animationType="slide" onRequestClose={() => setOptionsVisible(false)}>
+        <Pressable style={optStyles.backdrop} onPress={() => setOptionsVisible(false)}>
+          <Pressable style={[optStyles.sheet, { backgroundColor: theme.isDark ? '#1A1A1A' : '#fff' }]}>
+            <View style={optStyles.sheetTop}>
+              <View style={optStyles.handle} />
+              <TouchableOpacity onPress={() => setOptionsVisible(false)} style={optStyles.closeBtn} activeOpacity={0.7}>
+                <Text style={[optStyles.closeX, { color: theme.textMuted }]}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Avatar + nom */}
+            <View style={optStyles.profileRow}>
+              {profile?.avatar_url
+                ? <Image source={{ uri: profile.avatar_url }} style={optStyles.avatar} />
+                : <View style={optStyles.avatarFallback}><Text style={optStyles.avatarInitial}>{profile?.display_name?.[0]}</Text></View>}
+              <Text style={[optStyles.profileName, { color: theme.text }]}>{profile?.display_name}</Text>
+              <Text style={[optStyles.profileHandle, { color: theme.textMuted }]}>@{profile?.username}</Text>
+            </View>
+
+            <View style={[optStyles.divider, { backgroundColor: theme.border }]} />
+
+            {/* Partager */}
+            <TouchableOpacity style={optStyles.option} onPress={handleShareProfile} activeOpacity={0.7}>
+              <View style={[optStyles.optionIcon, { backgroundColor: '#EEF2FF' }]}>
+                <IcShare size={20} color="#6366F1" />
+              </View>
+              <View style={optStyles.optionText}>
+                <Text style={[optStyles.optionTitle, { color: theme.text }]}>Partager ce profil</Text>
+                <Text style={[optStyles.optionSub, { color: theme.textMuted }]}>Envoie le lien à quelqu'un</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Bloquer / Débloquer */}
+            <TouchableOpacity style={optStyles.option} onPress={handleBlock} activeOpacity={0.7}>
+              <View style={[optStyles.optionIcon, { backgroundColor: isBlocked ? '#F0FDF4' : '#FEF2F2' }]}>
+                <Text style={{ fontSize: 20 }}>{isBlocked ? '🔓' : '🚫'}</Text>
+              </View>
+              <View style={optStyles.optionText}>
+                <Text style={[optStyles.optionTitle, { color: isBlocked ? '#16A34A' : '#EF4444' }]}>
+                  {isBlocked ? `Débloquer @${profile?.username}` : `Bloquer @${profile?.username}`}
+                </Text>
+                <Text style={[optStyles.optionSub, { color: theme.textMuted }]}>
+                  {isBlocked ? 'Tu reverras ses vidéos dans ton feed' : 'Ses vidéos n\'apparaîtront plus dans ton feed'}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Modal verset coranique — messagerie cross-genre */}
+      <Modal visible={verseModalVisible} transparent animationType="fade" onRequestClose={() => setVerseModalVisible(false)}>
+        <Pressable style={verseStyles.backdrop} onPress={() => setVerseModalVisible(false)}>
+          <Pressable style={verseStyles.card}>
+            <Text style={verseStyles.bismillah}>بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</Text>
+            <Text style={verseStyles.arabic}>
+              وَلَا تَقْرَبُوا۟ ٱلزِّنَىٰٓ ۖ إِنَّهُۥ كَانَ فَـٰحِشَةًۭ وَسَآءَ سَبِيلًۭا ٣٢
+            </Text>
+            <Text style={verseStyles.french}>
+              « Et n'approchez point la fornication. En vérité, c'est une turpitude et quel mauvais chemin ! »
+            </Text>
+            <Text style={verseStyles.ref}>Sourate Al-Isrâ' (17:32)</Text>
+            <Text style={verseStyles.note}>
+              Sur Nour, la messagerie entre frères et sœurs non mahrams n'est pas autorisée afin de préserver les limites qu'Allah a fixées.
+            </Text>
+            <TouchableOpacity style={verseStyles.btn} onPress={() => setVerseModalVisible(false)} activeOpacity={0.8}>
+              <Text style={verseStyles.btnText}>J'ai compris</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -514,4 +606,63 @@ const styles = StyleSheet.create({
   cellCount: { fontSize: 10, color: COLORS.white },
   empty: { alignItems: 'center', paddingTop: 40 },
   emptyText: { fontSize: FONT.size.base },
+});
+
+const optStyles = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 36 },
+  sheetTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingTop: 12, paddingHorizontal: 16, position: 'relative' },
+  handle: { width: 36, height: 4, backgroundColor: '#ccc', borderRadius: 2 },
+  closeBtn: { position: 'absolute', right: 16, top: 8, padding: 8 },
+  closeX: { fontSize: 16, fontWeight: '600' },
+  profileRow: { alignItems: 'center', paddingVertical: 20, gap: 4 },
+  avatar: { width: 60, height: 60, borderRadius: 30, marginBottom: 4 },
+  avatarFallback: { width: 60, height: 60, borderRadius: 30, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  avatarInitial: { color: '#fff', fontSize: 24, fontWeight: '700' },
+  profileName: { fontSize: 16, fontWeight: '700' },
+  profileHandle: { fontSize: 13 },
+  divider: { height: 1, marginHorizontal: 16, marginBottom: 8 },
+  option: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 14 },
+  optionIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  optionText: { flex: 1, gap: 2 },
+  optionTitle: { fontSize: 15, fontWeight: '600' },
+  optionSub: { fontSize: 12 },
+});
+
+const verseStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.75)',
+    alignItems: 'center', justifyContent: 'center', padding: 24,
+  },
+  card: {
+    backgroundColor: '#0F1A12', borderRadius: 20,
+    padding: 28, width: '100%', maxWidth: 380,
+    borderWidth: 1, borderColor: '#2D7A4F',
+    alignItems: 'center', gap: 14,
+  },
+  bismillah: {
+    fontSize: 16, color: '#C9A84C',
+    fontFamily: 'System', textAlign: 'center',
+  },
+  arabic: {
+    fontSize: 22, color: COLORS.white, textAlign: 'center',
+    lineHeight: 38, direction: 'rtl',
+  },
+  french: {
+    fontSize: 14, color: '#D1D5DB', textAlign: 'center',
+    fontStyle: 'italic', lineHeight: 22,
+  },
+  ref: {
+    fontSize: 12, color: '#C9A84C', textAlign: 'center',
+  },
+  note: {
+    fontSize: 12, color: '#9CA3AF', textAlign: 'center',
+    lineHeight: 18, paddingTop: 4,
+    borderTopWidth: 1, borderTopColor: '#1F2D22',
+  },
+  btn: {
+    marginTop: 4, backgroundColor: '#2D7A4F',
+    borderRadius: 12, paddingVertical: 12, paddingHorizontal: 32,
+  },
+  btnText: { color: COLORS.white, fontSize: 15, fontWeight: '600' },
 });

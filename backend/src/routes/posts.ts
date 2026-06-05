@@ -49,27 +49,100 @@ function engagementScore(post: {
   return base * decayFactor * categoryBoost;
 }
 
-async function getUserPreferredCategories(userId: string): Promise<Set<string>> {
-  const recentLikes = await prisma.like.findMany({
-    where: { user_id: userId, post_id: { not: null } },
-    orderBy: { created_at: 'desc' },
-    take: 50,
-    include: {
-      post: {
-        include: { post_categories: { select: { category_id: true } } },
-      },
-    },
-  });
-
-  const cats = new Set<string>();
-  for (const like of recentLikes) {
-    like.post?.post_categories.forEach(pc => cats.add(pc.category_id));
-  }
-  return cats;
+interface UserPreferences {
+  categoryWeights: Map<string, number>;   // catId → score
+  creatorAffinity: Map<string, number>;   // userId → score
+  followingSet: Set<string>;              // followed creator IDs
+  blockedSet: Set<string>;                // blocked user IDs
+  hiddenSet: Set<string>;                 // hidden user IDs
 }
 
-async function buildFeedItems(userId: string, seenIds: string[], poolSize = 80) {
-  const preferredCats = await getUserPreferredCategories(userId);
+async function getUserPreferences(userId: string): Promise<UserPreferences> {
+  const [likes, watches, comments, favorites, follows, blocked, hidden] = await Promise.all([
+    // Likes — signal fort (50 derniers)
+    prisma.like.findMany({
+      where: { user_id: userId, post_id: { not: null } },
+      orderBy: { created_at: 'desc' },
+      take: 50,
+      include: { post: { include: { post_categories: { select: { category_id: true } } } } },
+    }),
+    // Watch time — signal fort (vidéos regardées à >60%)
+    prisma.postView.findMany({
+      where: { user_id: userId, completed: true },
+      orderBy: { updated_at: 'desc' },
+      take: 100,
+      include: { post: { include: { post_categories: { select: { category_id: true } }, user: { select: { id: true } } } } },
+    }),
+    // Commentaires — signal très fort
+    prisma.comment.findMany({
+      where: { user_id: userId },
+      orderBy: { created_at: 'desc' },
+      take: 30,
+      include: { post: { include: { post_categories: { select: { category_id: true } }, user: { select: { id: true } } } } },
+    }),
+    // Favoris — signal fort
+    prisma.favorite.findMany({
+      where: { user_id: userId },
+      orderBy: { created_at: 'desc' },
+      take: 30,
+      include: { post: { include: { post_categories: { select: { category_id: true } }, user: { select: { id: true } } } } },
+    }),
+    // Suivis
+    prisma.follow.findMany({ where: { follower_id: userId }, select: { following_id: true } }),
+    // Bloqués
+    prisma.blockedUser.findMany({ where: { blocker_id: userId }, select: { blocked_id: true } }),
+    // Cachés
+    prisma.hiddenUser.findMany({ where: { user_id: userId }, select: { hidden_id: true } }),
+  ]);
+
+  const categoryWeights = new Map<string, number>();
+  const creatorAffinity = new Map<string, number>();
+
+  const addCatWeight = (catIds: string[], weight: number) => {
+    for (const cid of catIds) {
+      categoryWeights.set(cid, (categoryWeights.get(cid) ?? 0) + weight);
+    }
+  };
+  const addCreatorAffinity = (creatorId: string, weight: number) => {
+    creatorAffinity.set(creatorId, (creatorAffinity.get(creatorId) ?? 0) + weight);
+  };
+
+  // Poids par signal
+  for (const like of likes) {
+    const cats = like.post?.post_categories.map((pc: { category_id: string }) => pc.category_id) ?? [];
+    addCatWeight(cats, 1.0);
+    if (like.post?.user_id) addCreatorAffinity(like.post.user_id, 0.8);
+  }
+  for (const view of watches) {
+    const cats = view.post?.post_categories.map((pc: { category_id: string }) => pc.category_id) ?? [];
+    addCatWeight(cats, 0.8);
+    if (view.post?.user?.id) addCreatorAffinity(view.post.user.id, 0.5);
+  }
+  for (const comment of comments) {
+    const cats = comment.post?.post_categories.map((pc: { category_id: string }) => pc.category_id) ?? [];
+    addCatWeight(cats, 2.0);
+    if (comment.post?.user?.id) addCreatorAffinity(comment.post.user.id, 1.5);
+  }
+  for (const fav of favorites) {
+    const cats = fav.post?.post_categories.map((pc: { category_id: string }) => pc.category_id) ?? [];
+    addCatWeight(cats, 1.5);
+    if (fav.post?.user?.id) addCreatorAffinity(fav.post.user.id, 1.2);
+  }
+
+  return {
+    categoryWeights,
+    creatorAffinity,
+    followingSet: new Set(follows.map((f: { following_id: string }) => f.following_id)),
+    blockedSet: new Set(blocked.map((b: { blocked_id: string }) => b.blocked_id)),
+    hiddenSet: new Set(hidden.map((h: { hidden_id: string }) => h.hidden_id)),
+  };
+}
+
+async function buildFeedItems(userId: string, seenIds: string[], poolSize = 120) {
+  const prefs = await getUserPreferences(userId);
+
+  // Exclure bloqués, cachés, et déjà vus
+  const excludedUserIds = [...prefs.blockedSet, ...prefs.hiddenSet];
 
   const posts = await prisma.post.findMany({
     where: {
@@ -78,6 +151,7 @@ async function buildFeedItems(userId: string, seenIds: string[], poolSize = 80) 
         ...(seenIds.length > 0 ? [{ id: { in: seenIds } }] : []),
         { not_interested: { some: { user_id: userId } } },
       ],
+      ...(excludedUserIds.length > 0 ? { user_id: { notIn: excludedUserIds } } : {}),
     },
     take: poolSize,
     orderBy: { created_at: 'desc' },
@@ -87,14 +161,48 @@ async function buildFeedItems(userId: string, seenIds: string[], poolSize = 80) 
     },
   });
 
-  const scored = posts.map(p => {
-    const postCats = new Set(p.post_categories.map(pc => pc.category_id));
-    const boost = preferredCats.size > 0 && [...postCats].some(c => preferredCats.has(c)) ? 1.5 : 1.0;
-    return { post: p, score: engagementScore(p, boost) };
+  // Score chaque post avec les préférences personnalisées
+  const maxCatWeight = Math.max(...prefs.categoryWeights.values(), 1);
+  const maxCreatorAffinity = Math.max(...prefs.creatorAffinity.values(), 1);
+
+  const scored = posts.map((p: any) => {
+    const postCats = p.post_categories.map((pc: { category_id: string }) => pc.category_id);
+
+    // Boost catégorie (0 → 1.8)
+    const catScore = postCats.reduce((sum: number, cid: string) => sum + (prefs.categoryWeights.get(cid) ?? 0), 0);
+    const catBoost = 1.0 + (catScore / maxCatWeight) * 0.8;
+
+    // Boost créateur affinité (0 → 1.5)
+    const affinity = prefs.creatorAffinity.get(p.user_id) ?? 0;
+    const affinityBoost = 1.0 + (affinity / maxCreatorAffinity) * 0.5;
+
+    // Boost suivi (×1.3 si le créateur est suivi)
+    const followBoost = prefs.followingSet.has(p.user_id) ? 1.3 : 1.0;
+
+    const totalBoost = catBoost * affinityBoost * followBoost;
+    return { post: p, score: engagementScore(p, totalBoost) };
   });
 
   scored.sort((a, b) => b.score - a.score);
-  return scored.map(s => s.post);
+
+  // Diversité : max 2 posts du même créateur par page
+  const creatorCount = new Map<string, number>();
+  const diversified: typeof scored = [];
+  const overflow: typeof scored = [];
+
+  for (const item of scored) {
+    const count = creatorCount.get(item.post.user_id) ?? 0;
+    if (count < 2) {
+      diversified.push(item);
+      creatorCount.set(item.post.user_id, count + 1);
+    } else {
+      overflow.push(item);
+    }
+  }
+
+  // Compléter avec l'overflow si pas assez de posts variés
+  const final = [...diversified, ...overflow];
+  return final.map(s => s.post);
 }
 
 export async function postRoutes(app: FastifyInstance) {

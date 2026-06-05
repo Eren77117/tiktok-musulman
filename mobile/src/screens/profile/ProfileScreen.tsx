@@ -227,27 +227,29 @@ export default function ProfileScreen() {
 
         {/* Hero */}
         <View style={[styles.heroSection, { backgroundColor: theme.bg }]}>
-          <TouchableOpacity onPress={handleAvatarPress} activeOpacity={0.85} style={styles.avatarWrap}>
-            {avatarLoading ? (
-              <View style={[styles.avatar, styles.avatarFallback]}>
-                <ActivityIndicator color={COLORS.primary} />
-              </View>
-            ) : user.avatar_url ? (
-              <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatar, styles.avatarFallback]}>
-                <Text style={styles.avatarText}>{user.display_name[0]?.toUpperCase()}</Text>
-              </View>
-            )}
-            <View style={styles.cameraOverlay}>
-              <IcEdit size={12} color={COLORS.white} />
-            </View>
-            {user.is_verified && (
-              <View style={styles.verifiedBadge}>
-                <IcCheck size={10} color={COLORS.white} strokeWidth={3} />
-              </View>
-            )}
-          </TouchableOpacity>
+          <View style={styles.avatarContainer}>
+            <TouchableOpacity onPress={() => navigation.navigate('Stories' as any)} activeOpacity={0.85} style={styles.avatarWrap}>
+              {avatarLoading ? (
+                <View style={[styles.avatar, styles.avatarFallback]}>
+                  <ActivityIndicator color={COLORS.primary} />
+                </View>
+              ) : user.avatar_url ? (
+                <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
+              ) : (
+                <View style={[styles.avatar, styles.avatarFallback]}>
+                  <Text style={styles.avatarText}>{user.display_name[0]?.toUpperCase()}</Text>
+                </View>
+              )}
+              {user.is_verified && (
+                <View style={styles.verifiedBadge}>
+                  <IcCheck size={10} color={COLORS.white} strokeWidth={3} />
+                </View>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.storyPlusBtn} onPress={() => navigation.navigate('StoryCreate' as any)} activeOpacity={0.8}>
+              <Text style={styles.storyPlusIcon}>+</Text>
+            </TouchableOpacity>
+          </View>
 
           <Text style={[styles.displayName, { color: theme.text }]}>{user.display_name}</Text>
           {user.bio ? <Text style={[styles.bio, { color: theme.textMuted }]}>{user.bio}</Text> : null}
@@ -451,6 +453,7 @@ const styles = StyleSheet.create({
   coverWrap: { width: '100%', height: 120, position: 'relative', overflow: 'hidden' },
   heroSection: { alignItems: 'center', paddingTop: SPACING.md, paddingBottom: SPACING.lg, paddingHorizontal: SPACING.lg, gap: 10, marginTop: -30 },
 
+  avatarContainer: { position: 'relative' },
   avatarWrap: { position: 'relative' },
   avatar: { width: 90, height: 90, borderRadius: 45, borderWidth: 3, borderColor: COLORS.white },
   avatarFallback: {
@@ -460,12 +463,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3, shadowRadius: 12, elevation: 6,
   },
   avatarText: { fontSize: 38, fontWeight: FONT.weight.bold, color: COLORS.primary },
-  cameraOverlay: {
-    position: 'absolute', bottom: 2, right: 2,
-    width: 26, height: 26, borderRadius: 13,
+  storyPlusBtn: {
+    position: 'absolute', bottom: 0, right: -4,
+    width: 28, height: 28, borderRadius: 14,
     backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: '#0B0B0B',
+    borderWidth: 2.5, borderColor: '#0B0B0B',
   },
+  storyPlusIcon: { color: '#fff', fontSize: 18, fontWeight: '700', lineHeight: 22 },
   verifiedBadge: {
     position: 'absolute', bottom: 2, left: 2,
     width: 22, height: 22, borderRadius: 11,

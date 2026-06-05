@@ -38,9 +38,9 @@ export const COLORS = {
   textMutedDark:  '#8A8A95',
 
   // Borders
-  border:      '#EBEBED',
-  borderDark:  '#1E1E1E',
-  borderLight: '#F4F4F6',
+  border:      'rgba(0,0,0,0.15)',
+  borderDark:  'rgba(255,255,255,0.18)',
+  borderLight: 'rgba(0,0,0,0.08)',
 
   // Semantic
   like:    '#FF3B5C',
@@ -58,7 +58,7 @@ export const COLORS = {
 
   // Tab bar
   tabActive:   '#00C26E',
-  tabInactive: '#9CA3AF',
+  tabInactive: '#3D3D4A',
 };
 
 // ─── SPACING ──────────────────────────────────────────────────────────────────
