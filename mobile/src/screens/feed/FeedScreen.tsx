@@ -197,22 +197,18 @@ export default function FeedScreen() {
 
       {/* Header overlay */}
       <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
-        {/* Live button */}
+        {/* Live button — icône blanche simple */}
         <TouchableOpacity
           style={styles.liveBtn}
           onPress={() => nav.navigate('LiveList' as any)}
-          activeOpacity={0.8}
+          activeOpacity={0.7}
         >
-          <IcLive size={14} color="#FF3B30" />
+          <IcLive size={20} color={COLORS.white} strokeWidth={1.8} />
           {lives.length > 0 && <View style={styles.liveDot} />}
         </TouchableOpacity>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tabs}
-          style={styles.tabsScroll}
-        >
+        {/* Tabs — centrés */}
+        <View style={styles.tabsRow}>
           {([
             ['suivis', 'Communauté'],
             ['pourtoi', 'Pour toi'],
@@ -228,7 +224,7 @@ export default function FeedScreen() {
               {tab === key && <View style={styles.tabUnderline} />}
             </TouchableOpacity>
           ))}
-        </ScrollView>
+        </View>
 
         {/* Search icon — top right */}
         <TouchableOpacity style={styles.searchBtn} onPress={() => nav.navigate('Search')} activeOpacity={0.8}>
@@ -662,19 +658,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 10, paddingBottom: 10, zIndex: 10,
   },
-  tabsScroll: { flex: 1 },
-  tabs: { flexDirection: 'row', gap: 22, paddingHorizontal: 6 },
+  tabsRow: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 22 },
   tabBtn: { alignItems: 'center', paddingBottom: 6, paddingHorizontal: 2 },
-  tabText: { fontSize: FONT.size.base, fontWeight: FONT.weight.medium, color: 'rgba(255,255,255,0.45)', letterSpacing: 0.1 },
-  tabTextActive: { color: '#FFFFFF', fontWeight: FONT.weight.bold },
-  tabUnderline: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, backgroundColor: '#00C26E', borderRadius: 1 },
+  tabText: { fontSize: 15, fontWeight: '600', color: 'rgba(255,255,255,0.5)', letterSpacing: 0.1,
+    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  tabTextActive: { color: '#FFFFFF', fontWeight: '800', fontSize: 16 },
+  tabUnderline: { position: 'absolute', bottom: 0, left: '10%', right: '10%', height: 2.5, backgroundColor: COLORS.white, borderRadius: 2 },
   liveBtn: {
-    width: 38, height: 38, borderRadius: 19,
-    backgroundColor: 'rgba(255,59,48,0.15)', borderWidth: 1, borderColor: 'rgba(255,59,48,0.5)',
+    width: 38, height: 38,
     alignItems: 'center', justifyContent: 'center', position: 'relative',
   },
   liveDot: {
-    position: 'absolute', top: 7, right: 7,
+    position: 'absolute', top: 6, right: 6,
     width: 6, height: 6, borderRadius: 3, backgroundColor: '#FF3B30',
     borderWidth: 1, borderColor: '#000',
   },

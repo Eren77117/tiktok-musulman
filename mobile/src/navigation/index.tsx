@@ -170,6 +170,21 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
             <TouchableOpacity
               style={[styles.sheetOption, { backgroundColor: theme.card, borderColor: theme.border }]}
               activeOpacity={0.75}
+              onPress={() => { setShowCreateSheet(false); navigation.navigate('StoryCreate'); }}
+            >
+              <View style={[styles.sheetOptionIcon, { backgroundColor: theme.primaryBg }]}>
+                <IcBell size={20} color={COLORS.primary} strokeWidth={1.5} />
+              </View>
+              <View style={styles.sheetOptionText}>
+                <Text style={[styles.sheetOptionTitle, { color: theme.text }]}>Ajouter une story</Text>
+                <Text style={[styles.sheetOptionSub, { color: theme.textMuted }]}>Photo ou vidéo visible 24h</Text>
+              </View>
+              <View style={styles.sheetArrow}><Text style={{ color: theme.textSubtle, fontSize: 16 }}>›</Text></View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.sheetOption, { backgroundColor: theme.card, borderColor: theme.border }]}
+              activeOpacity={0.75}
               onPress={() => { setShowCreateSheet(false); navigation.navigate('GoLive'); }}
             >
               <View style={[styles.sheetOptionIcon, { backgroundColor: '#1A0000' }]}>

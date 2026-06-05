@@ -2,9 +2,8 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Dimensions,
   Image, ActivityIndicator, Animated, Pressable, PanResponder,
-  Modal, Alert, Easing, ScrollView,
+  Modal, Alert, Easing,
 } from 'react-native';
-import { useTheme } from '../../hooks/useTheme';
 import Video, { VideoRef } from 'react-native-video';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { useMutation } from '@tanstack/react-query';
@@ -17,7 +16,6 @@ import { COLORS, FONT, RADIUS } from '../../constants/theme';
 import {
   IcHeartFill, IcHeart, IcComment, IcShare, IcSave, IcSaveFill,
   IcMusic, IcPlay, IcVolume, IcMute, IcCheck, IcMaximize, IcRepeat,
-  IcClose, IcProfile,
 } from '../ui/Icons';
 import ShareSheet from './ShareSheet';
 
@@ -134,54 +132,31 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
     onPanResponderTerminate: () => setSeeking(false),
   })).current;
 
-  // Profile panel (slides in from right on left-swipe)
-  const panelX = useRef(new Animated.Value(W)).current;
-  const panelBackdrop = useRef(new Animated.Value(0)).current;
-  const [panelOpen, setPanelOpen] = useState(false);
-
-  const openProfilePanel = useCallback(() => {
-    setPanelOpen(true);
-    Animated.parallel([
-      Animated.spring(panelX, { toValue: 0, useNativeDriver: true, damping: 26, stiffness: 300, mass: 0.9 }),
-      Animated.timing(panelBackdrop, { toValue: 0.55, duration: 220, useNativeDriver: true }),
-    ]).start();
-  }, [panelX, panelBackdrop]);
-
-  const closeProfilePanel = useCallback(() => {
-    Animated.parallel([
-      Animated.spring(panelX, { toValue: W, useNativeDriver: true, damping: 26, stiffness: 320, mass: 0.9 }),
-      Animated.timing(panelBackdrop, { toValue: 0, duration: 180, useNativeDriver: true }),
-    ]).start(() => setPanelOpen(false));
-  }, [panelX, panelBackdrop]);
+  // Swipe gauche → navigation page profil complète
+  const swipeAnim = useRef(new Animated.Value(0)).current;
 
   const profilePanResponder = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => false,
     onMoveShouldSetPanResponder: (evt, g) => {
-      // Only trigger from right half of screen, clear leftward swipe, not vertical
       const startX = evt.nativeEvent.pageX - g.dx;
-      return startX > W * 0.4 && g.dx < -12 && Math.abs(g.dx) > Math.abs(g.dy) * 1.3;
-    },
-    onPanResponderGrant: () => {
-      // Show panel immediately as gesture starts
-      setPanelOpen(true);
-      panelX.setValue(W);
+      return startX > W * 0.4 && g.dx < -14 && Math.abs(g.dx) > Math.abs(g.dy) * 1.3;
     },
     onPanResponderMove: (_, g) => {
-      if (g.dx < 0) {
-        const x = Math.max(W * 0.15, W + g.dx);
-        panelX.setValue(x);
-        panelBackdrop.setValue(Math.min(0.55, (-g.dx / (W * 0.85)) * 0.55));
-      }
+      if (g.dx < 0) swipeAnim.setValue(Math.max(-W * 0.2, g.dx));
     },
     onPanResponderRelease: (_, g) => {
-      if (-g.dx > W * 0.25 || g.vx < -0.5) {
-        openProfilePanel();
+      if (-g.dx > W * 0.22 || g.vx < -0.6) {
+        // Snap puis navigue
+        Animated.timing(swipeAnim, { toValue: -W * 0.25, duration: 120, useNativeDriver: true }).start(() => {
+          swipeAnim.setValue(0);
+          nav.navigate('UserProfile', { userId: post.user.id, username: post.user.username });
+        });
       } else {
-        closeProfilePanel();
+        Animated.spring(swipeAnim, { toValue: 0, useNativeDriver: true, tension: 200, friction: 14 }).start();
       }
     },
-    onPanResponderTerminate: (_, g) => {
-      if (-g.dx > W * 0.25) openProfilePanel(); else closeProfilePanel();
+    onPanResponderTerminate: () => {
+      Animated.spring(swipeAnim, { toValue: 0, useNativeDriver: true, tension: 200, friction: 14 }).start();
     },
   })).current;
 
@@ -373,11 +348,12 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
 
   return (
     <Animated.View
-      style={[styles.container, { height: ITEM_H }]}
+      style={[styles.container, { height: ITEM_H }, { transform: [{ translateX: swipeAnim }] }]}
       {...profilePanResponder.panHandlers}
     >
       {/* LAYER 1 — Thumbnail */}
-      {post.thumbnail_url
+      {/* Thumbnail — masqué en mode horizontal (fond noir pur) */}
+      {!isHorizontal && post.thumbnail_url
         ? <Image source={{ uri: post.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
         : <View style={[StyleSheet.absoluteFill, styles.fallback]} />
       }
@@ -669,31 +645,6 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
         onNotInterested={onNotInterested}
       />
 
-      {/* Profile Panel — slides in from right on left-swipe */}
-      {panelOpen && (
-        <>
-          <Animated.View
-            style={[StyleSheet.absoluteFill, { backgroundColor: '#000', opacity: panelBackdrop }]}
-            pointerEvents="box-none"
-          >
-            <Pressable style={StyleSheet.absoluteFill} onPress={closeProfilePanel} />
-          </Animated.View>
-          <Animated.View
-            style={[styles.profilePanel, { transform: [{ translateX: panelX }] }]}
-          >
-            <UserProfilePanel
-              user={post.user}
-              following={following}
-              onFollow={() => { setFollowing(f => !f); followMutation.mutate(); }}
-              onClose={closeProfilePanel}
-              onViewFull={() => {
-                closeProfilePanel();
-                setTimeout(() => nav.navigate('UserProfile', { userId: post.user.id, username: post.user.username }), 200);
-              }}
-            />
-          </Animated.View>
-        </>
-      )}
     </Animated.View>
   );
 }
@@ -944,145 +895,15 @@ const styles = StyleSheet.create({
   seekTimeText: { fontSize: 12, color: COLORS.white, fontWeight: FONT.weight.semibold },
 
   fullscreenBtn: {
-    position: 'absolute', bottom: 72, alignSelf: 'center',
-    left: W / 2 - 68,
+    position: 'absolute',
+    bottom: '8%',
+    alignSelf: 'center',
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: 'rgba(0,0,0,0.60)',
+    backgroundColor: 'rgba(0,0,0,0.65)',
     borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
   },
   fullscreenText: { fontSize: 13, fontWeight: '500', color: COLORS.white },
 
-  // Profile panel
-  profilePanel: {
-    position: 'absolute', top: 0, right: 0, bottom: 0,
-    width: W * 0.85,
-    overflow: 'hidden',
-  },
 });
 
-// ── UserProfilePanel ─────────────────────────────────────────────────────────
-function UserProfilePanel({ user, following, onFollow, onClose, onViewFull }: {
-  user: FeedPost['user'];
-  following: boolean;
-  onFollow: () => void;
-  onClose: () => void;
-  onViewFull: () => void;
-}) {
-  const theme = useTheme();
-
-  return (
-    <View style={[panelStyles.container, { backgroundColor: theme.surface }]}>
-      {/* Close handle */}
-      <View style={panelStyles.handleRow}>
-        <View style={[panelStyles.handle, { backgroundColor: theme.border }]} />
-        <TouchableOpacity onPress={onClose} style={panelStyles.closeBtn} activeOpacity={0.7}>
-          <IcClose size={18} color={theme.textMuted} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Avatar + Identity */}
-      <View style={panelStyles.identityRow}>
-        <View style={[panelStyles.avatarWrap, { borderColor: theme.primary }]}>
-          {user.avatar_url ? (
-            <Image source={{ uri: user.avatar_url }} style={panelStyles.avatar} />
-          ) : (
-            <View style={[panelStyles.avatar, { backgroundColor: theme.primaryBg, alignItems: 'center', justifyContent: 'center' }]}>
-              <Text style={{ fontSize: 28, fontWeight: '700', color: theme.primary }}>
-                {user.display_name[0]?.toUpperCase()}
-              </Text>
-            </View>
-          )}
-          {user.is_verified && (
-            <View style={[panelStyles.verifiedBadge, { backgroundColor: theme.primary }]}>
-              <IcCheck size={9} color="#fff" strokeWidth={3} />
-            </View>
-          )}
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[panelStyles.displayName, { color: theme.text }]} numberOfLines={1}>
-            {user.display_name}
-          </Text>
-          <Text style={[panelStyles.username, { color: theme.textMuted }]} numberOfLines={1}>
-            @{user.username}
-          </Text>
-        </View>
-      </View>
-
-      {/* Follow button */}
-      <TouchableOpacity
-        style={[panelStyles.followBtn, {
-          backgroundColor: following ? 'transparent' : theme.primary,
-          borderColor: following ? theme.border : theme.primary,
-          borderWidth: following ? 1.5 : 0,
-        }]}
-        onPress={onFollow}
-        activeOpacity={0.8}
-      >
-        <Text style={[panelStyles.followBtnText, { color: following ? theme.text : '#fff' }]}>
-          {following ? 'Abonné(e)' : 'S\'abonner'}
-        </Text>
-      </TouchableOpacity>
-
-      {/* View full profile */}
-      <TouchableOpacity style={[panelStyles.viewFullBtn, { borderColor: theme.border }]} onPress={onViewFull} activeOpacity={0.8}>
-        <IcProfile size={16} color={theme.textMuted} />
-        <Text style={[panelStyles.viewFullText, { color: theme.textMuted }]}>Voir le profil complet</Text>
-      </TouchableOpacity>
-
-      {/* Swipe hint */}
-      <Text style={[panelStyles.swipeHint, { color: theme.textSubtle }]}>
-        Glisse vers la droite pour revenir
-      </Text>
-    </View>
-  );
-}
-
-const panelStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    borderTopLeftRadius: 24, borderBottomLeftRadius: 24,
-    paddingHorizontal: 20,
-    paddingBottom: 32,
-    shadowColor: '#000', shadowOffset: { width: -4, height: 0 },
-    shadowOpacity: 0.25, shadowRadius: 16,
-    elevation: 20,
-  },
-  handleRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    paddingTop: 14, marginBottom: 20,
-  },
-  handle: { width: 36, height: 4, borderRadius: 2, flex: 1, maxWidth: 36 },
-  closeBtn: {
-    position: 'absolute', right: 0,
-    width: 32, height: 32, borderRadius: 16,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  identityRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 20 },
-  avatarWrap: {
-    width: 72, height: 72, borderRadius: 36,
-    borderWidth: 2.5, overflow: 'hidden',
-  },
-  avatar: { width: '100%', height: '100%' },
-  verifiedBadge: {
-    position: 'absolute', bottom: 2, right: 2,
-    width: 18, height: 18, borderRadius: 9,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: '#fff',
-  },
-  displayName: { fontSize: 17, fontWeight: '700', letterSpacing: -0.3 },
-  username: { fontSize: 13, marginTop: 2 },
-  followBtn: {
-    height: 44, borderRadius: 100,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 12,
-  },
-  followBtnText: { fontSize: 15, fontWeight: '700' },
-  viewFullBtn: {
-    height: 42, borderRadius: 100, borderWidth: 1.5,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    marginBottom: 24,
-  },
-  viewFullText: { fontSize: 14, fontWeight: '500' },
-  swipeHint: { fontSize: 11, textAlign: 'center', letterSpacing: 0.2 },
-});
