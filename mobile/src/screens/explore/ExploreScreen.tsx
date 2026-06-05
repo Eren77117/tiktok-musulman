@@ -103,14 +103,14 @@ export default function ExploreScreen() {
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: theme.bg }]}>
       {/* Search bar */}
       <View style={[styles.searchWrap, { backgroundColor: theme.surface, borderBottomColor: theme.borderLight }]}>
-        <View style={styles.searchBar}>
-          <IcSearch size={18} color={COLORS.textMuted} />
+        <View style={[styles.searchBar, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
+          <IcSearch size={18} color={theme.textMuted} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: theme.text }]}
             value={query}
             onChangeText={handleChange}
             placeholder="Rechercher vidéos, utilisateurs..."
-            placeholderTextColor={COLORS.textPlaceholder}
+            placeholderTextColor={theme.textPlaceholder}
             autoCapitalize="none"
             returnKeyType="search"
           />
@@ -218,11 +218,12 @@ export default function ExploreScreen() {
 }
 
 function EmptySearch() {
+  const theme = useTheme();
   return (
-    <View style={styles.emptyWrap}>
+    <View style={[styles.emptyWrap, { backgroundColor: theme.bg }]}>
       <IcSearch size={40} color={COLORS.primaryLight} />
-      <Text style={styles.emptyTitle}>Aucun résultat</Text>
-      <Text style={styles.emptySubtitle}>Essayez d'autres termes</Text>
+      <Text style={[styles.emptyTitle, { color: theme.text }]}>Aucun résultat</Text>
+      <Text style={[styles.emptySubtitle, { color: theme.textMuted }]}>Essayez d'autres termes</Text>
     </View>
   );
 }

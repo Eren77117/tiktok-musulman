@@ -138,7 +138,10 @@ export default function MessagesScreen() {
               >
                 <View style={styles.avatarWrap}>
                   <AvatarCircle user={c.other_user} size={52} />
-                  <View style={[styles.onlineDot, { borderColor: theme.surface }]} />
+                  {/* Unread indicator dot */}
+                  {(c.unread_count ?? 0) > 0 && (
+                    <View style={[styles.unreadDot, { borderColor: theme.bg }]} />
+                  )}
                 </View>
                 <View style={styles.rowInfo}>
                   <View style={styles.rowTop}>
@@ -214,10 +217,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
   },
   avatarWrap: { position: 'relative' },
-  onlineDot: {
+  unreadDot: {
     position: 'absolute', bottom: 1, right: 1,
     width: 12, height: 12, borderRadius: 6,
-    backgroundColor: '#22C55E', borderWidth: 2,
+    backgroundColor: COLORS.primary, borderWidth: 2,
   },
   rowInfo: { flex: 1, gap: 3 },
   rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
