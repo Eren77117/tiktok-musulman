@@ -1,13 +1,14 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../config/database';
 import { authenticate } from '../middleware/auth';
+import { getIo } from '../websocket/instance';
 import { z } from 'zod';
 
 const requestSchema = z.object({ recipient_id: z.string().uuid() });
 const messageSchema = z.object({
-  content: z.string().min(1).max(2000),
+  content: z.string().max(2000).default(''),
   media_url: z.string().url().optional(),
-});
+}).refine(d => d.content.trim().length > 0 || !!d.media_url, { message: 'content or media_url required' });
 
 export async function messageRoutes(app: FastifyInstance) {
   // ── Direct conversation (same gender = no restriction) ──────────────────────
@@ -207,10 +208,13 @@ export async function messageRoutes(app: FastifyInstance) {
     const hasMore = messages.length > parseInt(limit);
     const items = hasMore ? messages.slice(0, -1) : messages;
 
-    await prisma.message.updateMany({
+    const unread = await prisma.message.updateMany({
       where: { conversation_id: id, sender_id: { not: userId }, is_read: false },
       data: { is_read: true },
     });
+    if (unread.count > 0) {
+      getIo()?.to(`conversation:${id}`).emit('message:read', { conversationId: id, readBy: userId });
+    }
 
     return reply.send({ items, next_cursor: hasMore ? items[items.length - 1].id : null });
   });

@@ -65,6 +65,20 @@ export function createSocketServer(httpServer: HttpServer) {
       socket.leave(`conversation:${conversationId}`);
     });
 
+    socket.on('typing:start', (conversationId: string) => {
+      socket.to(`conversation:${conversationId}`).emit('typing:start', { userId });
+    });
+
+    socket.on('typing:stop', (conversationId: string) => {
+      socket.to(`conversation:${conversationId}`).emit('typing:stop', { userId });
+    });
+
+    socket.on('message:reaction', (data: { conversationId: string; msgId: string; emoji: string }) => {
+      socket.to(`conversation:${data.conversationId}`).emit('message:reaction', {
+        msgId: data.msgId, userId, emoji: data.emoji,
+      });
+    });
+
     socket.on('message:send', async (data: { conversationId: string; content: string }) => {
       const conversation = await prisma.conversation.findUnique({
         where: { id: data.conversationId },

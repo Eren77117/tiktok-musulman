@@ -74,6 +74,7 @@ export default function ProfileScreen() {
   const [avatarLoading, setAvatarLoading] = useState(false);
   const [coverLoading, setCoverLoading] = useState(false);
   const [coverError, setCoverError] = useState(false);
+  const [previewPost, setPreviewPost] = useState<Post | null>(null);
 
   // Notif count (badge cloche)
   const { data: notifData } = useQuery<{ count: number }>({
@@ -416,6 +417,7 @@ export default function ProfileScreen() {
                 <GridItem
                   item={item}
                   onPress={() => navigation.navigate('VideoPlayer', { postId: item.id })}
+                  onLongPress={() => setPreviewPost(item)}
                   repostBadge
                 />
               )}
@@ -431,11 +433,41 @@ export default function ProfileScreen() {
             keyExtractor={(p) => p.id}
             scrollEnabled={false}
             columnWrapperStyle={styles.gridRow}
-            renderItem={({ item }) => <GridItem item={item} onPress={() => navigation.navigate('VideoPlayer', { postId: item.id })} />}
+            renderItem={({ item }) => <GridItem item={item} onPress={() => navigation.navigate('VideoPlayer', { postId: item.id })} onLongPress={() => setPreviewPost(item)} />}
             ListEmptyComponent={<EmptyTab tab={activeTab} theme={theme} />}
           />
         )}
       </ScrollView>
+
+      {/* Long-press video preview */}
+      <Modal visible={!!previewPost} transparent animationType="fade" onRequestClose={() => setPreviewPost(null)}>
+        <TouchableOpacity style={previewSt.backdrop} activeOpacity={1} onPress={() => setPreviewPost(null)}>
+          <View style={[previewSt.card, { backgroundColor: theme.surface }]}>
+            {previewPost && (
+              <>
+                <Image
+                  source={{ uri: getThumbUrl(previewPost) ?? undefined }}
+                  style={previewSt.thumb}
+                  resizeMode="cover"
+                />
+                <View style={previewSt.stats}>
+                  <IcPlay size={13} color={theme.textMuted} />
+                  <Text style={[previewSt.stat, { color: theme.textMuted }]}>{fmtNum(previewPost.view_count)}</Text>
+                  <IcHeart size={13} color={theme.textMuted} />
+                  <Text style={[previewSt.stat, { color: theme.textMuted }]}>{fmtNum(previewPost.like_count)}</Text>
+                </View>
+                <TouchableOpacity
+                  style={previewSt.viewBtn}
+                  onPress={() => { setPreviewPost(null); navigation.navigate('VideoPlayer', { postId: previewPost.id }); }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={previewSt.viewBtnText}>Voir la vidéo</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -443,7 +475,7 @@ export default function ProfileScreen() {
 // In-memory thumbnail cache (persists for app session)
 const THUMB_CACHE = new Map<string, string>();
 
-function GridItem({ item, onPress, repostBadge }: { item: Post & { _repostedBy?: any }; onPress: () => void; repostBadge?: boolean }) {
+function GridItem({ item, onPress, onLongPress, repostBadge }: { item: Post & { _repostedBy?: any }; onPress: () => void; onLongPress?: () => void; repostBadge?: boolean }) {
   const precomputed = getThumbUrl(item);
   const [thumb, setThumb] = useState<string | null>(precomputed ?? THUMB_CACHE.get(item.id) ?? null);
   const [loading, setLoading] = useState(!thumb && !!item.video_url);
@@ -467,7 +499,7 @@ function GridItem({ item, onPress, repostBadge }: { item: Post & { _repostedBy?:
   }, [item.id]);
 
   return (
-    <TouchableOpacity style={styles.gridItem} activeOpacity={0.8} onPress={onPress}>
+    <TouchableOpacity style={styles.gridItem} activeOpacity={0.8} onPress={onPress} onLongPress={onLongPress} delayLongPress={350}>
       {thumb ? (
         <Image source={{ uri: thumb }} style={styles.gridThumb} resizeMode="cover" />
       ) : loading ? (
@@ -654,4 +686,14 @@ const styles = StyleSheet.create({
   emptyWrap: { alignItems: 'center', paddingVertical: 60, gap: 8 },
   emptyTitle: { fontSize: FONT.size.lg, fontWeight: FONT.weight.semibold },
   emptySubtitle: { fontSize: FONT.size.sm, textAlign: 'center', paddingHorizontal: SPACING.xl },
+});
+
+const previewSt = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  card: { width: '100%', borderRadius: 20, overflow: 'hidden', gap: 12, paddingBottom: 16 },
+  thumb: { width: '100%', aspectRatio: 9 / 16, maxHeight: 380 },
+  stats: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16 },
+  stat: { fontSize: 13 },
+  viewBtn: { marginHorizontal: 16, backgroundColor: COLORS.primary, borderRadius: RADIUS.full, paddingVertical: 12, alignItems: 'center' },
+  viewBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 });
