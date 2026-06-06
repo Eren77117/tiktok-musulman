@@ -267,4 +267,44 @@ export async function userRoutes(app: FastifyInstance) {
     });
     return reply.send({ success: true });
   });
+
+  // ADV-06 : suggested accounts (friends-of-friends + popular)
+  app.get('/suggested', { preHandler: authenticate }, async (req, reply) => {
+    const currentId = req.currentUser!.id;
+    const { limit = '20' } = req.query as { limit?: string };
+    const lim = Math.min(parseInt(limit), 50);
+
+    // IDs already followed
+    const following = await prisma.follow.findMany({
+      where: { follower_id: currentId },
+      select: { following_id: true },
+    });
+    const followingIds = new Set(following.map(f => f.following_id));
+    followingIds.add(currentId);
+
+    // Friends-of-friends
+    const fof = await prisma.follow.findMany({
+      where: { follower_id: { in: [...followingIds] }, following_id: { notIn: [...followingIds] } },
+      select: { following_id: true },
+      distinct: ['following_id'],
+      take: lim,
+    });
+    const fofIds = fof.map(f => f.following_id);
+
+    // Fill rest with popular accounts not followed
+    const needed = lim - fofIds.length;
+    const popular = needed > 0 ? await prisma.user.findMany({
+      where: { id: { notIn: [...followingIds, ...fofIds] }, is_banned: false },
+      orderBy: { follower_count: 'desc' },
+      take: needed,
+      select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true, follower_count: true },
+    }) : [];
+
+    const fofUsers = fofIds.length > 0 ? await prisma.user.findMany({
+      where: { id: { in: fofIds } },
+      select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true, follower_count: true },
+    }) : [];
+
+    return reply.send({ items: [...fofUsers, ...popular] });
+  });
 }

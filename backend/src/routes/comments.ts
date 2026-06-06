@@ -9,6 +9,30 @@ const commentSchema = z.object({
   parent_id: z.string().uuid().optional(),
 });
 
+const BANNED_WORDS = ['haram', 'kafir', 'merde', 'connard', 'putain', 'enculé', 'fdp'];
+
+function isSpam(content: string): boolean {
+  const lower = content.toLowerCase();
+  if (BANNED_WORDS.some(w => lower.includes(w))) return true;
+  // Repeated chars (aaaaaaa)
+  if (/(.)\1{6,}/.test(content)) return true;
+  // ALL CAPS long text
+  if (content.length > 20 && content === content.toUpperCase() && /[A-Z]/.test(content)) return true;
+  return false;
+}
+
+// Per-user rate limit: max 5 comments per 30s
+const userCommentTs = new Map<string, number[]>();
+function isRateLimited(userId: string): boolean {
+  const now = Date.now();
+  const window = 30000;
+  const ts = (userCommentTs.get(userId) ?? []).filter(t => now - t < window);
+  if (ts.length >= 5) return true;
+  ts.push(now);
+  userCommentTs.set(userId, ts);
+  return false;
+}
+
 export async function commentRoutes(app: FastifyInstance) {
   app.get('/post/:postId', { preHandler: authenticate }, async (req, reply) => {
     const { postId } = req.params as { postId: string };
@@ -49,6 +73,13 @@ export async function commentRoutes(app: FastifyInstance) {
     const { postId } = req.params as { postId: string };
     const parsed = commentSchema.safeParse(req.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
+
+    if (isRateLimited(req.currentUser!.id)) {
+      return reply.code(429).send({ error: 'Trop de commentaires, attends un peu.' });
+    }
+    if (isSpam(parsed.data.content)) {
+      return reply.code(400).send({ error: 'Commentaire non autorisé.' });
+    }
 
     const post = await prisma.post.findUnique({ where: { id: postId } });
     if (!post) return reply.status(404).send({ error: 'Post not found' });

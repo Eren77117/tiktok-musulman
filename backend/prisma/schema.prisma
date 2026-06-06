@@ -62,6 +62,8 @@ model User {
   password_hash     String
   display_name      String
   bio               String?
+  bio_links         String[]
+  profile_category  String?
   avatar_url        String?
   cover_url         String?
   gender            Gender
@@ -107,6 +109,7 @@ model User {
   story_likes       StoryLike[]
   story_replies     StoryReply[]  @relation("StoryReplySender")
   collections       Collection[]
+  series            Series[]
 
   @@index([username])
   @@index([email])
@@ -158,6 +161,7 @@ model Post {
   not_interested NotInterested[]
   linked_stories Story[]         @relation("StoryLinkedPost")
   collection_posts CollectionPost[]
+  series_episode   SeriesEpisode?
 
   @@index([user_id])
   @@index([created_at])
@@ -599,4 +603,63 @@ model CollectionPost {
 
   @@id([collection_id, post_id])
   @@index([collection_id])
+}
+
+model Series {
+  id          String   @id @default(cuid())
+  user_id     String
+  title       String
+  description String?
+  thumbnail_url String?
+  episode_count Int    @default(0)
+  created_at  DateTime @default(now())
+
+  user     User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  episodes SeriesEpisode[]
+
+  @@index([user_id])
+}
+
+model SeriesEpisode {
+  id         String   @id @default(cuid())
+  series_id  String
+  post_id    String   @unique
+  episode_num Int
+  created_at DateTime @default(now())
+
+  series Series @relation(fields: [series_id], references: [id], onDelete: Cascade)
+  post   Post   @relation(fields: [post_id], references: [id], onDelete: Cascade)
+
+  @@index([series_id])
+  @@unique([series_id, episode_num])
+}
+
+model UserVideoAnalytics {
+  id               String   @id @default(cuid())
+  user_id          String
+  post_id          String
+  watch_time       Float    @default(0)
+  watch_percent    Float    @default(0)
+  rewatch_count    Int      @default(0)
+  was_skipped      Boolean  @default(false)
+  liked            Boolean  @default(false)
+  commented        Boolean  @default(false)
+  shared           Boolean  @default(false)
+  saved            Boolean  @default(false)
+  session_id       String?
+  created_at       DateTime @default(now())
+
+  @@index([user_id])
+  @@index([post_id])
+  @@index([created_at])
+}
+
+model AlgoConfig {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       Float
+  description String?
+  updated_at  DateTime @updatedAt
+
+  @@index([key])
 }

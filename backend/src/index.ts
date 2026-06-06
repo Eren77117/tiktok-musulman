@@ -28,6 +28,8 @@ import { threadRoutes } from './routes/threads';
 import { bookRoutes } from './routes/books';
 import { soundRoutes } from './routes/sounds';
 import { collectionRoutes } from './routes/collections';
+import { analyticsRoutes } from './routes/analytics';
+import { seriesRoutes } from './routes/series';
 
 process.stdout.write(`[STARTUP] Node ${process.version}\n`);
 
@@ -78,6 +80,8 @@ async function bootstrap() {
   await app.register(bookRoutes, { prefix: '/api/books' });
   await app.register(soundRoutes, { prefix: '/api/sounds' });
   await app.register(collectionRoutes, { prefix: '/api/collections' });
+  await app.register(analyticsRoutes, { prefix: '/api/analytics' });
+  await app.register(seriesRoutes, { prefix: '/api/series' });
 
   app.setErrorHandler((error, _req, reply) => {
     app.log.error(error);

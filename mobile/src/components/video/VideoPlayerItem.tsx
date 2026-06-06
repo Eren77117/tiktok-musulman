@@ -21,6 +21,7 @@ import { AnimatedNumber } from '../ui/AnimatedNumber';
 import { MarqueeText } from '../ui/MarqueeText';
 import { SaveToCollectionSheet } from './SaveToCollectionSheet';
 import ShareSheet from './ShareSheet';
+import { useAnalyticsTracker } from '../../hooks/useAnalyticsTracker';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -42,6 +43,7 @@ export interface FeedPost {
   };
   sound: { id: string; title: string; artist: string | null } | null;
   reposted_by?: { id: string; username: string; avatar_url: string | null } | null;
+  series_episode?: { series_id: string; episode_num: number; series_title: string } | null;
 }
 
 interface Props {
@@ -100,6 +102,32 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
   const heartAnim = useRef(new Animated.Value(0)).current;
   const heartScale = useRef(new Animated.Value(0.3)).current;
   const [heartPos, setHeartPos] = useState({ x: W / 2 - 50, y: H / 2 - 80 });
+
+  // Smart pause overlay (ADV-03)
+  const [smartOverlayVisible, setSmartOverlayVisible] = useState(false);
+  const overlayAnim = useRef(new Animated.Value(0)).current;
+  const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const resetInactivityTimer = useCallback(() => {
+    if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+    if (smartOverlayVisible) {
+      Animated.timing(overlayAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => setSmartOverlayVisible(false));
+    }
+    inactivityTimer.current = setTimeout(() => {
+      setSmartOverlayVisible(true);
+      Animated.timing(overlayAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+    }, 4000);
+  }, [smartOverlayVisible, overlayAnim]);
+
+  useEffect(() => {
+    if (isVisible && !paused) {
+      resetInactivityTimer();
+    } else {
+      if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+      setSmartOverlayVisible(false);
+    }
+    return () => { if (inactivityTimer.current) clearTimeout(inactivityTimer.current); };
+  }, [isVisible, paused]);
 
   // Pause indicator
   const pauseAnim = useRef(new Animated.Value(0)).current;
@@ -172,6 +200,8 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
     },
   })).current;
 
+  const { track } = useAnalyticsTracker();
+
   // Watch time tracking enrichi
   const watchDataRef = useRef({
     watchStart: 0, totalWatchTime: 0, rewatchCount: 0,
@@ -196,15 +226,27 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
         const wasSkipped = session < 2.0;
         if (watchDataRef.current.totalWatchTime > 0.3) {
           const dur = post.duration ?? 15;
+          const watchPct = Math.min(1, watchDataRef.current.totalWatchTime / dur);
           api.post(`/posts/${post.id}/view`, {
             watch_time: Math.round(watchDataRef.current.totalWatchTime),
-            completion_ratio: Math.min(1, watchDataRef.current.totalWatchTime / dur),
-            completed: watchDataRef.current.totalWatchTime >= dur * 0.8,
+            completion_ratio: watchPct,
+            completed: watchPct >= 0.8,
             was_skipped: wasSkipped,
             rewatch_count: watchDataRef.current.rewatchCount,
             pause_count: watchDataRef.current.pauseCount,
             interacted: watchDataRef.current.interacted,
           }).catch(() => {});
+          track({
+            post_id: post.id,
+            watch_time: watchDataRef.current.totalWatchTime,
+            watch_percent: watchPct,
+            rewatch_count: watchDataRef.current.rewatchCount,
+            was_skipped: wasSkipped,
+            liked: likedRef.current,
+            commented: false,
+            shared: false,
+            saved: false,
+          });
         }
         // Reset
         watchDataRef.current = { watchStart: 0, totalWatchTime: 0, rewatchCount: 0, pauseCount: 0, interacted: false, sessionStart: 0 };
@@ -307,6 +349,7 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
   // ── Tap handler (shared across all zones) ────────────────────────────────
   // Double tap = instant like; single tap = toggle pause (after 300ms)
   const handleZoneTap = useCallback((x: number, y: number) => {
+    resetInactivityTimer();
     const now = Date.now();
     if (now - lastTapRef.current < 300) {
       // Double tap — fire immediately, cancel pending single-tap
@@ -478,6 +521,28 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
         <Text style={styles.speedText}>2x</Text>
       </Animated.View>
 
+      {/* Smart pause overlay — appears after 4s inactivity */}
+      {smartOverlayVisible && (
+        <Animated.View style={[styles.smartOverlay, { opacity: overlayAnim }]} pointerEvents="box-none">
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={resetInactivityTimer}
+          />
+          <View style={styles.smartOverlayContent} pointerEvents="box-none">
+            <TouchableOpacity
+              style={styles.smartFollowBtn}
+              onPress={() => { resetInactivityTimer(); if (!following) followMutation.mutate(); }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.smartFollowText}>
+                {following ? 'Abonné' : `+ Suivre @${post.user.username}`}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      )}
+
       {/* Floating heart on double-tap — TikTok bounce */}
       <Animated.View
         pointerEvents="none"
@@ -553,6 +618,15 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
             </View>
           )}
           <Text style={styles.repostText}>@{post.reposted_by.username}</Text>
+        </View>
+      )}
+
+      {/* Series episode badge */}
+      {post.series_episode && (
+        <View style={styles.seriesBadge} pointerEvents="none">
+          <Text style={styles.seriesBadgeText}>
+            Série · Ép. {post.series_episode.episode_num}
+          </Text>
         </View>
       )}
 
@@ -1027,6 +1101,32 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
   },
   fullscreenText: { fontSize: 13, fontWeight: '500', color: COLORS.white },
+
+  seriesBadge: {
+    position: 'absolute',
+    top: 60,
+    left: 12,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    borderRadius: 10,
+    paddingHorizontal: 10, paddingVertical: 4,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+  },
+  seriesBadgeText: { fontSize: 11, fontWeight: '600', color: COLORS.white },
+
+  smartOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 20,
+    justifyContent: 'flex-end',
+    paddingBottom: 120,
+    alignItems: 'center',
+  },
+  smartOverlayContent: { alignItems: 'center', gap: 12 },
+  smartFollowBtn: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 24, paddingHorizontal: 28, paddingVertical: 12,
+    shadowColor: COLORS.primary, shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
+  },
+  smartFollowText: { fontSize: 15, fontWeight: '700', color: COLORS.white },
 
 });
 

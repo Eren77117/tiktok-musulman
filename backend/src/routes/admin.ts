@@ -202,4 +202,39 @@ export async function adminRoutes(app: FastifyInstance) {
     });
     return reply.send(logs);
   });
+
+  // AlgoConfig — read/write algo weights
+  app.get('/algo-config', { preHandler: requireAdmin }, async (_req, reply) => {
+    const configs = await prisma.algoConfig.findMany({ orderBy: { key: 'asc' } });
+    return reply.send(configs);
+  });
+
+  app.put('/algo-config/:key', { preHandler: requireAdmin }, async (req, reply) => {
+    const { key } = req.params as { key: string };
+    const { value, description } = req.body as { value: number; description?: string };
+    if (typeof value !== 'number') return reply.code(400).send({ error: 'value must be number' });
+    const config = await prisma.algoConfig.upsert({
+      where: { key },
+      update: { value, ...(description ? { description } : {}) },
+      create: { key, value, description: description ?? null },
+    });
+    return reply.send(config);
+  });
+
+  // Analytics overview
+  app.get('/analytics', { preHandler: requireAdmin }, async (req, reply) => {
+    const { days = '7' } = req.query as { days?: string };
+    const since = new Date(Date.now() - parseInt(days) * 86400000);
+    const [totalViews, totalLikes, topPosts] = await Promise.all([
+      prisma.postView.count({ where: { created_at: { gte: since } } }),
+      prisma.like.count({ where: { created_at: { gte: since } } }),
+      prisma.post.findMany({
+        where: { status: 'ACTIVE', created_at: { gte: since } },
+        orderBy: { view_count: 'desc' },
+        take: 10,
+        select: { id: true, caption: true, view_count: true, like_count: true, user: { select: { username: true } } },
+      }),
+    ]);
+    return reply.send({ total_views: totalViews, total_likes: totalLikes, top_posts: topPosts, period_days: parseInt(days) });
+  });
 }
