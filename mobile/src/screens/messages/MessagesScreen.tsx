@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity, Image,
-  ActivityIndicator, RefreshControl, ScrollView,
+  ActivityIndicator, RefreshControl, ScrollView, ActionSheetIOS, Platform, Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -10,7 +10,7 @@ import { api } from '../../api/client';
 import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, SPACING, RADIUS } from '../../constants/theme';
 import { useTheme } from '../../hooks/useTheme';
-import { IcSearch, IcBell, IcPlus } from '../../components/ui/Icons';
+import { IcSearch, IcBell, IcPlus, IcPin, IcArchive } from '../../components/ui/Icons';
 import { useQuery } from '@tanstack/react-query';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -50,6 +50,33 @@ export default function MessagesScreen() {
   const navigation = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
+  const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
+  const [archivedIds, setArchivedIds] = useState<Set<string>>(new Set());
+
+  const handleLongPressConv = useCallback((c: Conversation) => {
+    const isPinned = pinnedIds.has(c.id);
+    const isArchived = archivedIds.has(c.id);
+    const options = [
+      'Annuler',
+      isPinned ? 'Désépingler' : 'Épingler',
+      isArchived ? 'Désarchiver' : 'Archiver',
+    ];
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions({ options, cancelButtonIndex: 0 }, (idx) => {
+        if (idx === 1) {
+          setPinnedIds(prev => { const s = new Set(prev); isPinned ? s.delete(c.id) : s.add(c.id); return s; });
+        } else if (idx === 2) {
+          setArchivedIds(prev => { const s = new Set(prev); isArchived ? s.delete(c.id) : s.add(c.id); return s; });
+        }
+      });
+    } else {
+      Alert.alert(c.other_user.display_name, undefined, [
+        { text: isPinned ? 'Désépingler' : 'Épingler', onPress: () => setPinnedIds(prev => { const s = new Set(prev); isPinned ? s.delete(c.id) : s.add(c.id); return s; }) },
+        { text: isArchived ? 'Désarchiver' : 'Archiver', onPress: () => setArchivedIds(prev => { const s = new Set(prev); isArchived ? s.delete(c.id) : s.add(c.id); return s; }) },
+        { text: 'Annuler', style: 'cancel' },
+      ]);
+    }
+  }, [pinnedIds, archivedIds]);
 
   const { data: notifCount } = useQuery<{ count: number }>({
     queryKey: ['notif-count'],
@@ -64,7 +91,13 @@ export default function MessagesScreen() {
     refetchOnWindowFocus: true,
   });
 
-  const conversations = data ?? [];
+  const allConvs = data ?? [];
+  // Pinned first, archived hidden
+  const conversations = [
+    ...allConvs.filter(c => pinnedIds.has(c.id) && !archivedIds.has(c.id)),
+    ...allConvs.filter(c => !pinnedIds.has(c.id) && !archivedIds.has(c.id)),
+  ];
+  const archivedConvs = allConvs.filter(c => archivedIds.has(c.id));
 
   const goToConversation = (c: Conversation) =>
     navigation.navigate('Conversation', { conversationId: c.id, otherUser: c.other_user });
@@ -130,24 +163,29 @@ export default function MessagesScreen() {
           }
           renderItem={({ item: c }) => {
             const unread = (c.unread_count ?? 0) > 0;
+            const isPinned = pinnedIds.has(c.id);
             return (
               <TouchableOpacity
                 style={[styles.row, { borderBottomColor: theme.borderLight, backgroundColor: theme.surface }]}
                 onPress={() => goToConversation(c)}
+                onLongPress={() => handleLongPressConv(c)}
+                delayLongPress={400}
                 activeOpacity={0.7}
               >
                 <View style={styles.avatarWrap}>
                   <AvatarCircle user={c.other_user} size={52} />
-                  {/* Unread indicator dot */}
                   {(c.unread_count ?? 0) > 0 && (
                     <View style={[styles.unreadDot, { borderColor: theme.bg }]} />
                   )}
                 </View>
                 <View style={styles.rowInfo}>
                   <View style={styles.rowTop}>
-                    <Text style={[styles.rowName, { color: theme.text }, unread && styles.rowNameUnread]}>
-                      {c.other_user.display_name}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 }}>
+                      {isPinned && <IcPin size={11} color={COLORS.primary} />}
+                      <Text style={[styles.rowName, { color: theme.text }, unread && styles.rowNameUnread]} numberOfLines={1}>
+                        {c.other_user.display_name}
+                      </Text>
+                    </View>
                     <Text style={[styles.rowTime, { color: theme.textSubtle }]}>
                       {c.last_message ? formatTime(c.last_message.created_at) : ''}
                     </Text>
@@ -165,6 +203,18 @@ export default function MessagesScreen() {
               </TouchableOpacity>
             );
           }}
+          ListFooterComponent={archivedConvs.length > 0 ? (
+            <TouchableOpacity
+              style={[styles.archivedRow, { borderTopColor: theme.borderLight }]}
+              onPress={() => Alert.alert('Archivées', `${archivedConvs.length} conversation(s) archivée(s)\nAppui long → Désarchiver`)}
+              activeOpacity={0.7}
+            >
+              <IcArchive size={18} color={theme.textMuted} />
+              <Text style={[styles.archivedText, { color: theme.textMuted }]}>
+                {archivedConvs.length} conversation{archivedConvs.length > 1 ? 's' : ''} archivée{archivedConvs.length > 1 ? 's' : ''}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Text style={[styles.emptyTitle, { color: theme.text }]}>Aucune conversation</Text>
@@ -237,6 +287,8 @@ const styles = StyleSheet.create({
   },
   badgeText: { color: COLORS.white, fontSize: 11, fontWeight: '700' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80, gap: 8 },
+  archivedRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, borderTopWidth: 1 },
+  archivedText: { fontSize: FONT.size.sm },
   emptyTitle: { fontSize: FONT.size.lg, fontWeight: FONT.weight.semibold },
   emptySub: { fontSize: FONT.size.sm },
 });

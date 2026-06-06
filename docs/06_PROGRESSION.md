@@ -475,9 +475,41 @@
 - [x] `CreatorStatsScreen.tsx` refait : toggle 7j/30j, 3 cards période, CompletionRing, durée moy., totaux, top 10 vidéos
 - [ ] Testé iPhone ✓
 
+### Lecteur vidéo — seek hold + zoom + time
+- [x] Long-press gauche = seek -10s continu (interval 400ms) avec overlay temps
+- [x] Long-press droite = seek +10s continu avec overlay MM:SS / MM:SS
+- [x] Pinch-to-zoom (GestureDetector + Reanimated, scale 1–3, spring reset)
+- [x] `seekTimeRef` synchronisé avec `onProgress`
+- [ ] Testé iPhone ✓
+
+### Feed — mémorisation position
+- [x] `pourToiRef` FlatList ref + `pourToiIndexRef` tracking
+- [x] `initialScrollIndex` restaure position après changement tab
+- [x] Pull-to-refresh remet index à 0
+- [ ] Testé iPhone ✓
+
+### Profil — partager
+- [x] Bouton Share (IcShare) dans action row de ProfileScreen
+- [x] `Share.share()` avec message + URL `nour.app/@username`
+- [ ] Testé iPhone ✓
+
+### Upload — visibilité + cover personnalisée
+- [x] Selector 3 boutons : Public / Abonnés / Privé
+- [x] `visibility` passé à l'API POST /posts
+- [x] Bouton "Couverture" (IcImage) → launchImageLibrary → upload image → `thumbnail_url`
+- [ ] Testé iPhone ✓
+
+### Messagerie — épingler + archiver
+- [x] Long-press sur conversation → ActionSheet Épingler / Archiver
+- [x] Conversations épinglées remontent en haut + IcPin
+- [x] Conversations archivées masquées (compteur en bas)
+- [x] `IcPin` + `IcArchive` ajoutés à Icons.tsx
+- [ ] Testé iPhone ✓
+
 ### Commit Phase 6
 - [x] Commits 47c3376, 2ab100e, ef9fc9f
-- [ ] `git commit -m "feat: CreatorStats period toggle + completion ring + top posts"`
+- [x] `git commit -m "feat: CreatorStats period toggle + completion ring + top posts"`
+- [ ] `git commit -m "feat: seek-hold + pinch-zoom + feed memory + upload visibility + messaging pin/archive"`
 - [ ] `git push origin main`
 
 ---

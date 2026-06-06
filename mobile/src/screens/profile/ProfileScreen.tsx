@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createThumbnail } from 'react-native-create-thumbnail';
 import {
-  View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, Linking,
+  View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, Linking, Share,
   FlatList, ScrollView, Alert, ActivityIndicator, RefreshControl, Modal, ActionSheetIOS, Platform,
 } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -14,7 +14,7 @@ import { api, getTokens } from '../../api/client';
 import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, SPACING, RADIUS, SHADOW, API_BASE_URL } from '../../constants/theme';
 import { useTheme } from '../../hooks/useTheme';
-import { IcSettings, IcMenu, IcSave, IcCheck, IcHeart, IcGrid, IcEdit, IcCamera, IcChart, IcPlay, IcRepeat, IcBell } from '../../components/ui/Icons';
+import { IcSettings, IcMenu, IcSave, IcCheck, IcHeart, IcGrid, IcEdit, IcCamera, IcChart, IcPlay, IcRepeat, IcBell, IcShare } from '../../components/ui/Icons';
 import { LinearGradient } from 'react-native-linear-gradient';
 import { EditProfileSheet } from './EditProfileSheet';
 
@@ -376,6 +376,13 @@ export default function ProfileScreen() {
             </TouchableOpacity>
             <TouchableOpacity style={[styles.editBtn, { borderColor: theme.border, paddingHorizontal: 14 }]} onPress={() => navigation.navigate('Drafts')} activeOpacity={0.8}>
               <IcEdit size={16} color={theme.text} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.editBtn, { borderColor: theme.border, paddingHorizontal: 14 }]}
+              onPress={() => Share.share({ message: `Suis-moi sur Nour ! @${user.username}`, url: `https://nour.app/@${user.username}` })}
+              activeOpacity={0.8}
+            >
+              <IcShare size={16} color={theme.text} />
             </TouchableOpacity>
             {(!(user as any).cover_url || coverError) && (
               <TouchableOpacity style={[styles.editBtn, { borderColor: theme.border, paddingHorizontal: 12 }]} onPress={pickCover} activeOpacity={0.8} disabled={coverLoading}>

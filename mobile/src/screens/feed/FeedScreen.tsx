@@ -64,6 +64,8 @@ export default function FeedScreen() {
   // Pause all videos when leaving this screen
   const effectiveVisibleId = isFocused && (tab === 'pourtoi' || tab === 'abonnes') ? visibleId : null;
   const seenIds = useRef<string[]>([]);
+  const pourToiRef = useRef<any>(null);
+  const pourToiIndexRef = useRef(0);
 
   // ── Pour Toi (video feed) ────────────────────────────────────────────────────
   const {
@@ -182,9 +184,11 @@ export default function FeedScreen() {
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (viewableItems.length > 0) {
-        const feedItem = viewableItems[0].item as FeedItem | undefined;
+        const first = viewableItems[0];
+        const feedItem = first.item as FeedItem | undefined;
         const id = feedItem?.type === 'video' ? feedItem.data.id : undefined;
         setVisibleId(id ?? null);
+        if (first.index != null) pourToiIndexRef.current = first.index;
         if (id && !seenIds.current.includes(id)) seenIds.current.push(id);
       }
     },
@@ -299,6 +303,7 @@ export default function FeedScreen() {
       )}
       {tab === 'pourtoi' && !loadingFeed && (
         <FlatList<FeedItem>
+          ref={pourToiRef}
           data={posts.filter(p => p.type !== 'video' || !hiddenPostIds.has(p.data.id))}
           style={{ flex: 1 }}
           onLayout={e => setListHeight(e.nativeEvent.layout.height)}
@@ -307,10 +312,11 @@ export default function FeedScreen() {
             p.type === 'book' ? `book-${p.data.id}` :
             `live-${p.data.id}`
           }
+          initialScrollIndex={pourToiIndexRef.current}
           refreshControl={
             <RefreshControl
               refreshing={refreshingFeed}
-              onRefresh={() => { seenIds.current = []; refetchFeed(); }}
+              onRefresh={() => { seenIds.current = []; pourToiIndexRef.current = 0; refetchFeed(); }}
               tintColor={COLORS.primary}
               colors={[COLORS.primary]}
             />
