@@ -14,6 +14,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { api } from '../../api/client';
 import { COLORS, FONT, SPACING, RADIUS, SHADOW } from '../../constants/theme';
 import { IcBack, IcFollow, IcFollowing, IcMail, IcHeart, IcPlay, IcCheck, IcMore, IcShare, IcRepeat } from '../../components/ui/Icons';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { Skeleton } from '../../components/ui/Skeleton';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
@@ -317,29 +318,50 @@ export default function UserProfileScreen({ route, navigation }: Props) {
             {/* Actions */}
             {!isOwnProfile && (
               <View style={styles.actions}>
+                {/* S'abonner — pill vert plein ou outline si suivi */}
                 <TouchableOpacity
-                  style={[styles.followBtn, profile.is_following && { backgroundColor: theme.surface, borderWidth: 1.5, borderColor: theme.border }]}
-                  onPress={() => followMutation.mutate()}
+                  style={[
+                    styles.followBtn,
+                    profile.is_following
+                      ? { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: COLORS.primary, shadowOpacity: 0 }
+                      : { backgroundColor: COLORS.primary, shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
+                  ]}
+                  onPress={() => {
+                    ReactNativeHapticFeedback.trigger('impactMedium', { enableVibrateFallback: true });
+                    followMutation.mutate();
+                  }}
                   disabled={followMutation.isPending}
-                  activeOpacity={0.8}
+                  activeOpacity={0.85}
                 >
                   {profile.is_following
-                    ? <IcFollowing size={15} color={theme.textMuted} />
-                    : <IcFollow size={15} color={COLORS.white} />
+                    ? <IcCheck size={15} color={COLORS.primary} strokeWidth={2.5} />
+                    : null
                   }
-                  <Text style={[styles.followText, profile.is_following && { color: theme.textMuted }]}>
-                    {profile.is_following ? 'Abonné' : 'Suivre'}
+                  <Text style={[styles.followText, profile.is_following && { color: COLORS.primary }]}>
+                    {profile.is_following ? 'Suivi' : "S'abonner"}
                   </Text>
                 </TouchableOpacity>
 
+                {/* Message — outline vert */}
                 <TouchableOpacity
-                  style={[styles.messageBtn, { borderColor: COLORS.primary, backgroundColor: theme.surface }]}
+                  style={[styles.messageBtn, { borderColor: COLORS.primary }]}
                   onPress={handleMessage}
                   activeOpacity={0.8}
                 >
                   <IcMail size={15} color={COLORS.primary} />
                   <Text style={[styles.messageBtnText, { color: COLORS.primary }]}>Message</Text>
                 </TouchableOpacity>
+
+                {/* Rejoindre live si en direct */}
+                {profile.active_live_session_id && (
+                  <TouchableOpacity
+                    style={styles.liveBtn}
+                    onPress={handleLivePress}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.liveBtnText}>En direct</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
 
@@ -600,6 +622,12 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   messageBtnText: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold },
+  liveBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, backgroundColor: '#FF3B30', borderRadius: RADIUS.full,
+    paddingHorizontal: 16, paddingVertical: 10,
+  },
+  liveBtnText: { fontSize: FONT.size.sm, fontWeight: '700', color: '#fff' },
 
   tabsRow: {
     flexDirection: 'row', width: '100%', marginTop: 4, borderTopWidth: 1,

@@ -14,8 +14,9 @@ import { api, getTokens } from '../../api/client';
 import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, SPACING, RADIUS, SHADOW, API_BASE_URL } from '../../constants/theme';
 import { useTheme } from '../../hooks/useTheme';
-import { IcSettings, IcMenu, IcSave, IcCheck, IcHeart, IcGrid, IcEdit, IcCamera, IcChart, IcPlay, IcRepeat } from '../../components/ui/Icons';
-import { EditProfileScreen } from './EditProfileScreen';
+import { IcSettings, IcMenu, IcSave, IcCheck, IcHeart, IcGrid, IcEdit, IcCamera, IcChart, IcPlay, IcRepeat, IcBell } from '../../components/ui/Icons';
+import { LinearGradient } from 'react-native-linear-gradient';
+import { EditProfileSheet } from './EditProfileSheet';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -73,6 +74,14 @@ export default function ProfileScreen() {
   const [avatarLoading, setAvatarLoading] = useState(false);
   const [coverLoading, setCoverLoading] = useState(false);
   const [coverError, setCoverError] = useState(false);
+
+  // Notif count (badge cloche)
+  const { data: notifData } = useQuery<{ count: number }>({
+    queryKey: ['notif-unread'],
+    queryFn: () => api.get('/notifications/unread-count').then(r => r.data).catch(() => ({ count: 0 })),
+    refetchInterval: 30_000,
+    enabled: !!user?.id,
+  });
 
   // Mes stories actives (pour l'anneau + viewer)
   const { data: myStories = [] } = useQuery<any[]>({
@@ -194,6 +203,31 @@ export default function ProfileScreen() {
     }
   };
 
+  const pickCover = async () => {
+    const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.8, maxWidth: 1200, maxHeight: 400 });
+    if (result.didCancel || !result.assets?.[0]?.uri) return;
+    setCoverLoading(true);
+    try {
+      const asset = result.assets[0];
+      const tokens = await getTokens();
+      if (!tokens) throw new Error('Non authentifié');
+      const formData = new FormData();
+      formData.append('file', { uri: asset.uri, type: asset.type ?? 'image/jpeg', name: 'cover.jpg' } as any);
+      const uploadRes = await fetch(`${API_BASE_URL}/upload/image`, {
+        method: 'POST', headers: { Authorization: `Bearer ${tokens.access}` }, body: formData,
+      });
+      if (!uploadRes.ok) throw new Error(`Upload error ${uploadRes.status}`);
+      const { url: cover_url } = await uploadRes.json();
+      await api.patch('/users/me', { cover_url });
+      updateUser({ cover_url } as any);
+      qc.invalidateQueries({ queryKey: ['me'] });
+    } catch (e: any) {
+      Alert.alert('Erreur', e?.message ?? "Impossible d'uploader la cover.");
+    } finally {
+      setCoverLoading(false);
+    }
+  };
+
   const gridData = activeTab === 0 ? posts?.items
     : activeTab === 2 && likeSubTab === 'Pour toi' ? liked?.items
     : activeTab === 3 ? favorites?.items
@@ -207,9 +241,18 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: theme.bg }]}>
-      <Modal visible={editVisible} animationType="slide" presentationStyle="pageSheet">
-        <EditProfileScreen onClose={() => { setEditVisible(false); qc.invalidateQueries({ queryKey: ['me'] }); }} />
-      </Modal>
+      <EditProfileSheet
+        visible={editVisible}
+        onClose={() => setEditVisible(false)}
+        user={user}
+        onSave={async (data) => {
+          await api.patch('/users/me', data);
+          updateUser(data as any);
+          await loadMe();
+          setEditVisible(false);
+          qc.invalidateQueries({ queryKey: ['me'] });
+        }}
+      />
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -219,9 +262,23 @@ export default function ProfileScreen() {
         {/* Top bar */}
         <View style={[styles.topBar, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
           <Text style={[styles.topUsername, { color: theme.text }]}>@{user.username}</Text>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Settings')} activeOpacity={0.7}>
-            <IcMenu size={20} color={theme.text} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            {/* Cloche notifications */}
+            <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Notifications')} activeOpacity={0.7}>
+              <IcBell size={22} color={theme.text} />
+              {(notifData?.count ?? 0) > 0 && (
+                <View style={[styles.notifBadge, { borderColor: theme.bg }]}>
+                  <Text style={styles.notifBadgeText}>
+                    {(notifData?.count ?? 0) > 99 ? '99+' : String(notifData?.count)}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            {/* Settings */}
+            <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Settings')} activeOpacity={0.7}>
+              <IcMenu size={20} color={theme.text} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Cover photo */}
@@ -234,13 +291,28 @@ export default function ProfileScreen() {
               onError={() => setCoverError(true)}
             />
           ) : (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: COLORS.primaryBg }]} />
+            <LinearGradient
+              colors={['#0A2918', '#0F3D22', '#1A5C35']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
           )}
-          {coverLoading && (
-            <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.3)' }]}>
-              <ActivityIndicator color={COLORS.white} />
-            </View>
-          )}
+          {/* Overlay gradient bas */}
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.35)']}
+            style={StyleSheet.absoluteFill}
+            start={{ x: 0, y: 0.4 }}
+            end={{ x: 0, y: 1 }}
+            pointerEvents="none"
+          />
+          {/* Bouton upload cover */}
+          <TouchableOpacity style={styles.coverCameraBtn} onPress={pickCover} activeOpacity={0.8} disabled={coverLoading}>
+            {coverLoading
+              ? <ActivityIndicator size="small" color={COLORS.white} />
+              : <IcCamera size={15} color={COLORS.white} />
+            }
+          </TouchableOpacity>
         </View>
 
         {/* Hero */}
@@ -402,8 +474,15 @@ function GridItem({ item, onPress, repostBadge }: { item: Post & { _repostedBy?:
           <IcPlay size={28} color={COLORS.primaryLight} />
         </View>
       )}
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.65)']}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0.5 }}
+        end={{ x: 0, y: 1 }}
+        pointerEvents="none"
+      />
       <View style={styles.gridOverlay}>
-        {repostBadge ? <IcPlay size={11} color={COLORS.white} /> : <IcHeart size={11} color={COLORS.white} />}
+        <IcPlay size={11} color={COLORS.white} />
         <Text style={styles.gridViews}>{fmtNum(item.view_count)}</Text>
       </View>
       {repostBadge && (
@@ -472,7 +551,21 @@ const styles = StyleSheet.create({
   topUsername: { fontSize: FONT.size.md, fontWeight: FONT.weight.bold, letterSpacing: -0.3 },
   iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 
-  coverWrap: { width: '100%', height: 120, position: 'relative', overflow: 'hidden' },
+  coverWrap: { width: '100%', height: 130, position: 'relative', overflow: 'hidden', backgroundColor: '#0F3D22' },
+  coverCameraBtn: {
+    position: 'absolute', bottom: 10, right: 12,
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
+  },
+  notifBadge: {
+    position: 'absolute', top: 0, right: 0,
+    minWidth: 16, height: 16, borderRadius: 8,
+    backgroundColor: '#FF3B30', alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 3, borderWidth: 1.5,
+  },
+  notifBadgeText: { fontSize: 9, fontWeight: '800', color: '#fff' },
   heroSection: { alignItems: 'center', paddingTop: SPACING.md, paddingBottom: SPACING.lg, paddingHorizontal: SPACING.lg, gap: 10, marginTop: -30 },
 
   avatarContainer: { position: 'relative' },
@@ -539,8 +632,7 @@ const styles = StyleSheet.create({
   gridThumb: { width: '100%', height: '100%' },
   gridThumbFallback: { backgroundColor: '#001F12', alignItems: 'center', justifyContent: 'center' },
   gridOverlay: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    padding: 5, backgroundColor: 'rgba(0,0,0,0.5)',
+    position: 'absolute', bottom: 5, left: 5,
     flexDirection: 'row', alignItems: 'center', gap: 3,
   },
   gridViews: { fontSize: FONT.size.xs, color: COLORS.white },

@@ -108,13 +108,15 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
   const [seekTime, setSeekTime] = useState(0);
   const totalDurationRef = useRef(post.duration || 0);
 
+  const thumbScale = useRef(new Animated.Value(1)).current;
+
   const seekPanResponder = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
-    // Never give up the gesture to the parent (prevent profilePanResponder stealing it)
     onPanResponderTerminationRequest: () => false,
     onPanResponderGrant: (evt) => {
       setSeeking(true);
+      Animated.spring(thumbScale, { toValue: 1.8, useNativeDriver: true, tension: 400, friction: 10 }).start();
       const pct = Math.max(0, Math.min(1, evt.nativeEvent.pageX / W));
       const time = pct * totalDurationRef.current;
       setSeekTime(time);
@@ -128,8 +130,14 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
       setProgress(pct);
       videoRef.current?.seek(time);
     },
-    onPanResponderRelease: () => setSeeking(false),
-    onPanResponderTerminate: () => setSeeking(false),
+    onPanResponderRelease: () => {
+      setSeeking(false);
+      Animated.spring(thumbScale, { toValue: 1, useNativeDriver: true, tension: 300, friction: 10 }).start();
+    },
+    onPanResponderTerminate: () => {
+      setSeeking(false);
+      Animated.spring(thumbScale, { toValue: 1, useNativeDriver: true, tension: 300, friction: 10 }).start();
+    },
   })).current;
 
   // Swipe gauche → navigation page profil complète
@@ -465,7 +473,7 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
         <View style={styles.progressBg}>
           <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
           {/* Thumb */}
-          <View style={[styles.progressThumb, { left: `${Math.round(progress * 100)}%` }]} />
+          <Animated.View style={[styles.progressThumb, { left: `${Math.round(progress * 100)}%`, transform: [{ scale: thumbScale }] }]} />
         </View>
       </View>
 
@@ -535,6 +543,12 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
             <CaptionText
               text={post.caption}
               expanded={captionExpanded}
+              onHashtag={(tag) => nav.navigate('Hashtag', { tag })}
+              onMention={(username) => {
+                api.get(`/users/by-username/${username}`)
+                  .then(r => nav.navigate('UserProfile', { userId: r.data.id, username }))
+                  .catch(() => {});
+              }}
             />
           </TouchableOpacity>
         ) : null}
@@ -722,15 +736,37 @@ const soundStyles = StyleSheet.create({
   optionText: { fontSize: FONT.size.base, color: COLORS.text },
 });
 
-function CaptionText({ text, expanded }: { text: string; expanded: boolean }) {
-  const parts = text.split(/(\s+)/);
+function CaptionText({
+  text,
+  expanded,
+  onHashtag,
+  onMention,
+}: {
+  text: string;
+  expanded: boolean;
+  onHashtag?: (tag: string) => void;
+  onMention?: (username: string) => void;
+}) {
+  const tokens = text.split(/(#\w+|@\w+)/g).filter(Boolean);
   return (
     <Text style={styles.caption} numberOfLines={expanded ? undefined : 2}>
-      {parts.map((part, i) =>
-        part.startsWith('#') || part.startsWith('@')
-          ? <Text key={i} style={styles.captionTag}>{part}</Text>
-          : part
-      )}
+      {tokens.map((token, i) => {
+        if (token.startsWith('#')) {
+          return (
+            <Text key={i} style={styles.captionTag} onPress={() => onHashtag?.(token.slice(1))} suppressHighlighting>
+              {token}
+            </Text>
+          );
+        }
+        if (token.startsWith('@')) {
+          return (
+            <Text key={i} style={styles.captionMention} onPress={() => onMention?.(token.slice(1))} suppressHighlighting>
+              {token}
+            </Text>
+          );
+        }
+        return <Text key={i}>{token}</Text>;
+      })}
     </Text>
   );
 }
@@ -824,6 +860,7 @@ const styles = StyleSheet.create({
   },
   caption: { fontSize: FONT.size.sm, color: 'rgba(255,255,255,0.92)', lineHeight: 20 },
   captionTag: { color: COLORS.primaryLight, fontWeight: FONT.weight.semibold },
+  captionMention: { color: COLORS.white, fontWeight: FONT.weight.semibold, textDecorationLine: 'underline' },
   soundRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   soundText: { fontSize: FONT.size.xs, color: 'rgba(255,255,255,0.85)', flexShrink: 1 },
 

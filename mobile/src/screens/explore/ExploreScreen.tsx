@@ -44,7 +44,7 @@ const CATEGORIES = [
 ];
 
 const { width: W } = Dimensions.get('window');
-const CELL = (W - 2) / 3;
+const CELL = (W - 2) / 2; // 2 colonnes au lieu de 3
 
 export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
@@ -93,8 +93,8 @@ export default function ExploreScreen() {
         </View>
       )}
       <View style={styles.cellOverlay}>
-        <IcHeart size={11} color={COLORS.white} />
-        <Text style={styles.cellCount}>{fmtNum(p.like_count)}</Text>
+        <IcPlay size={11} color={COLORS.white} />
+        <Text style={styles.cellCount}>{fmtNum(p.view_count)}</Text>
       </View>
     </TouchableOpacity>
   ), [navigation]);
@@ -169,7 +169,7 @@ export default function ExploreScreen() {
             <FlatList
               data={searchData?.posts ?? []}
               keyExtractor={(p) => p.id}
-              numColumns={3}
+              numColumns={2}
               contentContainerStyle={{ gap: 1 }}
               columnWrapperStyle={{ gap: 1 }}
               renderItem={renderGridItem}
@@ -181,7 +181,7 @@ export default function ExploreScreen() {
         <FlatList
           data={trending?.items ?? []}
           keyExtractor={(p) => p.id}
-          numColumns={3}
+          numColumns={2}
           contentContainerStyle={{ gap: 1, flexGrow: 1, backgroundColor: theme.bg }}
           columnWrapperStyle={{ gap: 1 }}
           ListHeaderComponent={
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
   catLabel: { fontSize: FONT.size.sm, fontWeight: FONT.weight.medium, color: COLORS.textMuted },
   catLabelActive: { color: COLORS.primary, fontWeight: FONT.weight.semibold },
 
-  cell: { width: CELL, height: CELL * (16 / 9), backgroundColor: '#111' },
+  cell: { width: CELL, height: CELL * 1.5, backgroundColor: '#111' },
   cellImg: { width: '100%', height: '100%' },
   cellFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#1a1a1a' },
   cellOverlay: {

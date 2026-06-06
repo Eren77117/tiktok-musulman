@@ -23,7 +23,7 @@ import { Skeleton } from '../../components/ui/Skeleton';
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 const { height: H } = Dimensions.get('window');
 
-type FeedTab = 'communaute' | 'proche' | 'suivis' | 'boutique' | 'pourtoi' | 'fils';
+type FeedTab = 'abonnes' | 'pourtoi' | 'fils';
 
 interface LiveSession {
   id: string;
@@ -61,7 +61,7 @@ export default function FeedScreen() {
   const ITEM_H = listHeight > 100 ? listHeight : H - tabBarHeight;
 
   // Pause all videos when leaving this screen
-  const effectiveVisibleId = isFocused && (tab === 'pourtoi' || tab === 'suivis') ? visibleId : null;
+  const effectiveVisibleId = isFocused && (tab === 'pourtoi' || tab === 'abonnes') ? visibleId : null;
   const seenIds = useRef<string[]>([]);
 
   // ── Pour Toi (video feed) ────────────────────────────────────────────────────
@@ -93,7 +93,7 @@ export default function FeedScreen() {
         .catch(() => ({ items: [], next_cursor: null })),
     initialPageParam: null as string | null,
     getNextPageParam: last => last.next_cursor,
-    enabled: tab === 'suivis',
+    enabled: tab === 'abonnes',
   });
 
   // ── Fils (threads) ───────────────────────────────────────────────────────────
@@ -136,7 +136,7 @@ export default function FeedScreen() {
         .catch(() => ({ items: [], next_cursor: null })),
     initialPageParam: null as string | null,
     getNextPageParam: last => last.next_cursor,
-    enabled: tab === 'communaute',
+    enabled: false // communaute removed,
   });
 
   // Active lives (refreshes every 30s)
@@ -210,7 +210,7 @@ export default function FeedScreen() {
         {/* Tabs — centrés */}
         <View style={styles.tabsRow}>
           {([
-            ['suivis', 'Communauté'],
+            ['abonnes', 'Abonnés'],
             ['pourtoi', 'Pour toi'],
             ['fils', 'Fils'],
           ] as [FeedTab, string][]).map(([key, label]) => (
@@ -232,8 +232,8 @@ export default function FeedScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ── SUIVIS — feed comptes suivis ── */}
-      {tab === 'suivis' && (
+      {/* ── ABONNÉS — feed comptes suivis ── */}
+      {tab === 'abonnes' && (
         <FlatList<FeedPost>
           data={(suivisData?.pages.flatMap(p => p.items) ?? []).filter(p => !hiddenPostIds.has(p.id))}
           keyExtractor={p => p.id}
@@ -343,50 +343,6 @@ export default function FeedScreen() {
         />
       )}
 
-      {/* ── COMMUNAUTÉ — trending videos ── */}
-      {tab === 'communaute' && (
-        <FlatList<FeedPost>
-          data={(communauteData?.pages.flatMap(p => p.items) ?? []).filter(p => !hiddenPostIds.has(p.id))}
-          keyExtractor={p => p.id}
-          style={{ flex: 1 }}
-          onLayout={e => setListHeight(e.nativeEvent.layout.height)}
-          renderItem={({ item }) => (
-            <VideoPlayerItem
-              post={item}
-              isVisible={effectiveVisibleId === item.id}
-              onComment={() => setCommentsPostId(item.id)}
-              onNotInterested={() => hidePost(item.id)}
-              itemHeight={ITEM_H}
-            />
-          )}
-          pagingEnabled
-          decelerationRate="fast"
-          showsVerticalScrollIndicator={false}
-          onViewableItemsChanged={onViewableItemsChanged}
-          viewabilityConfig={viewabilityConfig.current}
-          windowSize={3}
-          maxToRenderPerBatch={2}
-          initialNumToRender={1}
-          removeClippedSubviews
-          onEndReached={() => hasNextCommunaute && !fetchingCommunaute && fetchNextCommunaute()}
-          onEndReachedThreshold={2}
-          getItemLayout={(_, i) => ({ length: ITEM_H, offset: ITEM_H * i, index: i })}
-          ListEmptyComponent={
-            !loadingCommunaute ? (
-              <View style={styles.emptyWrap}>
-                <Text style={[styles.emptyText, { textAlign: 'center' }]}>Aucune vidéo tendance</Text>
-              </View>
-            ) : null
-          }
-        />
-      )}
-
-      {/* Placeholder tabs */}
-      {(tab === 'proche' || tab === 'boutique') && (
-        <View style={styles.emptyWrap}>
-          <Text style={[styles.emptyText, { opacity: 0.5 }]}>Bientôt disponible</Text>
-        </View>
-      )}
 
       {/* Comments bottom sheet */}
       <CommentsBottomSheet postId={commentsPostId} onClose={() => setCommentsPostId(null)} />
