@@ -8,11 +8,13 @@ import DocumentPicker, { types, isCancel } from 'react-native-document-picker';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { api } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
+import { useTheme } from '../../hooks/useTheme';
 import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, SPACING, RADIUS } from '../../constants/theme';
-import { IcClose, IcImage, IcVideo, IcSend } from '../../components/ui/Icons';
+import { IcClose, IcImage, IcVideo } from '../../components/ui/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ThreadComposer'>;
 
@@ -26,6 +28,7 @@ interface Media {
 export default function ThreadComposerScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
+  const theme = useTheme();
   const qc = useQueryClient();
   const [text, setText] = useState('');
   const [media, setMedia] = useState<Media | null>(null);
@@ -59,6 +62,7 @@ export default function ThreadComposerScreen({ navigation }: Props) {
 
   const handlePublish = async () => {
     if (!text.trim() && !media) return;
+    ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
     setUploading(true);
     try {
       let media_url: string | undefined;
@@ -87,15 +91,15 @@ export default function ThreadComposerScreen({ navigation }: Props) {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { paddingTop: insets.top }]}
+      style={[styles.container, { paddingTop: insets.top, backgroundColor: theme.bg }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { borderBottomColor: theme.border, backgroundColor: theme.surface }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeBtn} activeOpacity={0.7}>
-          <IcClose size={22} color={COLORS.text} />
+          <IcClose size={22} color={theme.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Nouveau fil</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Nouveau fil</Text>
         <TouchableOpacity
           style={[styles.publishBtn, !canPublish && styles.publishBtnDisabled]}
           onPress={handlePublish}
@@ -120,16 +124,16 @@ export default function ThreadComposerScreen({ navigation }: Props) {
                 <Text style={styles.avatarInitial}>{user?.display_name?.[0]?.toUpperCase() ?? 'U'}</Text>
               </View>
             )}
-            {!!text || !!media ? <View style={styles.threadLine} /> : null}
+            {!!text || !!media ? <View style={[styles.threadLine, { backgroundColor: theme.border }]} /> : null}
           </View>
           <View style={styles.composerMain}>
-            <Text style={styles.displayName}>{user?.display_name ?? ''}</Text>
+            <Text style={[styles.displayName, { color: theme.text }]}>{user?.display_name ?? ''}</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { color: theme.text }]}
               value={text}
               onChangeText={setText}
               placeholder="Quoi de nouveau ?"
-              placeholderTextColor={COLORS.textPlaceholder}
+              placeholderTextColor={theme.textSubtle}
               multiline
               maxLength={500}
               autoFocus
@@ -139,7 +143,7 @@ export default function ThreadComposerScreen({ navigation }: Props) {
                 {media.type === 'image' ? (
                   <Image source={{ uri: media.uri }} style={styles.mediaImage} resizeMode="cover" />
                 ) : (
-                  <View style={styles.videoPreview}>
+                  <View style={[styles.videoPreview, { backgroundColor: theme.primaryBg, borderColor: COLORS.primaryLight }]}>
                     <IcVideo size={32} color={COLORS.primary} />
                     <Text style={styles.videoName} numberOfLines={1}>{media.name}</Text>
                   </View>
@@ -150,13 +154,13 @@ export default function ThreadComposerScreen({ navigation }: Props) {
               </View>
             )}
             <View style={styles.mediaActions}>
-              <TouchableOpacity onPress={pickImage} style={styles.mediaBtn} activeOpacity={0.7}>
+              <TouchableOpacity onPress={pickImage} style={[styles.mediaBtn, { backgroundColor: theme.primaryBg }]} activeOpacity={0.7}>
                 <IcImage size={20} color={COLORS.primary} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={pickVideo} style={styles.mediaBtn} activeOpacity={0.7}>
+              <TouchableOpacity onPress={pickVideo} style={[styles.mediaBtn, { backgroundColor: theme.primaryBg }]} activeOpacity={0.7}>
                 <IcVideo size={20} color={COLORS.primary} />
               </TouchableOpacity>
-              <Text style={styles.charCount}>{text.length}/500</Text>
+              <Text style={[styles.charCount, { color: theme.textMuted }]}>{text.length}/500</Text>
             </View>
           </View>
         </View>
@@ -166,15 +170,14 @@ export default function ThreadComposerScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: SPACING.md, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: COLORS.borderLight,
-    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
   },
   closeBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: FONT.size.lg, fontWeight: FONT.weight.semibold, color: COLORS.text },
+  headerTitle: { fontSize: FONT.size.lg, fontWeight: FONT.weight.semibold },
   publishBtn: {
     backgroundColor: COLORS.primary, borderRadius: RADIUS.full,
     paddingHorizontal: 18, paddingVertical: 8,
@@ -188,18 +191,18 @@ const styles = StyleSheet.create({
   avatar: { width: 42, height: 42, borderRadius: 21 },
   avatarFallback: { backgroundColor: COLORS.primaryBg, borderWidth: 2, borderColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
   avatarInitial: { fontSize: 16, fontWeight: FONT.weight.bold, color: COLORS.primary },
-  threadLine: { width: 2, flex: 1, backgroundColor: COLORS.border, borderRadius: 1, marginTop: 4 },
+  threadLine: { width: 2, flex: 1, borderRadius: 1, marginTop: 4 },
 
   composerMain: { flex: 1, gap: 8 },
-  displayName: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold, color: COLORS.text },
-  input: { fontSize: FONT.size.base, color: COLORS.text, lineHeight: 22, minHeight: 80, textAlignVertical: 'top' },
+  displayName: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold },
+  input: { fontSize: FONT.size.base, lineHeight: 22, minHeight: 80, textAlignVertical: 'top' },
 
   mediaPreview: { position: 'relative', borderRadius: RADIUS.md, overflow: 'hidden', marginTop: 4 },
   mediaImage: { width: '100%', height: 200, borderRadius: RADIUS.md },
   videoPreview: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: COLORS.primaryBg, borderRadius: RADIUS.md,
-    padding: SPACING.md, borderWidth: 1, borderColor: COLORS.primaryLight,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md, borderWidth: 1,
   },
   videoName: { flex: 1, fontSize: FONT.size.sm, color: COLORS.primary },
   removeMedia: {
@@ -209,6 +212,6 @@ const styles = StyleSheet.create({
   },
 
   mediaActions: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  mediaBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.sm, backgroundColor: COLORS.primaryBg },
-  charCount: { marginLeft: 'auto', fontSize: FONT.size.xs, color: COLORS.textMuted },
+  mediaBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.sm },
+  charCount: { marginLeft: 'auto', fontSize: FONT.size.xs },
 });

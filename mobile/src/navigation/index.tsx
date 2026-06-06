@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
-  Modal, Pressable,
+  Modal, Pressable, Animated,
 } from 'react-native';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { useTheme } from '../hooks/useTheme';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -129,6 +130,42 @@ function useUnreadCount() {
   return data?.count ?? 0;
 }
 
+function TabItemAnimated({ route, isFocused, theme, showBadge, unread, onPress }: any) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const handlePress = () => {
+    ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
+    Animated.sequence([
+      Animated.spring(scale, { toValue: 0.82, useNativeDriver: true, tension: 300, friction: 10 }),
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 260, friction: 8 }),
+    ]).start();
+    onPress();
+  };
+
+  return (
+    <TouchableOpacity style={styles.tabItem} onPress={handlePress} activeOpacity={1}>
+      <Animated.View style={[styles.iconWrap, { transform: [{ scale }] }]}>
+        {isFocused && (
+          <View style={[styles.activeGlow, { backgroundColor: `${COLORS.primary}18` }]} />
+        )}
+        <TabIcon name={route.name} focused={isFocused} theme={theme} />
+        {showBadge && (
+          <View style={[styles.notifBadge, { borderColor: theme.tabBg }]}>
+            <Text style={styles.notifBadgeText}>{unread > 99 ? '99+' : String(unread)}</Text>
+          </View>
+        )}
+      </Animated.View>
+      <Text style={[
+        styles.tabLabel,
+        { color: isFocused ? theme.tabActive : theme.tabInactive },
+        isFocused && styles.tabLabelActive,
+      ]}>
+        {TAB_LABELS[route.name]}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
 function CustomTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
@@ -229,7 +266,15 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 
           if (isCreate) {
             return (
-              <TouchableOpacity key={route.key} style={styles.createBtnWrap} onPress={onPress} activeOpacity={0.85}>
+              <TouchableOpacity
+                key={route.key}
+                style={styles.createBtnWrap}
+                onPress={() => {
+                  ReactNativeHapticFeedback.trigger('impactMedium', { enableVibrateFallback: true });
+                  onPress();
+                }}
+                activeOpacity={0.85}
+              >
                 <View style={[styles.createInner, SHADOW.green]}>
                   <IcCreate size={20} color={COLORS.white} strokeWidth={2.2} />
                 </View>
@@ -240,26 +285,15 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           const showBadge = route.name === 'Messages' && unread > 0;
 
           return (
-            <TouchableOpacity key={route.key} style={styles.tabItem} onPress={onPress} activeOpacity={0.7}>
-              <View style={styles.iconWrap}>
-                {isFocused && (
-                  <View style={[styles.activeGlow, { backgroundColor: `${COLORS.primary}18` }]} />
-                )}
-                <TabIcon name={route.name} focused={isFocused} theme={theme} />
-                {showBadge && (
-                  <View style={[styles.notifBadge, { borderColor: theme.tabBg }]}>
-                    <Text style={styles.notifBadgeText}>{unread > 99 ? '99+' : String(unread)}</Text>
-                  </View>
-                )}
-              </View>
-              <Text style={[
-                styles.tabLabel,
-                { color: isFocused ? theme.tabActive : theme.tabInactive },
-                isFocused && styles.tabLabelActive,
-              ]}>
-                {TAB_LABELS[route.name]}
-              </Text>
-            </TouchableOpacity>
+            <TabItemAnimated
+              key={route.key}
+              route={route}
+              isFocused={isFocused}
+              theme={theme}
+              showBadge={showBadge}
+              unread={unread}
+              onPress={onPress}
+            />
           );
         })}
       </View>

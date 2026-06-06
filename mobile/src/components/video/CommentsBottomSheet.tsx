@@ -244,7 +244,11 @@ export function CommentsBottomSheet({ postId, onClose }: Props) {
               />
               <TouchableOpacity
                 style={[styles.sendBtn, (!text.trim() || addMutation.isPending) && styles.sendBtnOff]}
-                onPress={() => text.trim() && addMutation.mutate(text.trim())}
+                onPress={() => {
+                  if (!text.trim()) return;
+                  ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
+                  addMutation.mutate(text.trim());
+                }}
                 disabled={!text.trim() || addMutation.isPending}
               >
                 {addMutation.isPending

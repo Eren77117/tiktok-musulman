@@ -2,8 +2,9 @@ import React, { useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   ScrollView, Alert, ActivityIndicator, ActionSheetIOS, Platform,
-  FlatList, Animated, Image,
+  FlatList, Animated, Image, Modal,
 } from 'react-native';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import DocumentPicker, { types, isCancel } from 'react-native-document-picker';
@@ -55,6 +56,7 @@ export default function UploadScreen() {
   const [uploadStep, setUploadStep] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   // Mention/hashtag suggestions
   const [mentionQuery, setMentionQuery] = useState('');
@@ -62,6 +64,8 @@ export default function UploadScreen() {
   const [cursorPos, setCursorPos] = useState(0);
   const inputRef = useRef<TextInput>(null);
   const progressAnim = useRef(new Animated.Value(0)).current;
+  const successOpacity = useRef(new Animated.Value(0)).current;
+  const successScale = useRef(new Animated.Value(0.6)).current;
 
   // Fetch mention suggestions
   const { data: mentionData } = useQuery<{ users?: UserSuggestion[] }>({
@@ -285,7 +289,21 @@ export default function UploadScreen() {
         animateProgress(0);
         qc.invalidateQueries({ queryKey: ['feed'] });
         qc.invalidateQueries({ queryKey: ['user-posts'] });
-        Alert.alert('✓ Publié !', 'Ta vidéo est en ligne dans le feed.');
+        ReactNativeHapticFeedback.trigger('notificationSuccess', { enableVibrateFallback: true });
+        setShowSuccess(true);
+        successOpacity.setValue(0);
+        successScale.setValue(0.6);
+        Animated.parallel([
+          Animated.spring(successOpacity, { toValue: 1, useNativeDriver: true, tension: 180, friction: 12 }),
+          Animated.spring(successScale, { toValue: 1, useNativeDriver: true, tension: 200, friction: 10 }),
+        ]).start(() => {
+          setTimeout(() => {
+            Animated.timing(successOpacity, { toValue: 0, duration: 350, useNativeDriver: true }).start(() => {
+              setShowSuccess(false);
+              nav.navigate('Home' as never);
+            });
+          }, 1800);
+        });
       }, 600);
     } catch (err: any) {
       setUploading(false);
@@ -485,6 +503,19 @@ export default function UploadScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* ── Success overlay ── */}
+      {showSuccess && (
+        <Animated.View style={[styles.successOverlay, { opacity: successOpacity }]} pointerEvents="none">
+          <Animated.View style={[styles.successCard, { transform: [{ scale: successScale }] }]}>
+            <View style={styles.successCheckWrap}>
+              <IcCheck size={42} color={COLORS.white} strokeWidth={3} />
+            </View>
+            <Text style={styles.successTitle}>Publiée !</Text>
+            <Text style={styles.successSub}>Ta vidéo est en ligne dans le feed</Text>
+          </Animated.View>
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -589,6 +620,25 @@ const styles = StyleSheet.create({
   coverThumb: { width: 56, height: 74, borderRadius: 6, backgroundColor: '#111' },
   coverLabel: { fontSize: FONT.size.sm, fontWeight: '600', color: COLORS.text },
   coverHint: { fontSize: FONT.size.xs, color: COLORS.textMuted, marginTop: 2 },
+
+  successOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center', justifyContent: 'center', zIndex: 999,
+  },
+  successCard: {
+    backgroundColor: COLORS.white, borderRadius: 24,
+    paddingHorizontal: 40, paddingVertical: 36,
+    alignItems: 'center', gap: 12,
+    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 24, shadowOffset: { width: 0, height: 8 },
+  },
+  successCheckWrap: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center',
+    marginBottom: 4,
+  },
+  successTitle: { fontSize: 26, fontWeight: FONT.weight.bold, color: COLORS.text },
+  successSub: { fontSize: FONT.size.sm, color: COLORS.textMuted, textAlign: 'center' },
 
   btnRow: { flexDirection: 'row', gap: 12 },
   draftBtn: {
