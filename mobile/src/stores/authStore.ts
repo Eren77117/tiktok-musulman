@@ -7,6 +7,7 @@ export interface User {
   email: string;
   display_name: string;
   bio: string | null;
+  bio_links: string[];
   avatar_url: string | null;
   gender: 'MALE' | 'FEMALE';
   role: string;

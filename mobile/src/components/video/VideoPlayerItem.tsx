@@ -569,11 +569,15 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
 
       {/* Series episode badge */}
       {post.series_episode && (
-        <View style={styles.seriesBadge} pointerEvents="none">
+        <TouchableOpacity
+          style={styles.seriesBadge}
+          onPress={() => nav.navigate('SeriesPlayer', { seriesId: post.series_episode!.series_id, startEpisode: Math.max(0, (post.series_episode!.episode_num ?? 1) - 1) })}
+          activeOpacity={0.85}
+        >
           <Text style={styles.seriesBadgeText}>
             Série · Ép. {post.series_episode.episode_num}
           </Text>
-        </View>
+        </TouchableOpacity>
       )}
 
       {/* Bottom left — username + caption */}

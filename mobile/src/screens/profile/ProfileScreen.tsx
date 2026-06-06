@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createThumbnail } from 'react-native-create-thumbnail';
 import {
-  View, Text, StyleSheet, Image, TouchableOpacity, Dimensions,
+  View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, Linking,
   FlatList, ScrollView, Alert, ActivityIndicator, RefreshControl, Modal, ActionSheetIOS, Platform,
 } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -348,6 +348,15 @@ export default function ProfileScreen() {
 
           <Text style={[styles.displayName, { color: theme.text }]}>{user.display_name}</Text>
           {user.bio ? <Text style={[styles.bio, { color: theme.textMuted }]}>{user.bio}</Text> : null}
+          {(user as any).bio_links?.length > 0 && (
+            <View style={styles.bioLinksRow}>
+              {((user as any).bio_links as string[]).map((link: string, i: number) => (
+                <TouchableOpacity key={i} onPress={() => Linking.openURL(link).catch(() => {})} activeOpacity={0.75} style={styles.bioLinkPill}>
+                  <Text style={styles.bioLinkText} numberOfLines={1}>{link.replace(/^https?:\/\//, '')}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
           <View style={styles.statsRow}>
             <TouchableOpacity onPress={() => navigation.navigate('Followers', { userId: user.id, username: user.username, type: 'following' })} activeOpacity={0.7}>
@@ -682,6 +691,9 @@ const styles = StyleSheet.create({
 
   displayName: { fontSize: FONT.size.xxl, fontWeight: FONT.weight.bold, letterSpacing: -0.5 },
   bio: { fontSize: FONT.size.sm, textAlign: 'center', lineHeight: 20 },
+  bioLinksRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 6 },
+  bioLinkPill: { backgroundColor: 'rgba(0,176,90,0.12)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  bioLinkText: { fontSize: FONT.size.xs, color: COLORS.primary, fontWeight: FONT.weight.semibold, maxWidth: 160 },
 
   statsRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.lg, marginTop: 4 },
   statItem: { alignItems: 'center', gap: 2 },

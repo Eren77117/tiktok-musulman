@@ -51,6 +51,7 @@ import StoryViewerScreen from '../screens/stories/StoryViewerScreen';
 import StoryArchiveScreen from '../screens/stories/StoryArchiveScreen';
 import DraftsScreen from '../screens/upload/DraftsScreen';
 import CollectionScreen from '../screens/profile/CollectionScreen';
+import SeriesPlayerScreen from '../screens/feed/SeriesPlayerScreen';
 
 export type RootStackParamList = {
   Auth: undefined;
@@ -78,6 +79,7 @@ export type RootStackParamList = {
   StoryArchive: undefined;
   Drafts: undefined;
   Collection: { collectionId: string; name: string };
+  SeriesPlayer: { seriesId: string; startEpisode?: number };
   Upload: { draft?: any } | undefined;
 };
 
@@ -357,6 +359,8 @@ export function AppNavigator() {
               options={{ animation: 'slide_from_right' }} />
             <RootStack.Screen name="Collection" component={CollectionScreen}
               options={{ headerShown: false, animation: 'slide_from_right' }} />
+            <RootStack.Screen name="SeriesPlayer" component={SeriesPlayerScreen}
+              options={{ headerShown: false, animation: 'slide_from_bottom' }} />
             <RootStack.Screen name="Drafts" component={DraftsScreen}
               options={{ animation: 'slide_from_right', headerShown: false }} />
             <RootStack.Screen name="Upload" component={CreateScreen}

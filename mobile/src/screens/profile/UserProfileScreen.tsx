@@ -24,6 +24,7 @@ interface Profile {
   username: string;
   display_name: string;
   bio: string | null;
+  bio_links: string[];
   avatar_url: string | null;
   is_verified: boolean;
   is_following: boolean;
@@ -328,6 +329,15 @@ export default function UserProfileScreen({ route, navigation }: Props) {
 
             <Text style={[styles.displayName, { color: theme.text }]}>{profile.display_name}</Text>
             {profile.bio ? <BioText bio={profile.bio} theme={theme} /> : null}
+            {profile.bio_links?.length > 0 && (
+              <View style={styles.bioLinksRow}>
+                {profile.bio_links.map((link, i) => (
+                  <TouchableOpacity key={i} onPress={() => Linking.openURL(link).catch(() => {})} activeOpacity={0.75} style={styles.bioLinkPill}>
+                    <Text style={styles.bioLinkText} numberOfLines={1}>{link.replace(/^https?:\/\//, '')}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
             {/* Stats */}
             <View style={styles.statsRow}>
@@ -659,6 +669,9 @@ const styles = StyleSheet.create({
 
   displayName: { fontSize: FONT.size.xxl, fontWeight: FONT.weight.bold, letterSpacing: -0.3 },
   bio: { fontSize: FONT.size.sm, textAlign: 'center', lineHeight: 20 },
+  bioLinksRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 6 },
+  bioLinkPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,176,90,0.12)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  bioLinkText: { fontSize: FONT.size.xs, color: COLORS.primary, fontWeight: FONT.weight.semibold, maxWidth: 160 },
 
   statsRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.lg, marginTop: 4 },
   statItem: { alignItems: 'center', gap: 2, minWidth: 70 },

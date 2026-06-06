@@ -345,9 +345,9 @@
 ### ADV-02 : Mode Séries
 - [x] Modèles Prisma `Series` + `SeriesEpisode` créés
 - [x] Endpoints GET/POST séries (`/api/series`)
-- [ ] `SeriesPlayerScreen.tsx` avec auto-play countdown (TODO Phase 6)
-- [x] Badge "Série · Ép. X" dans VideoPlayerItem si series_episode présent
-- [ ] Testé : badge visible ✓
+- [x] `SeriesPlayerScreen.tsx` avec auto-play countdown 5s + pager vertical
+- [x] Badge "Série · Ép. X" tappable → ouvre SeriesPlayerScreen depuis feed
+- [ ] Testé iPhone ✓
 
 ### ADV-03 : Smart pause overlay
 - [x] Timer inactivité 4s
@@ -360,8 +360,10 @@
 
 ### ADV-05 : Bio enrichie
 - [x] Champs `bio_links[]` + `profile_category` dans User schema (migré Railway)
-- [ ] UI liens cliquables dans profil (TODO Phase 6)
-- [ ] Testé ✓
+- [x] bio_links sélectionné dans GET /users/:username + PATCH /me
+- [x] Liens cliquables dans ProfileScreen + UserProfileScreen (pills verts → Linking.openURL)
+- [x] Édition bio_links dans EditProfileSheet (ajout/suppression, max 3)
+- [ ] Testé iPhone ✓
 
 ### ADV-06 : Recommandations comptes
 - [x] `GET /users/suggested` (amis-d'amis + populaires par followers)
@@ -404,8 +406,9 @@
 ### DEEP-02 : Commentaires enrichis (commit 47c3376)
 - [x] Tri smart (likes×3 + replies×5 + récence), pinned first
 - [x] Épinglage créateur (PATCH /comments/:id/pin + is_pinned + creator_liked Prisma)
-- [ ] Réponses inline depth=1 expandables (TODO Phase 7)
-- [ ] Testé ✓
+- [x] Réponses inline depth=1 expandables (showReplies toggle + GET /comments/:id/replies)
+- [x] Commentaires temps réel socket (comment:new émis backend + reçu frontend)
+- [ ] Testé iPhone ✓
 
 ### DEEP-03 : Profil rétention
 - [x] Section "Comptes similaires" GET /users/:id/similar (shared followers + popular fallback)
