@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity,
   ActivityIndicator, RefreshControl, Image, ScrollView, Animated,
@@ -133,7 +134,7 @@ export default function NotificationsScreen() {
           { borderBottomColor: theme.borderLight },
           !n.is_read && { backgroundColor: theme.isDark ? '#0D1F13' : '#F0FDF4' },
         ]}
-        onPress={() => markRead(n)}
+        onPress={() => { ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true }); markRead(n); }}
         activeOpacity={0.7}
       >
         <View style={styles.iconWrap}>
@@ -169,7 +170,7 @@ export default function NotificationsScreen() {
         </TouchableOpacity>
         <Text style={[styles.title, { color: theme.text }]}>Notifications</Text>
         {unreadCount > 0 ? (
-          <TouchableOpacity onPress={() => readAllMutation.mutate()} style={styles.markAllBtn} disabled={readAllMutation.isPending}>
+          <TouchableOpacity onPress={() => { ReactNativeHapticFeedback.trigger('impactMedium', { enableVibrateFallback: true }); readAllMutation.mutate(); }} style={styles.markAllBtn} disabled={readAllMutation.isPending}>
             <Text style={styles.markAllText}>Tout lire</Text>
           </TouchableOpacity>
         ) : <View style={{ width: 68 }} />}
@@ -188,6 +189,7 @@ export default function NotificationsScreen() {
                 key={tab.key}
                 style={styles.tab}
                 onPress={() => {
+                  ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
                   setActiveTab(tab.key);
                   animateTab(i);
                 }}

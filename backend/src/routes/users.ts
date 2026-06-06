@@ -11,6 +11,7 @@ const updateProfileSchema = z.object({
   profile_category: z.string().max(50).optional().nullable(),
   avatar_url: z.string().optional().nullable(),
   cover_url: z.string().optional().nullable(),
+  profile_category: z.string().max(50).optional().nullable(),
 }).passthrough(); // allow extra keys from mobile settings
 
 const USER_SELECT_PUBLIC = {
@@ -95,6 +96,7 @@ export async function userRoutes(app: FastifyInstance) {
     if (profile_category !== undefined) updateData.profile_category = profile_category;
     if (avatar_url !== undefined) updateData.avatar_url = avatar_url;
     if (cover_url !== undefined) updateData.cover_url = cover_url;
+    if (profile_category !== undefined) updateData.profile_category = profile_category;
 
     const ME_SELECT = {
       id: true, username: true, display_name: true, bio: true,

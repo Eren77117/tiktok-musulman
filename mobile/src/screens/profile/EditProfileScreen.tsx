@@ -15,18 +15,25 @@ import { IcClose, IcCheck, IcEdit } from '../../components/ui/Icons';
 
 interface Props { onClose: () => void }
 
+const PROFILE_CATEGORIES = [
+  'Islam', 'Coran', 'Famille', 'Éducation', 'Humour Halal',
+  'Lifestyle', 'Science', 'Rappel', 'Voyage', 'Cuisine Halal', 'Autre',
+];
+
 export function EditProfileScreen({ onClose }: Props) {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const { user, updateUser, loadMe } = useAuthStore();
   const [displayName, setDisplayName] = useState(user?.display_name ?? '');
   const [bio, setBio] = useState(user?.bio ?? '');
+  const [category, setCategory] = useState((user as any)?.profile_category ?? '');
   const [avatarLoading, setAvatarLoading] = useState(false);
 
   const mutation = useMutation({
     mutationFn: () => api.patch('/users/me', {
       display_name: displayName.trim(),
       bio: bio.trim() || null,
+      profile_category: category || null,
     }),
     onSuccess: async (res) => {
       updateUser(res.data);
@@ -36,7 +43,22 @@ export function EditProfileScreen({ onClose }: Props) {
     onError: (e: any) => Alert.alert('Erreur', e?.response?.data?.error ?? 'Échec de la mise à jour'),
   });
 
-  const isDirty = displayName !== user?.display_name || bio !== (user?.bio ?? '');
+  const pickCategory = () => {
+    const options = [...PROFILE_CATEGORIES, 'Aucune', 'Annuler'];
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options, cancelButtonIndex: options.length - 1 },
+        (i) => {
+          if (i < PROFILE_CATEGORIES.length) setCategory(PROFILE_CATEGORIES[i]);
+          else if (options[i] === 'Aucune') setCategory('');
+        },
+      );
+    }
+  };
+
+  const isDirty = displayName !== user?.display_name
+    || bio !== (user?.bio ?? '')
+    || category !== ((user as any)?.profile_category ?? '');
 
   const handleAvatarPress = () => {
     const options = ['Prendre une photo', 'Choisir depuis la galerie', 'Annuler'];
@@ -174,6 +196,20 @@ export function EditProfileScreen({ onClose }: Props) {
               textAlignVertical="top"
             />
             <Text style={[styles.charCount, { color: theme.textSubtle }]}>{bio.length}/200</Text>
+          </View>
+
+          <View style={styles.field}>
+            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>Catégorie</Text>
+            <TouchableOpacity
+              style={[styles.input, { backgroundColor: theme.surface, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+              onPress={pickCategory}
+              activeOpacity={0.8}
+            >
+              <Text style={{ color: category ? theme.text : theme.textSubtle, fontSize: 16 }}>
+                {category || 'Sélectionner une catégorie'}
+              </Text>
+              <Text style={{ color: theme.textSubtle, fontSize: 12 }}>›</Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.field}>

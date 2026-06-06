@@ -34,6 +34,7 @@ interface Profile {
   post_count: number;
   gender: 'MALE' | 'FEMALE';
   active_live_session_id: string | null;
+  profile_category: string | null;
 }
 
 interface Post {
