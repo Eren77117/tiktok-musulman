@@ -1,5 +1,5 @@
 # TODO — Nour App · CEO Mode
-> Mis à jour: 2026-06-05 — Session CEO carte blanche
+> Mis à jour: 2026-06-06 — Session UX/DA/thème
 > Source règles: ~/Desktop/CLAUDE_AGENT_INSTRUCTIONS.md + ~/Desktop/RIDE_GUIDE_COMPLET.md
 
 ---
@@ -51,46 +51,46 @@
 - [x] Pull-to-refresh avec animation (spinner vert)
 - [x] Indicateur de chargement en bas (spinner vert)
 - [ ] Precaching des 2-3 vidéos suivantes (backgrounded)
-- [ ] Mémorisation de la position dans le feed (reprendre où on était)
+- [x] Mémorisation de la position dans le feed (pourToiIndexRef + initialScrollIndex) ✅
 - [ ] Skip vidéo en swipant vers le haut plus rapidement (animation accélérée)
 - [x] Indicateur de progression de la vidéo (barre verte en bas)
 - [x] Durée de la vidéo affichée (badge haut gauche)
 - [x] Réduire le délai de single-tap pause (300ms → 200ms)
 
 ### 🎬 Lecteur vidéo
-- [ ] Seek en maintenant appuyé gauche/droite (afficher le temps)
+- [x] Seek en maintenant appuyé gauche/droite (holdSeeking + ±10s continu) ✅
 - [ ] Afficher le temps actuel / durée totale en mode 2x
 - [ ] Résolution adaptative (quality selector bas)
-- [ ] Replay automatique après la fin (animation de rechargement)
-- [ ] Plein écran paysage si la vidéo est en 16:9 horizontal
-- [ ] Pinch-to-zoom sur la vidéo
+- [x] Replay automatique après la fin (seek(0) + replayAnim) ✅
+- [x] Plein écran paysage si la vidéo est en 16:9 horizontal (presentFullscreenPlayer) ✅
+- [x] Pinch-to-zoom sur la vidéo (GestureDetector + Reanimated, x1→x3) ✅
 - [ ] Option désactiver l'autoplay (accessibilité)
 
 ### 💬 Commentaires
-- [ ] Commentaires en temps réel (Socket.IO, pas de refresh)
-- [x] Répondre à un commentaire (parent_id + banner @username)
-- [x] Liker un commentaire (API réelle + toggle)
-- [ ] Mentionner @utilisateur dans un commentaire
+- [x] Commentaires en temps réel (Socket.IO post:watch/comment:new) ✅
+- [x] Répondre à un commentaire (parent_id + banner @username) ✅
+- [x] Liker un commentaire (API réelle + toggle) ✅
+- [x] Mentionner @utilisateur dans un commentaire (autocomplete @) ✅
 - [ ] Épingler un commentaire (créateur seulement)
-- [x] Supprimer son propre commentaire (ActionSheet + API)
-- [ ] Pagination des commentaires (load more)
+- [x] Supprimer son propre commentaire (ActionSheet + API) ✅
+- [x] Pagination des commentaires (load more) ✅
 - [ ] Afficher les commentaires en live dans le player (overlay)
 
 ### 👤 Profil
-- [ ] Bannière/cover photo sur le profil (au-dessus de l'avatar)
-- [ ] Lien externe dans la bio (cliquable)
+- [x] Bannière/cover photo sur le profil (LinearGradient + pickCover) ✅
+- [x] Lien externe dans la bio (cliquable, Linking.openURL) ✅
 - [ ] Catégorie/niche du compte (Islam, Coran, Famille...)
-- [ ] Statistiques avancées (vues totales, portée)
+- [x] Statistiques avancées (CreatorStatsScreen: vues, likes, complétion, top posts) ✅
 - [ ] QR Code du profil (partager son compte)
-- [ ] Bouton "Partager le profil" (lien universel)
+- [x] Bouton "Partager le profil" (Share sheet natif) ✅
 - [ ] Mode créateur vs mode standard
 - [ ] Onglet "Reposts" sur le profil
 
 ### 🔔 Notifications
-- [ ] Page notifications avec 4 onglets : Tous / J'aime / Commentaires / Abonnés
+- [x] Page notifications avec 4 onglets : Tous / J'aime / Commentaires / Abonnés ✅
 - [ ] Notification groupée ("X et Y ont aimé ta vidéo")
-- [x] Badge non-lus sur l'onglet Boite (navigation tab bar)
-- [ ] Marquer tout comme lu
+- [x] Badge non-lus sur l'onglet Boite (navigation tab bar) ✅
+- [x] Marquer tout comme lu (PATCH /notifications/read-all) ✅
 - [ ] Push notifications APNs (APNS_KEY_ID, APNS_TEAM_ID en env)
 - [ ] Notification quand quelqu'un mentionne @vous dans un commentaire
 - [ ] Notification quand votre vidéo est en tendance

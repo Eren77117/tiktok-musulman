@@ -9,6 +9,7 @@ import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { api } from '../../api/client';
 import { RootStackParamList } from '../../navigation';
 import { VideoPlayerItem, FeedPost } from '../../components/video/VideoPlayerItem';
@@ -201,6 +202,7 @@ export default function FeedScreen() {
 
   // Tap "Pour toi" again while already on it → refresh feed
   const handlePourToiPress = useCallback(() => {
+    ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
     if (tab === 'pourtoi') { seenIds.current = []; refetchFeed(); }
     else setTab('pourtoi');
   }, [tab, refetchFeed]);
@@ -230,7 +232,10 @@ export default function FeedScreen() {
           ] as [FeedTab, string][]).map(([key, label]) => (
             <TouchableOpacity
               key={key}
-              onPress={key === 'pourtoi' ? handlePourToiPress : () => setTab(key)}
+              onPress={key === 'pourtoi' ? handlePourToiPress : () => {
+                  ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
+                  setTab(key);
+                }}
               style={styles.tabBtn}
               activeOpacity={0.8}
             >
