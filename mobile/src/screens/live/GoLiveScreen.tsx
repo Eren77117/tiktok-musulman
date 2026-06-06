@@ -5,7 +5,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
-  Alert, ActivityIndicator, Dimensions, Platform, StatusBar,
+  Alert, ActivityIndicator, Dimensions, Platform, StatusBar, Modal, FlatList, Image,
 } from 'react-native';
 import { RTCPeerConnection, RTCView, mediaDevices, MediaStream, RTCSessionDescription, RTCIceCandidate } from 'react-native-webrtc';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,6 +46,9 @@ export default function GoLiveScreen({ navigation }: Props) {
   const [chatEnabled, setChatEnabled] = useState(true);
   const [loading, setLoading] = useState(false);
   const [cameraFront, setCameraFront] = useState(true);
+  const [liveSeconds, setLiveSeconds] = useState(0);
+  const [showViewers, setShowViewers] = useState(false);
+  const [viewerList, setViewerList] = useState<Array<{ id: string; username: string; display_name: string; avatar_url: string | null }>>([]);
 
   const socketRef = useRef<Socket | null>(null);
   const peerRefs = useRef<Map<string, RTCPeerConnection>>(new Map());
@@ -54,6 +57,14 @@ export default function GoLiveScreen({ navigation }: Props) {
   // ── Camera setup ────────────────────────────────────────────────────────────
   // Use ref so socket callbacks always have fresh stream (avoids stale closure bug)
   const localStreamRef = useRef<MediaStream | null>(null);
+
+  // Live duration timer
+  useEffect(() => {
+    if (step !== 'live') return;
+    setLiveSeconds(0);
+    const interval = setInterval(() => setLiveSeconds(s => s + 1), 1000);
+    return () => clearInterval(interval);
+  }, [step]);
 
   useEffect(() => {
     let stream: MediaStream | null = null;
@@ -260,9 +271,23 @@ export default function GoLiveScreen({ navigation }: Props) {
           <View style={styles.liveDot} />
           <Text style={styles.liveBadgeText}>LIVE</Text>
         </View>
-        <View style={styles.viewerBadge}>
+        <TouchableOpacity
+          style={styles.viewerBadge}
+          onPress={async () => {
+            if (!sessionId) return;
+            const { data } = await api.get(`/live/${sessionId}/viewers`).catch(() => ({ data: { items: [] } }));
+            setViewerList(data.items);
+            setShowViewers(true);
+          }}
+          activeOpacity={0.8}
+        >
           <IcUsers size={14} color={COLORS.white} />
           <Text style={styles.viewerCount}>{viewerCount}</Text>
+        </TouchableOpacity>
+        <View style={styles.timerBadge}>
+          <Text style={styles.timerText}>
+            {String(Math.floor(liveSeconds / 3600)).padStart(2,'0')}:{String(Math.floor((liveSeconds % 3600) / 60)).padStart(2,'0')}:{String(liveSeconds % 60).padStart(2,'0')}
+          </Text>
         </View>
         <TouchableOpacity onPress={endLive} style={styles.endBtn} activeOpacity={0.8}>
           <Text style={styles.endBtnText}>Terminer</Text>
@@ -311,6 +336,33 @@ export default function GoLiveScreen({ navigation }: Props) {
           <IcMail size={18} color={chatEnabled ? COLORS.primary : COLORS.white} />
         </TouchableOpacity>
       </View>
+
+      {/* Viewer list modal */}
+      <Modal visible={showViewers} transparent animationType="slide" onRequestClose={() => setShowViewers(false)}>
+        <TouchableOpacity style={styles.viewerModalBackdrop} activeOpacity={1} onPress={() => setShowViewers(false)}>
+          <View style={[styles.viewerModal, { paddingBottom: insets.bottom + 16 }]}>
+            <View style={styles.viewerModalHandle} />
+            <Text style={styles.viewerModalTitle}>Spectateurs ({viewerList.length})</Text>
+            <FlatList
+              data={viewerList}
+              keyExtractor={v => v.id}
+              renderItem={({ item: v }) => (
+                <View style={styles.viewerRow}>
+                  {v.avatar_url
+                    ? <Image source={{ uri: v.avatar_url }} style={styles.viewerAvatar} />
+                    : <View style={[styles.viewerAvatar, styles.viewerAvatarFb]}><Text style={{ color: '#fff', fontWeight: '700' }}>{v.display_name[0]?.toUpperCase()}</Text></View>
+                  }
+                  <View>
+                    <Text style={styles.viewerName}>{v.display_name}</Text>
+                    <Text style={styles.viewerHandle}>@{v.username}</Text>
+                  </View>
+                </View>
+              )}
+              ListEmptyComponent={<Text style={styles.viewerEmpty}>Aucun spectateur</Text>}
+            />
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -339,6 +391,8 @@ const styles = StyleSheet.create({
   liveBadgeText: { fontSize: 11, fontWeight: '800', color: COLORS.white, letterSpacing: 1 },
   viewerBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: RADIUS.full, paddingHorizontal: 10, paddingVertical: 5 },
   viewerCount: { fontSize: FONT.size.sm, fontWeight: '700', color: COLORS.white },
+  timerBadge: { backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: RADIUS.full, paddingHorizontal: 8, paddingVertical: 5 },
+  timerText: { fontSize: 11, fontWeight: '700', color: COLORS.white, letterSpacing: 0.5, fontVariant: ['tabular-nums'] as any },
   endBtn: { marginLeft: 'auto', backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.full, paddingHorizontal: 14, paddingVertical: 6, borderWidth: 1, borderColor: '#FF3B5C' },
   endBtnText: { fontSize: FONT.size.sm, fontWeight: '600', color: '#FF3B5C' },
   titleOverlay: { position: 'absolute', top: 90, left: 14, right: 80 },
@@ -354,4 +408,15 @@ const styles = StyleSheet.create({
   controls: { position: 'absolute', right: 14, flexDirection: 'column', gap: 12 },
   ctrlBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
   ctrlIcon: { fontSize: 20, color: COLORS.white },
+
+  viewerModalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  viewerModal: { backgroundColor: '#111', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '60%', padding: 16 },
+  viewerModalHandle: { width: 36, height: 4, backgroundColor: '#444', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  viewerModalTitle: { fontSize: FONT.size.base, fontWeight: '700', color: COLORS.white, marginBottom: 12 },
+  viewerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
+  viewerAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#333' },
+  viewerAvatarFb: { alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primary },
+  viewerName: { fontSize: FONT.size.sm, fontWeight: '600', color: COLORS.white },
+  viewerHandle: { fontSize: FONT.size.xs, color: 'rgba(255,255,255,0.5)' },
+  viewerEmpty: { color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginTop: 20, fontSize: FONT.size.sm },
 });

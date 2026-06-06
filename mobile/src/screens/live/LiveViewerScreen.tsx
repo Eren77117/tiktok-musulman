@@ -86,6 +86,7 @@ export default function LiveViewerScreen({ route, navigation }: Props) {
   const [connected, setConnected] = useState(false);
   const [liveEnded, setLiveEnded] = useState(false);
   const [hearts, setHearts] = useState<FloatingHeart[]>([]);
+  const [liveSeconds, setLiveSeconds] = useState(0);
 
   const socketRef = useRef<Socket | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -191,6 +192,12 @@ export default function LiveViewerScreen({ route, navigation }: Props) {
     setTimeout(() => setHearts(prev => prev.filter(h => h.id !== id)), 2500);
   }, []);
 
+  // Live elapsed timer — counts from when viewer joined
+  useEffect(() => {
+    const interval = setInterval(() => setLiveSeconds(s => s + 1), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const sendMessage = () => {
     if (!chatText.trim() || !socketRef.current) return;
     socketRef.current.emit('live:comment', { sessionId, text: chatText.trim() });
@@ -234,6 +241,11 @@ export default function LiveViewerScreen({ route, navigation }: Props) {
           <Text style={styles.hostName} numberOfLines={1}>{session?.user.display_name ?? ''}</Text>
         </View>
         <ViewerCountBadge count={viewerCount} />
+        <View style={styles.liveTimerBadge}>
+          <Text style={styles.liveTimerText}>
+            {String(Math.floor(liveSeconds / 60)).padStart(2,'0')}:{String(liveSeconds % 60).padStart(2,'0')}
+          </Text>
+        </View>
         <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
           <IcClose size={22} color={COLORS.white} />
         </TouchableOpacity>
@@ -315,6 +327,8 @@ const styles = StyleSheet.create({
   hostName: { fontSize: FONT.size.sm, fontWeight: '700', color: COLORS.white, flex: 1 },
   viewerBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: RADIUS.full, paddingHorizontal: 8, paddingVertical: 4 },
   viewerCount: { fontSize: 12, fontWeight: '700', color: COLORS.white },
+  liveTimerBadge: { backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: RADIUS.full, paddingHorizontal: 8, paddingVertical: 4 },
+  liveTimerText: { fontSize: 11, fontWeight: '700', color: COLORS.white, letterSpacing: 0.5 },
   closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
   liveTitle: { position: 'absolute', left: 14, right: 80, color: COLORS.white, fontSize: FONT.size.sm, fontWeight: '600', textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   chatArea: { position: 'absolute', bottom: 0, left: 0, right: 90, maxHeight: H * 0.4, padding: 14 },

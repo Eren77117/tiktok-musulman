@@ -90,6 +90,20 @@ export async function liveRoutes(app: FastifyInstance) {
     return reply.send({ chat_enabled: enabled });
   });
 
+  // GET /:id/viewers — recent unique viewers from LiveWatchHistory
+  app.get('/:id/viewers', { preHandler: authenticate }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const history = await prisma.liveWatchHistory.findMany({
+      where: { session_id: id },
+      orderBy: { watched_at: 'desc' },
+      take: 50,
+      include: {
+        viewer: { select: { id: true, username: true, display_name: true, avatar_url: true } },
+      },
+    }).catch(() => []);
+    return reply.send({ items: history.map(h => h.viewer) });
+  });
+
   app.delete('/:id/messages/:msgId', { preHandler: authenticate }, async (req, reply) => {
     const { id, msgId } = req.params as { id: string; msgId: string };
     const s = await prisma.liveSession.findUnique({ where: { id } });

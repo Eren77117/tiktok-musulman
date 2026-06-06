@@ -449,6 +449,27 @@
 - [x] Barre de progression: capturePanResponder bloque scroll FlatList
 - [x] Repost: /following feed inclut reposts des abonnés, queryKey invalidé
 
+### Notifications 4 onglets
+- [x] Tabs animés : Tout / J'aime / Commentaires / Abonnés
+- [x] Badge unread count par tab
+- [x] Animated underline slide (spring)
+- [ ] Testé iPhone ✓
+
+### Replay automatique
+- [x] `onEnd` → replay indicator overlay (IcRepeat + "Revoir") pour vidéos > 10s
+- [x] `repeat` prop maintenu (boucle silencieuse pour vidéos courtes)
+- [ ] Testé iPhone ✓
+
+### Live timer
+- [x] Compteur HH:MM:SS dans GoLiveScreen header
+- [x] Compteur MM:SS dans LiveViewerScreen header
+- [ ] Testé iPhone ✓
+
+### Live viewer list
+- [x] Backend GET /live/:id/viewers (LiveWatchHistory)
+- [x] Tap sur compteur viewers → modal sheet liste spectateurs
+- [ ] Testé iPhone ✓
+
 ### Commit Phase 6
 - [x] Commits 47c3376, 2ab100e, ef9fc9f
 - [x] `git push origin main`

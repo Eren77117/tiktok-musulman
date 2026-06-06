@@ -88,6 +88,8 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
   const [soundSheetVisible, setSoundSheetVisible] = useState(false);
   const [isHorizontal, setIsHorizontal] = useState(false);
   const [shareSheetVisible, setShareSheetVisible] = useState(false);
+  const [showReplay, setShowReplay] = useState(false);
+  const replayAnim = useRef(new Animated.Value(0)).current;
 
   // Vinyl spinning animation
   const vinylRotation = useRef(new Animated.Value(0)).current;
@@ -439,6 +441,16 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
             videoRef.current?.seek(0);
             setProgress(0);
             setSeekTime(0);
+            const dur = totalDurationRef.current;
+            if (dur > 10) {
+              setShowReplay(true);
+              replayAnim.setValue(0);
+              Animated.sequence([
+                Animated.timing(replayAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+                Animated.delay(1200),
+                Animated.timing(replayAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+              ]).start(() => setShowReplay(false));
+            }
           }}
           ignoreSilentSwitch="ignore"
           playInBackground={false}
@@ -510,6 +522,14 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
       >
         <IcHeartFill size={112} color="#FF3B5C" />
       </Animated.View>
+
+      {/* Replay indicator */}
+      {showReplay && (
+        <Animated.View pointerEvents="none" style={[styles.replayOverlay, { opacity: replayAnim }]}>
+          <IcRepeat size={32} color={COLORS.white} />
+          <Text style={styles.replayText}>Revoir</Text>
+        </Animated.View>
+      )}
 
       {/* Seekable progress bar — interactive, above tab bar */}
       <View style={styles.seekBarHit} {...seekPanResponder.panHandlers}>
@@ -915,6 +935,13 @@ const styles = StyleSheet.create({
   speedText: { fontSize: 22, fontWeight: '800', color: '#00C26E', letterSpacing: 0.5 },
 
   floatingHeart: { position: 'absolute', width: 112, height: 112 },
+  replayOverlay: {
+    position: 'absolute', top: '50%', alignSelf: 'center',
+    marginTop: -40, alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 16,
+    paddingHorizontal: 20, paddingVertical: 14,
+  },
+  replayText: { color: COLORS.white, fontSize: 13, fontWeight: '600' },
 
 
   repostBadge: {

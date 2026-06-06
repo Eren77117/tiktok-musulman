@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity,
-  ActivityIndicator, RefreshControl, Image,
+  ActivityIndicator, RefreshControl, Image, ScrollView, Animated,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
@@ -38,6 +38,21 @@ const TYPE_META: Record<string, { icon: any; color: string; bg: string }> = {
   SYSTEM:                   { icon: Bell,          color: '#6B7280', bg: '#F3F4F6' },
 };
 
+const TABS = [
+  { key: 'all',      label: 'Tout' },
+  { key: 'likes',    label: "J'aime" },
+  { key: 'comments', label: 'Commentaires' },
+  { key: 'follows',  label: 'Abonnés' },
+] as const;
+type TabKey = typeof TABS[number]['key'];
+
+const TAB_TYPES: Record<TabKey, string[]> = {
+  all:      [],
+  likes:    ['LIKE', 'SAVE'],
+  comments: ['COMMENT', 'MENTION'],
+  follows:  ['FOLLOW'],
+};
+
 function fmtTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
   if (diff < 60_000) return "à l'instant";
@@ -46,13 +61,27 @@ function fmtTime(iso: string) {
   return `${Math.floor(diff / 86_400_000)}j`;
 }
 
-type Item = { type: 'header'; label: string } | { type: 'notif'; notif: Notification };
-
 export default function NotificationsScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const qc = useQueryClient();
+  const [activeTab, setActiveTab] = useState<TabKey>('all');
+
+  // Animated underline
+  const tabWidths = useRef<number[]>([]);
+  const tabOffsets = useRef<number[]>([]);
+  const underlineX = useRef(new Animated.Value(0)).current;
+  const underlineW = useRef(new Animated.Value(0)).current;
+
+  const animateTab = (index: number) => {
+    const w = tabWidths.current[index] ?? 0;
+    const x = tabOffsets.current[index] ?? 0;
+    Animated.parallel([
+      Animated.spring(underlineX, { toValue: x, useNativeDriver: false, stiffness: 420, damping: 34 }),
+      Animated.spring(underlineW, { toValue: w, useNativeDriver: false, stiffness: 420, damping: 34 }),
+    ]).start();
+  };
 
   const { data, isLoading, refetch, isRefetching } = useQuery<{ items: Notification[] }>({
     queryKey: ['notifications'],
@@ -90,99 +119,124 @@ export default function NotificationsScreen() {
   };
 
   const allNotifs = data?.items ?? [];
-  const follows = allNotifs.filter(n => n.type === 'FOLLOW');
-  const activity = allNotifs.filter(n => n.type !== 'FOLLOW');
-  const unread = allNotifs.filter(n => !n.is_read).length;
+  const types = TAB_TYPES[activeTab];
+  const filtered = types.length === 0 ? allNotifs : allNotifs.filter(n => types.includes(n.type));
+  const unreadCount = allNotifs.filter(n => !n.is_read).length;
 
-  // Construire la liste plate avec headers
-  const listData: Item[] = [];
-  if (follows.length > 0) {
-    listData.push({ type: 'header', label: 'Nouveau abonné' });
-    follows.forEach(n => listData.push({ type: 'notif', notif: n }));
-  }
-  if (activity.length > 0) {
-    listData.push({ type: 'header', label: 'Activité' });
-    activity.forEach(n => listData.push({ type: 'notif', notif: n }));
-  }
+  const renderNotif = useCallback(({ item: n }: { item: Notification }) => {
+    const meta = TYPE_META[n.type] ?? TYPE_META.SYSTEM;
+    const isFollow = n.type === 'FOLLOW';
+    return (
+      <TouchableOpacity
+        style={[
+          styles.row,
+          { borderBottomColor: theme.borderLight },
+          !n.is_read && { backgroundColor: theme.isDark ? '#0D1F13' : '#F0FDF4' },
+        ]}
+        onPress={() => markRead(n)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.iconWrap}>
+          {n.data?.avatar_url && isFollow ? (
+            <View>
+              <Image source={{ uri: n.data.avatar_url }} style={styles.avatarImg} />
+              <View style={[styles.iconBadge, { backgroundColor: meta.bg }]}>
+                <meta.icon size={11} color={meta.color} strokeWidth={2} />
+              </View>
+            </View>
+          ) : (
+            <View style={[styles.iconCircle, { backgroundColor: meta.bg }]}>
+              <meta.icon size={20} color={meta.color} strokeWidth={1.8} />
+            </View>
+          )}
+        </View>
+        <View style={styles.rowInfo}>
+          <Text style={[styles.rowTitle, { color: theme.text }]}>{n.title}</Text>
+          <Text style={[styles.rowBody, { color: theme.textMuted }]} numberOfLines={2}>{n.body}</Text>
+          <Text style={[styles.rowTime, { color: theme.textSubtle }]}>{fmtTime(n.created_at)}</Text>
+        </View>
+        {!n.is_read && <View style={[styles.dot, { backgroundColor: COLORS.primary }]} />}
+      </TouchableOpacity>
+    );
+  }, [theme]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bg, paddingTop: insets.top }]}>
-      {/* Header style messagerie */}
+      {/* Header */}
       <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.borderLight }]}>
         <TouchableOpacity onPress={() => nav.goBack()} style={styles.backBtn}>
           <IcBack size={24} color={theme.text} />
         </TouchableOpacity>
         <Text style={[styles.title, { color: theme.text }]}>Notifications</Text>
-        {unread > 0 ? (
+        {unreadCount > 0 ? (
           <TouchableOpacity onPress={() => readAllMutation.mutate()} style={styles.markAllBtn} disabled={readAllMutation.isPending}>
             <Text style={styles.markAllText}>Tout lire</Text>
           </TouchableOpacity>
         ) : <View style={{ width: 68 }} />}
       </View>
 
+      {/* Tabs */}
+      <View style={[styles.tabsWrap, { backgroundColor: theme.surface, borderBottomColor: theme.borderLight }]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsRow}>
+          {TABS.map((tab, i) => {
+            const isActive = activeTab === tab.key;
+            const tabUnread = tab.key === 'all'
+              ? unreadCount
+              : allNotifs.filter(n => TAB_TYPES[tab.key].includes(n.type) && !n.is_read).length;
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                style={styles.tab}
+                onPress={() => {
+                  setActiveTab(tab.key);
+                  animateTab(i);
+                }}
+                onLayout={e => {
+                  tabWidths.current[i] = e.nativeEvent.layout.width;
+                  tabOffsets.current[i] = e.nativeEvent.layout.x;
+                  if (i === 0 && activeTab === 'all') {
+                    underlineW.setValue(e.nativeEvent.layout.width);
+                    underlineX.setValue(e.nativeEvent.layout.x);
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.tabLabel, { color: isActive ? COLORS.primary : theme.textMuted }, isActive && styles.tabLabelActive]}>
+                  {tab.label}
+                </Text>
+                {tabUnread > 0 && (
+                  <View style={styles.tabBadge}>
+                    <Text style={styles.tabBadgeText}>{tabUnread > 9 ? '9+' : tabUnread}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+        <Animated.View style={[styles.tabUnderline, { left: underlineX, width: underlineW }]} />
+      </View>
+
       {isLoading ? (
         <View style={styles.center}><ActivityIndicator color={COLORS.primary} size="large" /></View>
-      ) : listData.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <View style={styles.empty}>
           <Bell size={48} color={theme.textSubtle} strokeWidth={1.5} />
           <Text style={[styles.emptyTitle, { color: theme.text }]}>Aucune notification</Text>
-          <Text style={[styles.emptySub, { color: theme.textMuted }]}>Tes likes, abonnés et commentaires apparaîtront ici</Text>
+          <Text style={[styles.emptySub, { color: theme.textMuted }]}>
+            {activeTab === 'all' ? 'Tes likes, abonnés et commentaires apparaîtront ici' :
+             activeTab === 'likes' ? 'Personne n\'a encore aimé tes vidéos' :
+             activeTab === 'comments' ? 'Aucun commentaire pour l\'instant' :
+             'Aucun nouvel abonné pour l\'instant'}
+          </Text>
         </View>
       ) : (
         <FlatList
-          data={listData}
-          keyExtractor={(item, i) => item.type === 'header' ? `h-${i}` : item.notif.id}
+          data={filtered}
+          keyExtractor={n => n.id}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 24 }}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={COLORS.primary} />}
-          renderItem={({ item }) => {
-            if (item.type === 'header') {
-              return (
-                <View style={[styles.sectionHeader, { backgroundColor: theme.bg }]}>
-                  <Text style={[styles.sectionLabel, { color: theme.text }]}>{item.label}</Text>
-                </View>
-              );
-            }
-
-            const n = item.notif;
-            const meta = TYPE_META[n.type] ?? TYPE_META.SYSTEM;
-            const isFollow = n.type === 'FOLLOW';
-
-            return (
-              <TouchableOpacity
-                style={[
-                  styles.row,
-                  { borderBottomColor: theme.borderLight },
-                  !n.is_read && { backgroundColor: theme.isDark ? '#0D1F13' : '#F0FDF4' },
-                ]}
-                onPress={() => markRead(n)}
-                activeOpacity={0.7}
-              >
-                {/* Icône ou avatar */}
-                <View style={styles.iconWrap}>
-                  {n.data?.avatar_url && isFollow ? (
-                    <View>
-                      <Image source={{ uri: n.data.avatar_url }} style={styles.avatarImg} />
-                      <View style={[styles.iconBadge, { backgroundColor: meta.bg }]}>
-                        <meta.icon size={11} color={meta.color} strokeWidth={2} />
-                      </View>
-                    </View>
-                  ) : (
-                    <View style={[styles.iconCircle, { backgroundColor: meta.bg }]}>
-                      <meta.icon size={20} color={meta.color} strokeWidth={1.8} />
-                    </View>
-                  )}
-                </View>
-
-                <View style={styles.rowInfo}>
-                  <Text style={[styles.rowTitle, { color: theme.text }]}>{n.title}</Text>
-                  <Text style={[styles.rowBody, { color: theme.textMuted }]} numberOfLines={2}>{n.body}</Text>
-                  <Text style={[styles.rowTime, { color: theme.textSubtle }]}>{fmtTime(n.created_at)}</Text>
-                </View>
-                {!n.is_read && <View style={[styles.dot, { backgroundColor: COLORS.primary }]} />}
-              </TouchableOpacity>
-            );
-          }}
+          renderItem={renderNotif}
         />
       )}
     </View>
@@ -200,10 +254,17 @@ const styles = StyleSheet.create({
   markAllBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   markAllText: { fontSize: FONT.size.sm, color: COLORS.primary, fontWeight: FONT.weight.semibold },
 
-  sectionHeader: {
-    paddingHorizontal: SPACING.md, paddingTop: 20, paddingBottom: 8,
+  tabsWrap: { borderBottomWidth: 1 },
+  tabsRow: { paddingHorizontal: SPACING.md, gap: 4 },
+  tab: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 12 },
+  tabLabel: { fontSize: FONT.size.sm, fontWeight: FONT.weight.medium },
+  tabLabelActive: { fontWeight: FONT.weight.bold },
+  tabBadge: {
+    backgroundColor: COLORS.primary, borderRadius: 10,
+    minWidth: 17, height: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
   },
-  sectionLabel: { fontSize: 17, fontWeight: '700' },
+  tabBadgeText: { fontSize: 10, fontWeight: '800', color: '#fff' },
+  tabUnderline: { position: 'absolute', bottom: 0, height: 2.5, backgroundColor: COLORS.primary, borderRadius: 2 },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   row: {
