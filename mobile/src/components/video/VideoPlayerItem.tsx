@@ -15,7 +15,7 @@ import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, RADIUS } from '../../constants/theme';
 import {
   IcHeartFill, IcHeart, IcComment, IcShare, IcSave, IcSaveFill,
-  IcMusic, IcPlay, IcVolume, IcMute, IcCheck, IcMaximize, IcRepeat, IcEye,
+  IcMusic, IcPlay, IcCheck, IcMaximize, IcRepeat,
 } from '../ui/Icons';
 import { AnimatedNumber } from '../ui/AnimatedNumber';
 import { MarqueeText } from '../ui/MarqueeText';
@@ -103,32 +103,6 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
   const heartScale = useRef(new Animated.Value(0.3)).current;
   const [heartPos, setHeartPos] = useState({ x: W / 2 - 50, y: H / 2 - 80 });
 
-  // Smart pause overlay (ADV-03)
-  const [smartOverlayVisible, setSmartOverlayVisible] = useState(false);
-  const overlayAnim = useRef(new Animated.Value(0)).current;
-  const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const resetInactivityTimer = useCallback(() => {
-    if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
-    if (smartOverlayVisible) {
-      Animated.timing(overlayAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => setSmartOverlayVisible(false));
-    }
-    inactivityTimer.current = setTimeout(() => {
-      setSmartOverlayVisible(true);
-      Animated.timing(overlayAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-    }, 4000);
-  }, [smartOverlayVisible, overlayAnim]);
-
-  useEffect(() => {
-    if (isVisible && !paused) {
-      resetInactivityTimer();
-    } else {
-      if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
-      setSmartOverlayVisible(false);
-    }
-    return () => { if (inactivityTimer.current) clearTimeout(inactivityTimer.current); };
-  }, [isVisible, paused]);
-
   // Pause indicator
   const pauseAnim = useRef(new Animated.Value(0)).current;
 
@@ -145,6 +119,8 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
   const seekPanResponder = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
+    onStartShouldSetPanResponderCapture: () => true,
+    onMoveShouldSetPanResponderCapture: () => true,
     onPanResponderTerminationRequest: () => false,
     onPanResponderGrant: (evt) => {
       setSeeking(true);
@@ -349,7 +325,6 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
   // ── Tap handler (shared across all zones) ────────────────────────────────
   // Double tap = instant like; single tap = toggle pause (after 300ms)
   const handleZoneTap = useCallback((x: number, y: number) => {
-    resetInactivityTimer();
     const now = Date.now();
     if (now - lastTapRef.current < 300) {
       // Double tap — fire immediately, cancel pending single-tap
@@ -382,8 +357,6 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
     if (zone === 'left' || zone === 'right') {
       setRate(2);
       showSpeedIndicator();
-      // Force ExoPlayer to apply rate change immediately (Android workaround)
-      videoRef.current?.seek(seekTime > 0 ? seekTime : 0);
     } else {
       pausedBeforeLongRef.current = paused;
       setPaused(true);
@@ -521,28 +494,6 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
         <Text style={styles.speedText}>2x</Text>
       </Animated.View>
 
-      {/* Smart pause overlay — appears after 4s inactivity */}
-      {smartOverlayVisible && (
-        <Animated.View style={[styles.smartOverlay, { opacity: overlayAnim }]} pointerEvents="box-none">
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            onPress={resetInactivityTimer}
-          />
-          <View style={styles.smartOverlayContent} pointerEvents="box-none">
-            <TouchableOpacity
-              style={styles.smartFollowBtn}
-              onPress={() => { resetInactivityTimer(); if (!following) followMutation.mutate(); }}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.smartFollowText}>
-                {following ? 'Abonné' : `+ Suivre @${post.user.username}`}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
-      )}
-
       {/* Floating heart on double-tap — TikTok bounce */}
       <Animated.View
         pointerEvents="none"
@@ -585,16 +536,6 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
         </TouchableOpacity>
       )}
 
-      {/* View count badge */}
-      <View style={styles.viewCountBadge} pointerEvents="none">
-        <IcEye size={11} color="rgba(255,255,255,0.8)" />
-        <Text style={styles.viewCountText}>{fmt(post.view_count)}</Text>
-      </View>
-
-      {/* Mute button */}
-      <TouchableOpacity style={styles.muteBtn} onPress={() => setMuted(m => !m)} activeOpacity={0.8}>
-        {muted ? <IcMute size={18} color={COLORS.white} /> : <IcVolume size={18} color={COLORS.white} />}
-      </TouchableOpacity>
 
 
       {/* Bottom gradient */}
@@ -660,7 +601,6 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
             onPress={() => nav.navigate('Sound', { soundId: post.sound!.id, title: post.sound!.title, artist: post.sound!.artist })}
             activeOpacity={0.8}
           >
-            <IcMusic size={13} color={COLORS.white} />
             <MarqueeText
               text={`${post.sound.title}${post.sound.artist ? ` · ${post.sound.artist}` : ''}`}
               style={styles.soundText}
@@ -967,20 +907,6 @@ const styles = StyleSheet.create({
 
   floatingHeart: { position: 'absolute', width: 112, height: 112 },
 
-  viewCountBadge: {
-    position: 'absolute', top: 54, right: 56,
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    borderRadius: 10, paddingHorizontal: 7, paddingVertical: 3,
-  },
-  viewCountText: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.85)' },
-
-  muteBtn: {
-    position: 'absolute', top: 54, right: 14,
-    width: 34, height: 34, borderRadius: 17,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    alignItems: 'center', justifyContent: 'center',
-  },
 
   repostBadge: {
     position: 'absolute', bottom: 200, left: 14,
@@ -1112,21 +1038,6 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
   },
   seriesBadgeText: { fontSize: 11, fontWeight: '600', color: COLORS.white },
-
-  smartOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 20,
-    justifyContent: 'flex-end',
-    paddingBottom: 120,
-    alignItems: 'center',
-  },
-  smartOverlayContent: { alignItems: 'center', gap: 12 },
-  smartFollowBtn: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 24, paddingHorizontal: 28, paddingVertical: 12,
-    shadowColor: COLORS.primary, shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
-  },
-  smartFollowText: { fontSize: 15, fontWeight: '700', color: COLORS.white },
 
 });
 

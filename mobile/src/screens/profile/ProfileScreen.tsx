@@ -281,42 +281,37 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Cover photo */}
-        <View style={styles.coverWrap}>
-          {(user as any).cover_url && !coverError ? (
+        {/* Cover photo — shown only if cover_url set */}
+        {(user as any).cover_url && !coverError ? (
+          <View style={styles.coverWrap}>
             <Image
               source={{ uri: (user as any).cover_url }}
               style={StyleSheet.absoluteFill}
               resizeMode="cover"
               onError={() => setCoverError(true)}
             />
-          ) : (
             <LinearGradient
-              colors={['#0A2918', '#0F3D22', '#1A5C35']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+              colors={['transparent', 'rgba(0,0,0,0.35)']}
               style={StyleSheet.absoluteFill}
+              start={{ x: 0, y: 0.4 }}
+              end={{ x: 0, y: 1 }}
+              pointerEvents="none"
             />
-          )}
-          {/* Overlay gradient bas */}
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.35)']}
-            style={StyleSheet.absoluteFill}
-            start={{ x: 0, y: 0.4 }}
-            end={{ x: 0, y: 1 }}
-            pointerEvents="none"
-          />
-          {/* Bouton upload cover */}
-          <TouchableOpacity style={styles.coverCameraBtn} onPress={pickCover} activeOpacity={0.8} disabled={coverLoading}>
-            {coverLoading
-              ? <ActivityIndicator size="small" color={COLORS.white} />
-              : <IcCamera size={15} color={COLORS.white} />
-            }
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity style={styles.coverCameraBtn} onPress={pickCover} activeOpacity={0.8} disabled={coverLoading}>
+              {coverLoading
+                ? <ActivityIndicator size="small" color={COLORS.white} />
+                : <IcCamera size={15} color={COLORS.white} />
+              }
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         {/* Hero */}
-        <View style={[styles.heroSection, { backgroundColor: theme.bg }]}>
+        <View style={[
+          styles.heroSection,
+          { backgroundColor: theme.bg },
+          !(user as any).cover_url || coverError ? { marginTop: 0, paddingTop: 24 } : {},
+        ]}>
           <View style={styles.avatarContainer}>
             {/* Anneau story actif */}
             {hasStory && (
@@ -360,9 +355,19 @@ export default function ProfileScreen() {
             <StatItem label="Publications" value={user.post_count ?? 0} theme={theme} />
           </View>
 
-          <TouchableOpacity style={[styles.editBtn, { borderColor: theme.border }]} onPress={() => setEditVisible(true)} activeOpacity={0.8}>
-            <Text style={[styles.editBtnText, { color: theme.text }]}>Modifier le profil</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity style={[styles.editBtn, { borderColor: theme.border, flex: 1 }]} onPress={() => setEditVisible(true)} activeOpacity={0.8}>
+              <Text style={[styles.editBtnText, { color: theme.text }]}>Modifier le profil</Text>
+            </TouchableOpacity>
+            {(!(user as any).cover_url || coverError) && (
+              <TouchableOpacity style={[styles.editBtn, { borderColor: theme.border, paddingHorizontal: 12 }]} onPress={pickCover} activeOpacity={0.8} disabled={coverLoading}>
+                {coverLoading
+                  ? <ActivityIndicator size="small" color={theme.text} />
+                  : <IcCamera size={16} color={theme.text} />
+                }
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* Tabs */}

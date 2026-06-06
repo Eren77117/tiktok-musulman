@@ -79,6 +79,7 @@ export default function ShareSheet({ post, visible, onClose, onNotInterested }: 
       setReposted(data.reposted);
       ReactNativeHapticFeedback.trigger('impactMedium', HAPTIC);
       qc.invalidateQueries({ queryKey: ['feed'] });
+      qc.invalidateQueries({ queryKey: ['following-feed'] });
       qc.invalidateQueries({ queryKey: ['trending'] });
       qc.invalidateQueries({ queryKey: ['post', post.id] });
     },

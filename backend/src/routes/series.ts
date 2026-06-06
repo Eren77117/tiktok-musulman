@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { prisma } from '../lib/prisma';
+import { prisma } from '../config/database';
 import { authenticate } from '../middleware/auth';
 import { z } from 'zod';
 
@@ -23,7 +23,7 @@ export async function seriesRoutes(app: FastifyInstance) {
       orderBy: { created_at: 'desc' },
       include: { _count: { select: { episodes: true } } },
     });
-    return reply.send({ items: series.map(s => ({ ...s, episode_count: s._count.episodes })) });
+    return reply.send({ items: series.map((s: typeof series[number]) => ({ ...s, episode_count: s._count.episodes })) });
   });
 
   // Get single series with episodes

@@ -219,43 +219,84 @@ export async function postRoutes(app: FastifyInstance) {
     const ids = follows.map(f => f.following_id);
     if (ids.length === 0) return reply.send({ items: [], next_cursor: null });
 
-    const posts = await prisma.post.findMany({
-      where: {
-        user_id: { in: ids },
-        video_url: { not: '' },
-        ...(cursor ? { id: { lt: cursor } } : {}),
-      },
-      take: lim + 1,
-      orderBy: { created_at: 'desc' },
-      include: {
-        ...POST_INCLUDE,
-        _count: { select: { likes: true, comments: true } },
-      },
-    });
+    // Cursor is encoded as "postId:timestamp" or plain postId for backwards compat
+    const cursorTs = cursor ? (cursor.includes(':') ? new Date(cursor.split(':')[1]) : undefined) : undefined;
 
-    const hasMore = posts.length > lim;
-    const items = hasMore ? posts.slice(0, lim) : posts;
+    // Fetch regular posts + reposts from followed users in parallel
+    const [regularPosts, repostRecords] = await Promise.all([
+      prisma.post.findMany({
+        where: {
+          user_id: { in: ids },
+          video_url: { not: '' },
+          status: 'ACTIVE',
+          ...(cursorTs ? { created_at: { lt: cursorTs } } : {}),
+        },
+        take: lim * 2,
+        orderBy: { created_at: 'desc' },
+        include: { ...POST_INCLUDE, _count: { select: { likes: true, comments: true } } },
+      }),
+      prisma.repost.findMany({
+        where: {
+          user_id: { in: ids },
+          ...(cursorTs ? { created_at: { lt: cursorTs } } : {}),
+        },
+        take: lim * 2,
+        orderBy: { created_at: 'desc' },
+        include: {
+          user: { select: { id: true, username: true, display_name: true, avatar_url: true } },
+          post: {
+            include: { ...POST_INCLUDE, _count: { select: { likes: true, comments: true } } },
+          },
+        },
+      }),
+    ]);
 
+    // Merge: regular posts get sortTs = created_at; reposts get sortTs = repost.created_at
+    type FeedItem = {
+      sortTs: Date;
+      isRepost: boolean;
+      reposted_by?: { id: string; username: string; avatar_url: string | null };
+      post: typeof regularPosts[number] | typeof repostRecords[number]['post'];
+    };
+
+    const merged: FeedItem[] = [
+      ...regularPosts.map(p => ({ sortTs: p.created_at, isRepost: false, post: p })),
+      ...repostRecords
+        .filter(r => r.post.status === 'ACTIVE' && r.post.video_url)
+        .map(r => ({
+          sortTs: r.created_at,
+          isRepost: true,
+          reposted_by: { id: r.user.id, username: r.user.username, avatar_url: r.user.avatar_url },
+          post: r.post,
+        })),
+    ].sort((a, b) => b.sortTs.getTime() - a.sortTs.getTime());
+
+    const page = merged.slice(0, lim + 1);
+    const hasMore = page.length > lim;
+    const items = hasMore ? page.slice(0, lim) : page;
+
+    const postIds = items.map(i => i.post.id);
     const [likedIds, savedIds] = await Promise.all([
-      prisma.like.findMany({
-        where: { user_id: userId, post_id: { in: items.map(p => p.id) } },
-        select: { post_id: true },
-      }),
-      prisma.favorite.findMany({
-        where: { user_id: userId, post_id: { in: items.map(p => p.id) } },
-        select: { post_id: true },
-      }),
+      prisma.like.findMany({ where: { user_id: userId, post_id: { in: postIds } }, select: { post_id: true } }),
+      prisma.favorite.findMany({ where: { user_id: userId, post_id: { in: postIds } }, select: { post_id: true } }),
     ]);
     const likedSet = new Set(likedIds.map(l => l.post_id));
     const savedSet = new Set(savedIds.map(s => s.post_id));
 
+    const lastItem = items[items.length - 1];
+    const nextCursor = hasMore ? `${lastItem.post.id}:${lastItem.sortTs.toISOString()}` : null;
+
     return reply.send({
-      items: items.map(p => ({
-        ...p, is_liked: likedSet.has(p.id), is_saved: savedSet.has(p.id),
-        like_count: p.like_count, comment_count: p.comment_count,
-        user: { ...p.user, is_following: true },
+      items: items.map(i => ({
+        ...i.post,
+        is_liked: likedSet.has(i.post.id),
+        is_saved: savedSet.has(i.post.id),
+        like_count: i.post.like_count,
+        comment_count: i.post.comment_count,
+        user: { ...i.post.user, is_following: true },
+        reposted_by: i.isRepost ? i.reposted_by : null,
       })),
-      next_cursor: hasMore ? items[items.length - 1].id : null,
+      next_cursor: nextCursor,
     });
   });
 

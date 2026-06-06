@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { prisma } from '../lib/prisma';
+import { prisma } from '../config/database';
 import { authenticate } from '../middleware/auth';
 
 interface AnalyticsEvent {
