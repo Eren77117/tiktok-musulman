@@ -470,9 +470,15 @@
 - [x] Tap sur compteur viewers → modal sheet liste spectateurs
 - [ ] Testé iPhone ✓
 
+### Stats avancées créateur
+- [x] Backend `/me/stats?period=7|30` — vues/likes/abonnés sur période, completion_rate, avg_watch_sec, top_posts
+- [x] `CreatorStatsScreen.tsx` refait : toggle 7j/30j, 3 cards période, CompletionRing, durée moy., totaux, top 10 vidéos
+- [ ] Testé iPhone ✓
+
 ### Commit Phase 6
 - [x] Commits 47c3376, 2ab100e, ef9fc9f
-- [x] `git push origin main`
+- [ ] `git commit -m "feat: CreatorStats period toggle + completion ring + top posts"`
+- [ ] `git push origin main`
 
 ---
 
