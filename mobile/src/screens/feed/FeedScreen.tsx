@@ -19,6 +19,7 @@ import { IcFilm, IcUsers, IcSearch, IcLive, IcHeartFill, IcHeart, IcComment, IcS
 import { useAuthStore } from '../../stores/authStore';
 import { useTheme } from '../../hooks/useTheme';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { useVideoPreloader } from '../../hooks/useVideoPreloader';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 const { height: H } = Dimensions.get('window');
@@ -73,10 +74,12 @@ export default function FeedScreen() {
     queryKey: ['feed'],
     queryFn: ({ pageParam }) =>
       api.get('/posts/feed', {
-        params: { cursor: pageParam, limit: 5, seen: seenIds.current.slice(-20).join(',') },
+        params: { cursor: pageParam, limit: 6, seen: seenIds.current.slice(-20).join(',') },
       }).then(r => r.data as { items: FeedPost[]; next_cursor: string | null }),
     initialPageParam: null as string | null,
     getNextPageParam: last => last.next_cursor,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   // ── Suivis (following feed) ──────────────────────────────────────────────────
@@ -113,6 +116,13 @@ export default function FeedScreen() {
 
   const rawPosts = feedData?.pages.flatMap(p => p.items) ?? [];
   const threads  = threadsData?.pages.flatMap(p => p.items) ?? [];
+
+  // Préchargement thumbnails vidéos suivantes
+  const currentFeedIndex = rawPosts.findIndex(p => p.id === visibleId);
+  useVideoPreloader(
+    rawPosts.map(p => ({ id: p.id, video_url: p.video_url, thumbnail_url: p.thumbnail_url })),
+    currentFeedIndex
+  );
 
   // Books feed (fetch once, inject every 3 videos)
   const { data: booksData } = useInfiniteQuery({
@@ -328,8 +338,9 @@ export default function FeedScreen() {
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig.current}
           windowSize={5}
-          maxToRenderPerBatch={3}
+          maxToRenderPerBatch={2}
           initialNumToRender={2}
+          updateCellsBatchingPeriod={16}
           removeClippedSubviews
           onEndReached={() => hasNextFeed && !fetchingFeed && fetchNextFeed()}
           onEndReachedThreshold={3}

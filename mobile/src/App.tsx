@@ -12,12 +12,22 @@ import { SplashScreen } from './components/ui/SplashScreen';
 import OnboardingScreen, { ONBOARDING_KEY } from './screens/onboarding/OnboardingScreen';
 import { api } from './api/client';
 
-// ── QueryClient global — stale 30s, retry 2× ────────────────────────────────
-// Exported so cache can be cleared on logout from anywhere
+// ── QueryClient global — optimisé TikTok-level ──────────────────────────────
 export const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 30_000, retry: 2, refetchOnWindowFocus: true },
-    mutations: { retry: 0 },
+    queries: {
+      staleTime: 2 * 60 * 1000,          // 2 min stale par défaut
+      gcTime: 10 * 60 * 1000,            // 10 min en cache mémoire
+      retry: 2,
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10_000),
+      refetchOnWindowFocus: false,        // pas de refetch au focus
+      refetchOnMount: 'always',
+      networkMode: 'online',
+    },
+    mutations: {
+      retry: 1,
+      networkMode: 'online',
+    },
   },
 });
 

@@ -168,25 +168,42 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
     },
   })).current;
 
-  // Watch time tracking
-  const watchStartRef = useRef<number | null>(null);
-  const watchAccumRef = useRef(0);
+  // Watch time tracking enrichi
+  const watchDataRef = useRef({
+    watchStart: 0, totalWatchTime: 0, rewatchCount: 0,
+    pauseCount: 0, interacted: false, sessionStart: 0,
+  });
 
   useEffect(() => {
     setPaused(!isVisible);
     if (isVisible) {
-      watchStartRef.current = Date.now();
+      const now = Date.now();
+      watchDataRef.current.watchStart = now;
+      if (watchDataRef.current.sessionStart === 0) {
+        watchDataRef.current.sessionStart = now;
+      } else {
+        watchDataRef.current.rewatchCount++;
+      }
     } else {
-      if (watchStartRef.current) {
-        watchAccumRef.current += (Date.now() - watchStartRef.current) / 1000;
-        watchStartRef.current = null;
-        if (watchAccumRef.current > 0.5) {
+      if (watchDataRef.current.watchStart > 0) {
+        const session = (Date.now() - watchDataRef.current.watchStart) / 1000;
+        watchDataRef.current.totalWatchTime += session;
+        watchDataRef.current.watchStart = 0;
+        const wasSkipped = session < 2.0;
+        if (watchDataRef.current.totalWatchTime > 0.3) {
+          const dur = post.duration ?? 15;
           api.post(`/posts/${post.id}/view`, {
-            watch_time: Math.round(watchAccumRef.current),
-            completed: watchAccumRef.current >= (post.duration ?? 15) * 0.8,
+            watch_time: Math.round(watchDataRef.current.totalWatchTime),
+            completion_ratio: Math.min(1, watchDataRef.current.totalWatchTime / dur),
+            completed: watchDataRef.current.totalWatchTime >= dur * 0.8,
+            was_skipped: wasSkipped,
+            rewatch_count: watchDataRef.current.rewatchCount,
+            pause_count: watchDataRef.current.pauseCount,
+            interacted: watchDataRef.current.interacted,
           }).catch(() => {});
-          watchAccumRef.current = 0;
         }
+        // Reset
+        watchDataRef.current = { watchStart: 0, totalWatchTime: 0, rewatchCount: 0, pauseCount: 0, interacted: false, sessionStart: 0 };
       }
     }
   }, [isVisible]);
@@ -346,6 +363,7 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
 
   // ── Like button toggle (left heart icon) ─────────────────────────────────
   const handleLikePress = useCallback(() => {
+    watchDataRef.current.interacted = true;
     const wasLiked = likedRef.current;
     setLiked(l => !l);
     setLikeCount(c => wasLiked ? c - 1 : c + 1);
