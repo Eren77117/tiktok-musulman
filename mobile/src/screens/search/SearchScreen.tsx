@@ -88,6 +88,13 @@ export default function SearchScreen() {
     setTab('tout');
   }, []);
 
+  const { data: suggestionsData } = useQuery<SearchData>({
+    queryKey: ['search/suggestions', debouncedQ],
+    queryFn: () => api.get('/search/suggestions', { params: { q: debouncedQ } }).then(r => r.data),
+    enabled: debouncedQ.length >= 2,
+    staleTime: 30_000,
+  });
+
   const { data: searchData, isLoading: searchLoading } = useQuery<SearchData>({
     queryKey: ['search', debouncedQ],
     queryFn: () => api.get('/search', { params: { q: debouncedQ } }).then(r => r.data),
@@ -142,6 +149,23 @@ export default function SearchScreen() {
   }
 
   function renderTabContent() {
+    // Show suggestions inline while full search loads
+    if (searchLoading && suggestionsData) {
+      const sugUsers = suggestionsData.users ?? [];
+      const sugHashtags = suggestionsData.hashtags ?? [];
+      const mixed: Array<{ type: 'user'; data: UserResult } | { type: 'hash'; data: HashtagResult }> = [
+        ...sugUsers.map(u => ({ type: 'user' as const, data: u })),
+        ...sugHashtags.map(h => ({ type: 'hash' as const, data: h })),
+      ];
+      return (
+        <FlatList
+          data={mixed}
+          keyExtractor={(item) => item.type === 'user' ? `su-${item.data.id}` : `sh-${item.data.tag}`}
+          renderItem={({ item }) => item.type === 'user' ? renderUserRow(item.data) : renderHashRow(item.data)}
+          contentContainerStyle={{ padding: SPACING.md }}
+        />
+      );
+    }
     if (searchLoading) {
       return <View style={s.center}><ActivityIndicator color={theme.primary} size="large" /></View>;
     }

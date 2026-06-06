@@ -64,6 +64,30 @@ export async function searchRoutes(app: FastifyInstance) {
     return reply.send(result);
   });
 
+  app.get('/suggestions', { preHandler: authenticate }, async (req, reply) => {
+    const { q } = req.query as { q?: string };
+    if (!q || q.trim().length < 2) return reply.send({ users: [], hashtags: [] });
+
+    const [users, hashtags] = await Promise.all([
+      prisma.user.findMany({
+        where: {
+          OR: [{ username: { startsWith: q, mode: 'insensitive' } }, { display_name: { contains: q, mode: 'insensitive' } }],
+          is_banned: false,
+        },
+        take: 5,
+        orderBy: { follower_count: 'desc' },
+        select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true },
+      }),
+      prisma.category.findMany({
+        where: { name: { contains: q, mode: 'insensitive' } },
+        take: 5,
+        orderBy: { post_count: 'desc' },
+        select: { name: true, post_count: true, slug: true },
+      }),
+    ]);
+    return reply.send({ users, hashtags: hashtags.map(h => ({ tag: h.name, slug: h.slug, count: h.post_count })) });
+  });
+
   app.get('/trending', { preHandler: authenticate }, async (req, reply) => {
     const [trendingUsers, categories] = await Promise.all([
       prisma.user.findMany({
