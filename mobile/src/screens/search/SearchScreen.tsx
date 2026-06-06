@@ -1,17 +1,20 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, TextInput, StyleSheet, FlatList, ScrollView,
   TouchableOpacity, Image, ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { IcSearch, IcClose, IcHash, IcUsers, IcBack } from '../../components/ui/Icons';
+import { IcSearch, IcClose, IcHash, IcUsers, IcBack, IcClock } from '../../components/ui/Icons';
 import { COLORS, FONT, SPACING, RADIUS } from '../../constants/theme';
 import { api } from '../../api/client';
 import { RootStackParamList } from '../../navigation';
+
+const HISTORY_KEY = 'nour_search_history';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -43,13 +46,41 @@ export default function SearchScreen() {
   const [query, setQuery] = useState('');
   const [debouncedQ, setDebouncedQ] = useState('');
   const [tab, setTab] = useState<Tab>('tout');
+  const [history, setHistory] = useState<string[]>([]);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(HISTORY_KEY).then(h => setHistory(JSON.parse(h ?? '[]'))).catch(() => {});
+  }, []);
+
+  const saveHistory = useCallback(async (q: string) => {
+    const updated = [q, ...history.filter(h => h !== q)].slice(0, 10);
+    setHistory(updated);
+    await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+  }, [history]);
+
+  const removeHistoryItem = useCallback(async (q: string) => {
+    const updated = history.filter(h => h !== q);
+    setHistory(updated);
+    await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+  }, [history]);
+
+  const clearHistory = useCallback(async () => {
+    setHistory([]);
+    await AsyncStorage.setItem(HISTORY_KEY, '[]');
+  }, []);
 
   const handleChange = useCallback((v: string) => {
     setQuery(v);
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => setDebouncedQ(v.trim()), 350);
   }, []);
+
+  const doSearch = useCallback((q: string) => {
+    setQuery(q);
+    setDebouncedQ(q);
+    saveHistory(q);
+  }, [saveHistory]);
 
   const handleClear = useCallback(() => {
     setQuery('');
@@ -160,6 +191,32 @@ export default function SearchScreen() {
     const tUsers = trendingData?.users ?? [];
     return (
       <ScrollView contentContainerStyle={{ padding: SPACING.md }} showsVerticalScrollIndicator={false}>
+        {/* Historique */}
+        {history.length > 0 && (
+          <View style={{ marginBottom: SPACING.lg }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm }}>
+              <Text style={s.sectionTitle}>Récents</Text>
+              <TouchableOpacity onPress={clearHistory} activeOpacity={0.7}>
+                <Text style={{ fontSize: FONT.size.sm, color: theme.textSubtle }}>Tout effacer</Text>
+              </TouchableOpacity>
+            </View>
+            {history.slice(0, 6).map(q => (
+              <TouchableOpacity
+                key={q}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 }}
+                onPress={() => doSearch(q)}
+                activeOpacity={0.7}
+              >
+                <IcClock size={16} color={theme.textSubtle} />
+                <Text style={{ flex: 1, fontSize: FONT.size.base, color: theme.text }}>{q}</Text>
+                <TouchableOpacity onPress={() => removeHistoryItem(q)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <IcClose size={14} color={theme.textSubtle} />
+                </TouchableOpacity>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
         {tHashtags.length > 0 && (
           <View style={{ marginBottom: SPACING.lg }}>
             <Text style={s.sectionTitle}>Tendances</Text>
@@ -209,6 +266,7 @@ export default function SearchScreen() {
             autoCapitalize="none"
             autoCorrect={false}
             returnKeyType="search"
+            onSubmitEditing={() => { if (query.trim()) saveHistory(query.trim()); }}
           />
           {query.length > 0 && (
             <TouchableOpacity onPress={handleClear} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>

@@ -49,6 +49,7 @@ import SearchScreen from '../screens/search/SearchScreen';
 import StoryCreateScreen from '../screens/stories/StoryCreateScreen';
 import StoryViewerScreen from '../screens/stories/StoryViewerScreen';
 import StoryArchiveScreen from '../screens/stories/StoryArchiveScreen';
+import DraftsScreen from '../screens/upload/DraftsScreen';
 
 export type RootStackParamList = {
   Auth: undefined;
@@ -74,6 +75,8 @@ export type RootStackParamList = {
   StoryCreate: undefined;
   StoryViewer: { groups: any[]; initialGroupIndex?: number };
   StoryArchive: undefined;
+  Drafts: undefined;
+  Upload: { draft?: any } | undefined;
 };
 
 export type AuthStackParamList = {
@@ -350,6 +353,10 @@ export function AppNavigator() {
               options={{ animation: 'fade', presentation: 'fullScreenModal', headerShown: false }} />
             <RootStack.Screen name="StoryArchive" component={StoryArchiveScreen}
               options={{ animation: 'slide_from_right' }} />
+            <RootStack.Screen name="Drafts" component={DraftsScreen}
+              options={{ animation: 'slide_from_right', headerShown: false }} />
+            <RootStack.Screen name="Upload" component={CreateScreen}
+              options={{ animation: 'slide_from_bottom', presentation: 'modal', headerShown: false }} />
           </>
         ) : (
           <RootStack.Screen name="Auth" component={AuthNavigator} />

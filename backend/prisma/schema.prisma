@@ -106,6 +106,7 @@ model User {
   story_views       StoryView[]
   story_likes       StoryLike[]
   story_replies     StoryReply[]  @relation("StoryReplySender")
+  collections       Collection[]
 
   @@index([username])
   @@index([email])
@@ -156,6 +157,7 @@ model Post {
   reposts        Repost[]
   not_interested NotInterested[]
   linked_stories Story[]         @relation("StoryLinkedPost")
+  collection_posts CollectionPost[]
 
   @@index([user_id])
   @@index([created_at])
@@ -571,4 +573,30 @@ model NotInterested {
 
   @@unique([user_id, post_id])
   @@index([user_id])
+}
+
+model Collection {
+  id            String   @id @default(cuid())
+  name          String
+  user_id       String
+  thumbnail_url String?
+  created_at    DateTime @default(now())
+
+  user  User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  posts CollectionPost[]
+
+  @@unique([user_id, name])
+  @@index([user_id])
+}
+
+model CollectionPost {
+  collection_id String
+  post_id       String
+  saved_at      DateTime @default(now())
+
+  collection Collection @relation(fields: [collection_id], references: [id], onDelete: Cascade)
+  post       Post       @relation(fields: [post_id], references: [id], onDelete: Cascade)
+
+  @@id([collection_id, post_id])
+  @@index([collection_id])
 }

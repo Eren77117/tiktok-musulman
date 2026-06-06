@@ -15,10 +15,11 @@ import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, RADIUS } from '../../constants/theme';
 import {
   IcHeartFill, IcHeart, IcComment, IcShare, IcSave, IcSaveFill,
-  IcMusic, IcPlay, IcVolume, IcMute, IcCheck, IcMaximize, IcRepeat,
+  IcMusic, IcPlay, IcVolume, IcMute, IcCheck, IcMaximize, IcRepeat, IcEye,
 } from '../ui/Icons';
 import { AnimatedNumber } from '../ui/AnimatedNumber';
 import { MarqueeText } from '../ui/MarqueeText';
+import { SaveToCollectionSheet } from './SaveToCollectionSheet';
 import ShareSheet from './ShareSheet';
 
 const { width: W, height: H } = Dimensions.get('window');
@@ -73,6 +74,7 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
   const [liked, setLiked] = useState(post.is_liked);
   const [likeCount, setLikeCount] = useState(post.like_count);
   const [saved, setSaved] = useState(post.is_saved ?? false);
+  const [collectionSheetVisible, setCollectionSheetVisible] = useState(false);
   const [following, setFollowing] = useState(post.user.is_following ?? false);
   const [muted, setMuted] = useState(false);
   const [paused, setPaused] = useState(!isVisible);
@@ -518,6 +520,12 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
         </TouchableOpacity>
       )}
 
+      {/* View count badge */}
+      <View style={styles.viewCountBadge} pointerEvents="none">
+        <IcEye size={11} color="rgba(255,255,255,0.8)" />
+        <Text style={styles.viewCountText}>{fmt(post.view_count)}</Text>
+      </View>
+
       {/* Mute button */}
       <TouchableOpacity style={styles.muteBtn} onPress={() => setMuted(m => !m)} activeOpacity={0.8}>
         {muted ? <IcMute size={18} color={COLORS.white} /> : <IcVolume size={18} color={COLORS.white} />}
@@ -623,11 +631,11 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
         {/* Comment */}
         <ActionBtn icon={<IcComment size={30} color={COLORS.white} />} count={fmt(post.comment_count)} onPress={() => { watchDataRef.current.interacted = true; onComment(); }} />
 
-        {/* Save */}
+        {/* Save → Collections */}
         <ActionBtn
           icon={saved ? <IcSaveFill size={28} color={COLORS.primary} /> : <IcSave size={28} color={COLORS.white} />}
           count={''}
-          onPress={() => saveMutation.mutate()}
+          onPress={() => setCollectionSheetVisible(true)}
         />
 
         {/* Share */}
@@ -705,6 +713,13 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
         visible={shareSheetVisible}
         onClose={() => setShareSheetVisible(false)}
         onNotInterested={onNotInterested}
+      />
+
+      {/* Save to Collection Sheet */}
+      <SaveToCollectionSheet
+        visible={collectionSheetVisible}
+        postId={post.id}
+        onClose={() => setCollectionSheetVisible(false)}
       />
 
     </Animated.View>
@@ -877,6 +892,14 @@ const styles = StyleSheet.create({
   speedText: { fontSize: 22, fontWeight: '800', color: '#00C26E', letterSpacing: 0.5 },
 
   floatingHeart: { position: 'absolute', width: 112, height: 112 },
+
+  viewCountBadge: {
+    position: 'absolute', top: 54, right: 56,
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 10, paddingHorizontal: 7, paddingVertical: 3,
+  },
+  viewCountText: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.85)' },
 
   muteBtn: {
     position: 'absolute', top: 54, right: 14,

@@ -4,6 +4,8 @@ import {
   ScrollView, Alert, ActivityIndicator, ActionSheetIOS, Platform,
   FlatList, Animated, Image,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
 import DocumentPicker, { types, isCancel } from 'react-native-document-picker';
 import { createThumbnail } from 'react-native-create-thumbnail';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -12,7 +14,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, getTokens } from '../../api/client';
 import { API_BASE_URL } from '../../constants';
 import { COLORS, FONT, SPACING, RADIUS, SHADOW } from '../../constants/theme';
-import { IcVideo, IcCreate, IcClose, IcImage, IcHash, IcAt, IcCheck, IcMusic } from '../../components/ui/Icons';
+import { IcVideo, IcCreate, IcClose, IcImage, IcHash, IcAt, IcCheck, IcMusic, IcSave } from '../../components/ui/Icons';
+import { showToast } from '../../components/ui/Toast';
 
 interface VideoFile {
   uri: string;
@@ -38,8 +41,11 @@ function parseCaption(text: string): React.ReactNode[] {
   });
 }
 
+interface Draft { id: string; caption: string; videoUri: string | null; thumbnailUri: string | null; createdAt: string }
+
 export default function UploadScreen() {
   const insets = useSafeAreaInsets();
+  const nav = useNavigation<any>();
   const qc = useQueryClient();
   const [media, setMedia] = useState<VideoFile | null>(null);
   const [caption, setCaption] = useState('');
@@ -133,6 +139,26 @@ export default function UploadScreen() {
 
   const animateProgress = (to: number) => {
     Animated.timing(progressAnim, { toValue: to, duration: 300, useNativeDriver: false }).start();
+  };
+
+  const handleSaveDraft = async () => {
+    try {
+      const stored = await AsyncStorage.getItem('nour_drafts');
+      const drafts: Draft[] = JSON.parse(stored ?? '[]');
+      const newDraft: Draft = {
+        id: Date.now().toString(),
+        caption: caption.trim(),
+        videoUri: media?.uri ?? null,
+        thumbnailUri: null,
+        createdAt: new Date().toISOString(),
+      };
+      drafts.unshift(newDraft);
+      await AsyncStorage.setItem('nour_drafts', JSON.stringify(drafts.slice(0, 20)));
+      showToast('Brouillon sauvegardé', 'success');
+      nav.goBack();
+    } catch {
+      showToast('Erreur de sauvegarde', 'error');
+    }
   };
 
   const handlePublish = async () => {
@@ -361,18 +387,30 @@ export default function UploadScreen() {
           <Text style={styles.tipItem}>· Max 100 MB pour un upload rapide</Text>
         </View>
 
-        {/* ── Publish button ── */}
-        <TouchableOpacity
-          style={[styles.submitBtn, (!media || uploading) && styles.submitBtnDisabled]}
-          onPress={handlePublish}
-          disabled={!media || uploading}
-          activeOpacity={0.85}
-        >
-          {uploading
-            ? <ActivityIndicator color={COLORS.white} size="small" />
-            : <Text style={styles.submitBtnText}>Publier</Text>
-          }
-        </TouchableOpacity>
+        {/* ── Buttons row ── */}
+        <View style={styles.btnRow}>
+          <TouchableOpacity
+            style={[styles.draftBtn, (!media || uploading) && { opacity: 0.4 }]}
+            onPress={handleSaveDraft}
+            disabled={!media || uploading}
+            activeOpacity={0.8}
+          >
+            <IcSave size={16} color={COLORS.primary} />
+            <Text style={styles.draftBtnText}>Brouillon</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.submitBtn, { flex: 1 }, (!media || uploading) && styles.submitBtnDisabled]}
+            onPress={handlePublish}
+            disabled={!media || uploading}
+            activeOpacity={0.85}
+          >
+            {uploading
+              ? <ActivityIndicator color={COLORS.white} size="small" />
+              : <Text style={styles.submitBtnText}>Publier</Text>
+            }
+          </TouchableOpacity>
+        </View>
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -467,6 +505,13 @@ const styles = StyleSheet.create({
   tipItem: { fontSize: FONT.size.xs, color: COLORS.textMuted, lineHeight: 18 },
   tipHighlight: { color: COLORS.primary, fontWeight: FONT.weight.semibold },
 
+  btnRow: { flexDirection: 'row', gap: 12 },
+  draftBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderWidth: 1.5, borderColor: COLORS.primary, borderRadius: RADIUS.md,
+    paddingVertical: 16, paddingHorizontal: 16,
+  },
+  draftBtnText: { fontSize: FONT.size.md, fontWeight: FONT.weight.semibold, color: COLORS.primary },
   submitBtn: {
     backgroundColor: COLORS.primary, borderRadius: RADIUS.md,
     paddingVertical: 16, alignItems: 'center', ...SHADOW.green,

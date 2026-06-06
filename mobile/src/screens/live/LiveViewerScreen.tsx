@@ -5,7 +5,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
-  FlatList, Alert, ActivityIndicator, Dimensions, StatusBar,
+  FlatList, Alert, ActivityIndicator, Dimensions, StatusBar, Animated, Easing,
 } from 'react-native';
 import { RTCPeerConnection, RTCView, RTCSessionDescription, RTCIceCandidate } from 'react-native-webrtc';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,7 +16,7 @@ import { api, getTokens } from '../../api/client';
 import { API_BASE_URL } from '../../constants/theme';
 import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, SPACING, RADIUS } from '../../constants/theme';
-import { IcClose, IcHeart, IcUsers, IcSend } from '../../components/ui/Icons';
+import { IcClose, IcHeart, IcHeartFill, IcUsers, IcSend } from '../../components/ui/Icons';
 
 const { width: W, height: H } = Dimensions.get('window');
 const SOCKET_URL = API_BASE_URL.replace('/api', '');
@@ -29,6 +29,48 @@ interface LiveSession {
   id: string; title: string; viewer_count: number; chat_enabled: boolean;
   user: { id: string; username: string; display_name: string; avatar_url: string | null };
 }
+interface FloatingHeart { id: string; x: number }
+
+function FloatingHeartItem({ x }: { x: number }) {
+  const translateY = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+  const scale = useRef(new Animated.Value(0.3)).current;
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 300, friction: 8 }),
+      Animated.timing(translateY, { toValue: -200, duration: 2000, useNativeDriver: true, easing: Easing.out(Easing.ease) }),
+      Animated.sequence([
+        Animated.delay(1500),
+        Animated.timing(opacity, { toValue: 0, duration: 500, useNativeDriver: true }),
+      ]),
+    ]).start();
+  }, []);
+  return (
+    <Animated.View style={{ position: 'absolute', bottom: 100, right: x, transform: [{ translateY }, { scale }], opacity }}>
+      <IcHeartFill size={28} color="#FF3B5C" />
+    </Animated.View>
+  );
+}
+
+function ViewerCountBadge({ count }: { count: number }) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const prevCount = useRef(count);
+  useEffect(() => {
+    if (count !== prevCount.current) {
+      prevCount.current = count;
+      Animated.sequence([
+        Animated.timing(scaleAnim, { toValue: 1.3, duration: 150, useNativeDriver: true }),
+        Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, tension: 200, friction: 10 }),
+      ]).start();
+    }
+  }, [count]);
+  return (
+    <Animated.View style={[styles.viewerBadge, { transform: [{ scale: scaleAnim }] }]}>
+      <IcUsers size={13} color={COLORS.white} />
+      <Text style={styles.viewerCount}>{count}</Text>
+    </Animated.View>
+  );
+}
 
 export default function LiveViewerScreen({ route, navigation }: Props) {
   const { sessionId, broadcasterId } = route.params as any;
@@ -40,6 +82,7 @@ export default function LiveViewerScreen({ route, navigation }: Props) {
   const [chatEnabled, setChatEnabled] = useState(true);
   const [connected, setConnected] = useState(false);
   const [liveEnded, setLiveEnded] = useState(false);
+  const [hearts, setHearts] = useState<FloatingHeart[]>([]);
 
   const socketRef = useRef<Socket | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -86,6 +129,7 @@ export default function LiveViewerScreen({ route, navigation }: Props) {
       socket.on('reconnect', joinRoom);
 
       socket.on('live:ended', () => setLiveEnded(true));
+      socket.on('live:reaction', addHeart);
 
       socket.on('live:comment', (msg: ChatMsg) => {
         setMessages(prev => [...prev.slice(-200), msg]);
@@ -137,6 +181,13 @@ export default function LiveViewerScreen({ route, navigation }: Props) {
     };
   }, [sessionId, broadcasterId]);
 
+  const addHeart = useCallback(() => {
+    const id = Date.now().toString();
+    const x = Math.random() * 60 + 20;
+    setHearts(prev => [...prev.slice(-15), { id, x }]);
+    setTimeout(() => setHearts(prev => prev.filter(h => h.id !== id)), 2500);
+  }, []);
+
   const sendMessage = () => {
     if (!chatText.trim() || !socketRef.current) return;
     socketRef.current.emit('live:comment', { sessionId, text: chatText.trim() });
@@ -179,10 +230,7 @@ export default function LiveViewerScreen({ route, navigation }: Props) {
           </View>
           <Text style={styles.hostName} numberOfLines={1}>{session?.user.display_name ?? ''}</Text>
         </View>
-        <View style={styles.viewerBadge}>
-          <IcUsers size={13} color={COLORS.white} />
-          <Text style={styles.viewerCount}>{viewerCount}</Text>
-        </View>
+        <ViewerCountBadge count={viewerCount} />
         <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
           <IcClose size={22} color={COLORS.white} />
         </TouchableOpacity>
@@ -212,10 +260,20 @@ export default function LiveViewerScreen({ route, navigation }: Props) {
         </View>
       )}
 
+      {/* Floating hearts */}
+      {hearts.map(h => <FloatingHeartItem key={h.id} x={h.x} />)}
+
       {/* Follow + reaction buttons (right side) */}
       <View style={[styles.rightActions, { bottom: insets.bottom + 80 }]}>
-        <TouchableOpacity style={styles.actionBtn}>
-          <IcHeart size={28} color={COLORS.white} />
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={() => {
+            addHeart();
+            socketRef.current?.emit('live:reaction', { sessionId });
+          }}
+          activeOpacity={0.7}
+        >
+          <IcHeartFill size={28} color="#FF3B5C" />
         </TouchableOpacity>
       </View>
 

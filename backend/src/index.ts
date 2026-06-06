@@ -27,6 +27,7 @@ import { supportRoutes } from './routes/support';
 import { threadRoutes } from './routes/threads';
 import { bookRoutes } from './routes/books';
 import { soundRoutes } from './routes/sounds';
+import { collectionRoutes } from './routes/collections';
 
 process.stdout.write(`[STARTUP] Node ${process.version}\n`);
 
@@ -76,6 +77,7 @@ async function bootstrap() {
   await app.register(threadRoutes, { prefix: '/api/threads' });
   await app.register(bookRoutes, { prefix: '/api/books' });
   await app.register(soundRoutes, { prefix: '/api/sounds' });
+  await app.register(collectionRoutes, { prefix: '/api/collections' });
 
   app.setErrorHandler((error, _req, reply) => {
     app.log.error(error);
