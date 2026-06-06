@@ -11,7 +11,11 @@ import { api, getTokens } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
 import { useTheme } from '../../hooks/useTheme';
 import { COLORS, FONT, SPACING, RADIUS, API_BASE_URL } from '../../constants/theme';
-import { IcClose, IcSend, IcHeartFill, IcHeart, IcComment, IcMore, IcFilterSort } from '../ui/Icons';
+import { IcClose, IcSend, IcHeartFill, IcHeart, IcComment, IcMore, IcFilterSort, IcAt } from '../ui/Icons';
+
+interface MentionUser {
+  id: string; username: string; display_name: string; avatar_url: string | null;
+}
 
 const SOCKET_URL = API_BASE_URL.replace('/api', '');
 
@@ -48,6 +52,7 @@ export function CommentsBottomSheet({ postId, onClose }: Props) {
   const { user } = useAuthStore();
   const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState<{ id: string; username: string } | null>(null);
+  const [mentionQuery, setMentionQuery] = useState('');
   const inputRef = useRef<any>(null);
   const translateY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
 
@@ -126,6 +131,24 @@ export function CommentsBottomSheet({ postId, onClose }: Props) {
   }, [postId]);
 
   const [limit, setLimit] = useState(20);
+  const { data: mentionData } = useQuery<{ users?: MentionUser[] }>({
+    queryKey: ['mention-comment', mentionQuery],
+    queryFn: () => api.get('/search', { params: { q: mentionQuery } }).then(r => r.data).catch(() => ({})),
+    enabled: mentionQuery.length >= 1,
+  });
+
+  const handleTextChange = (val: string) => {
+    setText(val);
+    const match = val.slice(0, val.length).match(/@(\w*)$/);
+    setMentionQuery(match ? match[1] : '');
+  };
+
+  const insertMention = (username: string) => {
+    const newText = text.replace(/@\w*$/, `@${username} `);
+    setText(newText);
+    setMentionQuery('');
+  };
+
   const { data, isLoading } = useQuery<{ items: Comment[]; next_cursor: string | null }>({
     queryKey: ['comments', postId, limit],
     queryFn: () => api.get(`/comments/post/${postId}`, { params: { limit } }).then(r => r.data),
@@ -221,6 +244,27 @@ export function CommentsBottomSheet({ postId, onClose }: Props) {
 
           {/* Input */}
           <View style={[styles.inputRow, { borderTopColor: theme.borderLight, backgroundColor: theme.surface }]}>
+            {/* @Mention suggestions */}
+            {mentionQuery.length >= 1 && (mentionData?.users?.length ?? 0) > 0 && (
+              <View style={[styles.mentionBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                {mentionData!.users!.slice(0, 4).map(u => (
+                  <TouchableOpacity key={u.id} style={[styles.mentionRow, { borderBottomColor: theme.borderLight }]} onPress={() => insertMention(u.username)} activeOpacity={0.7}>
+                    {u.avatar_url
+                      ? <Image source={{ uri: u.avatar_url }} style={styles.mentionAvatar} />
+                      : <View style={[styles.mentionAvatar, { backgroundColor: COLORS.primaryBg, alignItems: 'center', justifyContent: 'center' }]}>
+                          <Text style={{ color: COLORS.primary, fontWeight: '700', fontSize: 12 }}>{u.display_name[0]?.toUpperCase()}</Text>
+                        </View>
+                    }
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.mentionName, { color: theme.text }]}>{u.display_name}</Text>
+                      <Text style={{ fontSize: 11, color: theme.textMuted }}>@{u.username}</Text>
+                    </View>
+                    <IcAt size={13} color={COLORS.primary} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
             {replyTo && (
               <View style={[styles.replyBanner, { backgroundColor: theme.inputBg }]}>
                 <Text style={[styles.replyBannerText, { color: theme.textMuted }]}>
@@ -236,7 +280,7 @@ export function CommentsBottomSheet({ postId, onClose }: Props) {
                 ref={inputRef}
                 style={[styles.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
                 value={text}
-                onChangeText={setText}
+                onChangeText={handleTextChange}
                 placeholder={replyTo ? `Répondre à @${replyTo.username}...` : 'Ajouter un commentaire...'}
                 placeholderTextColor={theme.textSubtle}
                 multiline
@@ -451,4 +495,16 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center',
   },
   sendBtnOff: { opacity: 0.4 },
+
+  mentionBox: {
+    borderRadius: 12, borderWidth: 1, overflow: 'hidden',
+    marginBottom: 8,
+    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: { width: 0, height: -2 },
+  },
+  mentionRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1,
+  },
+  mentionAvatar: { width: 32, height: 32, borderRadius: 16 },
+  mentionName: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold },
 });
