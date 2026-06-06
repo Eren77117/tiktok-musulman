@@ -591,6 +591,21 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
         </View>
       )}
 
+      {/* Speed badge — top right */}
+      <TouchableOpacity
+        style={styles.speedBadge}
+        onPress={() => {
+          const SPEEDS = [1, 1.5, 2, 0.5];
+          const idx = SPEEDS.indexOf(rate);
+          const next = SPEEDS[(idx + 1) % SPEEDS.length];
+          setRate(next);
+          ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
+        }}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.speedText}>{rate === 1 ? '1×' : `${rate}×`}</Text>
+      </TouchableOpacity>
+
       {/* Plein écran — videos horizontales uniquement */}
       {isHorizontal && (
         <TouchableOpacity
@@ -976,13 +991,19 @@ const styles = StyleSheet.create({
   holdSeekTime: { fontSize: 16, fontWeight: '700', color: COLORS.white, letterSpacing: 0.5 },
 
   speedBadge: {
+    position: 'absolute', top: 60, right: 14,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+  },
+  speedBadgeOLD: {
     position: 'absolute', top: '45%', alignSelf: 'center',
     left: W / 2 - 36,
     backgroundColor: 'rgba(0,194,110,0.15)', borderRadius: RADIUS.full,
     paddingHorizontal: 20, paddingVertical: 9,
     borderWidth: 1, borderColor: 'rgba(0,194,110,0.4)',
   },
-  speedText: { fontSize: 22, fontWeight: '800', color: '#00C26E', letterSpacing: 0.5 },
+  speedText: { fontSize: 13, fontWeight: '700', color: COLORS.white },
 
   floatingHeart: { position: 'absolute', width: 112, height: 112 },
   replayOverlay: {
