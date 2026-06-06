@@ -17,7 +17,7 @@ import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, RADIUS } from '../../constants/theme';
 import {
   IcHeartFill, IcHeart, IcComment, IcShare, IcSave, IcSaveFill,
-  IcMusic, IcPlay, IcCheck, IcMaximize, IcRepeat,
+  IcMusic, IcPlay, IcCheck, IcMaximize, IcRepeat, IcVolume, IcMute,
 } from '../ui/Icons';
 import { AnimatedNumber } from '../ui/AnimatedNumber';
 import { MarqueeText } from '../ui/MarqueeText';
@@ -591,6 +591,21 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
         </View>
       )}
 
+      {/* Mute button — top left */}
+      <TouchableOpacity
+        style={styles.muteBadge}
+        onPress={() => {
+          setMuted(m => !m);
+          ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
+        }}
+        activeOpacity={0.8}
+      >
+        {muted
+          ? <IcMute size={16} color={COLORS.white} />
+          : <IcVolume size={16} color={COLORS.white} />
+        }
+      </TouchableOpacity>
+
       {/* Speed badge — top right */}
       <TouchableOpacity
         style={styles.speedBadge}
@@ -990,18 +1005,18 @@ const styles = StyleSheet.create({
   holdSeekArrow: { fontSize: 28, color: COLORS.white },
   holdSeekTime: { fontSize: 16, fontWeight: '700', color: COLORS.white, letterSpacing: 0.5 },
 
+  muteBadge: {
+    position: 'absolute', top: 60, left: 14,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 20, width: 34, height: 34,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+  },
   speedBadge: {
     position: 'absolute', top: 60, right: 14,
     backgroundColor: 'rgba(0,0,0,0.55)',
     borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
-  },
-  speedBadgeOLD: {
-    position: 'absolute', top: '45%', alignSelf: 'center',
-    left: W / 2 - 36,
-    backgroundColor: 'rgba(0,194,110,0.15)', borderRadius: RADIUS.full,
-    paddingHorizontal: 20, paddingVertical: 9,
-    borderWidth: 1, borderColor: 'rgba(0,194,110,0.4)',
   },
   speedText: { fontSize: 13, fontWeight: '700', color: COLORS.white },
 

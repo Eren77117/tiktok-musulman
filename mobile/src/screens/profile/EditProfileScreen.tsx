@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { api, getTokens } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
+import { useTheme } from '../../hooks/useTheme';
 import { COLORS, FONT, SPACING, RADIUS, API_BASE_URL } from '../../constants/theme';
 import { IcClose, IcCheck, IcEdit } from '../../components/ui/Icons';
 
@@ -16,6 +17,7 @@ interface Props { onClose: () => void }
 
 export function EditProfileScreen({ onClose }: Props) {
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
   const { user, updateUser, loadMe } = useAuthStore();
   const [displayName, setDisplayName] = useState(user?.display_name ?? '');
   const [bio, setBio] = useState(user?.bio ?? '');
@@ -94,15 +96,15 @@ export function EditProfileScreen({ onClose }: Props) {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { paddingTop: insets.top }]}
+      style={[styles.container, { backgroundColor: theme.bg, paddingTop: insets.top }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.borderLight }]}>
         <TouchableOpacity onPress={onClose} style={styles.headerBtn} activeOpacity={0.7}>
-          <IcClose size={22} color={COLORS.text} />
+          <IcClose size={22} color={theme.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Modifier le profil</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Modifier le profil</Text>
         <TouchableOpacity
           style={[styles.saveBtn, (!isDirty || mutation.isPending) && styles.saveBtnDisabled]}
           onPress={() => mutation.mutate()}
@@ -147,42 +149,42 @@ export function EditProfileScreen({ onClose }: Props) {
         {/* Fields */}
         <View style={styles.fields}>
           <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Nom affiché</Text>
+            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>Nom affiché</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text }]}
               value={displayName}
               onChangeText={setDisplayName}
               placeholder="Votre nom"
-              placeholderTextColor={COLORS.textPlaceholder}
+              placeholderTextColor={theme.textSubtle}
               maxLength={50}
               autoCorrect={false}
             />
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Bio</Text>
+            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>Bio</Text>
             <TextInput
-              style={[styles.input, styles.textarea]}
+              style={[styles.input, styles.textarea, { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text }]}
               value={bio}
               onChangeText={setBio}
               placeholder="Parlez de vous..."
-              placeholderTextColor={COLORS.textPlaceholder}
+              placeholderTextColor={theme.textSubtle}
               maxLength={200}
               multiline
               textAlignVertical="top"
             />
-            <Text style={styles.charCount}>{bio.length}/200</Text>
+            <Text style={[styles.charCount, { color: theme.textSubtle }]}>{bio.length}/200</Text>
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Nom d'utilisateur</Text>
+            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>Nom d'utilisateur</Text>
             <TextInput
-              style={[styles.input, styles.inputDisabled]}
+              style={[styles.input, styles.inputDisabled, { backgroundColor: theme.inputBg ?? theme.border, borderColor: theme.border, color: theme.textMuted }]}
               value={user?.username}
               editable={false}
-              placeholderTextColor={COLORS.textMuted}
+              placeholderTextColor={theme.textMuted}
             />
-            <Text style={styles.fieldHint}>Le nom d'utilisateur ne peut pas être modifié.</Text>
+            <Text style={[styles.fieldHint, { color: theme.textSubtle }]}>Le nom d'utilisateur ne peut pas être modifié.</Text>
           </View>
         </View>
       </ScrollView>
@@ -191,15 +193,14 @@ export function EditProfileScreen({ onClose }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: SPACING.md, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: COLORS.borderLight,
-    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
   },
   headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: FONT.size.lg, fontWeight: FONT.weight.semibold, color: COLORS.text },
+  headerTitle: { fontSize: FONT.size.lg, fontWeight: FONT.weight.semibold },
   saveBtn: {
     backgroundColor: COLORS.primary, borderRadius: RADIUS.full,
     paddingHorizontal: 16, paddingVertical: 8,
@@ -227,14 +228,14 @@ const styles = StyleSheet.create({
 
   fields: { gap: SPACING.md },
   field: { gap: 6 },
-  fieldLabel: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold, color: COLORS.textMuted },
+  fieldLabel: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold },
   input: {
-    backgroundColor: COLORS.white, borderWidth: 1.5, borderColor: COLORS.border,
-    borderRadius: RADIUS.md, paddingHorizontal: SPACING.md, paddingVertical: 12,
-    fontSize: FONT.size.base, color: COLORS.text,
+    borderWidth: 1.5, borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.md, paddingVertical: 12,
+    fontSize: FONT.size.base,
   },
-  inputDisabled: { backgroundColor: COLORS.inputBg, color: COLORS.textMuted },
+  inputDisabled: {},
   textarea: { minHeight: 90, textAlignVertical: 'top', paddingTop: 12 },
-  charCount: { fontSize: FONT.size.xs, color: COLORS.textSubtle, textAlign: 'right' },
-  fieldHint: { fontSize: FONT.size.xs, color: COLORS.textSubtle },
+  charCount: { fontSize: FONT.size.xs, textAlign: 'right' },
+  fieldHint: { fontSize: FONT.size.xs },
 });
