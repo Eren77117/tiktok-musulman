@@ -1,8 +1,9 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, TextInput, StyleSheet, FlatList,
   TouchableOpacity, Image, ActivityIndicator, ScrollView, Dimensions,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -11,7 +12,7 @@ import { api } from '../../api/client';
 import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, SPACING, RADIUS } from '../../constants/theme';
 import { useTheme } from '../../hooks/useTheme';
-import { IcSearch, IcClose, IcHeart, IcPlay } from '../../components/ui/Icons';
+import { IcSearch, IcClose, IcHeart, IcPlay, IcClock } from '../../components/ui/Icons';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -54,7 +55,29 @@ export default function ExploreScreen() {
   const [debouncedQ, setDebouncedQ] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchTab, setSearchTab] = useState<'videos' | 'users'>('videos');
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem('nour_search_history').then(v => {
+      if (v) setSearchHistory(JSON.parse(v));
+    }).catch(() => {});
+  }, []);
+
+  const saveToHistory = useCallback(async (q: string) => {
+    const trimmed = q.trim();
+    if (!trimmed || trimmed.length < 2) return;
+    setSearchHistory(prev => {
+      const next = [trimmed, ...prev.filter(h => h !== trimmed)].slice(0, 8);
+      AsyncStorage.setItem('nour_search_history', JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const clearHistory = useCallback(async () => {
+    setSearchHistory([]);
+    AsyncStorage.removeItem('nour_search_history').catch(() => {});
+  }, []);
 
   const { data: searchData, isLoading: searchLoading } = useQuery<{ users?: UserResult[]; posts?: Post[] }>({
     queryKey: ['search', debouncedQ],
@@ -81,7 +104,15 @@ export default function ExploreScreen() {
   const handleChange = (v: string) => {
     setQuery(v);
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => setDebouncedQ(v), 350);
+    searchTimer.current = setTimeout(() => {
+      setDebouncedQ(v);
+      if (v.trim().length >= 2) saveToHistory(v.trim());
+    }, 500);
+  };
+
+  const applyHistory = (h: string) => {
+    setQuery(h);
+    setDebouncedQ(h);
   };
 
   const isSearching = debouncedQ.length > 1;
@@ -128,6 +159,26 @@ export default function ExploreScreen() {
           )}
         </View>
       </View>
+
+      {/* Search history — shown when bar is focused but no query yet */}
+      {!isSearching && searchHistory.length > 0 && query.length === 0 && (
+        <View style={[styles.historyWrap, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+          <View style={styles.historyHeader}>
+            <Text style={[styles.historyTitle, { color: theme.textMuted }]}>Recherches récentes</Text>
+            <TouchableOpacity onPress={clearHistory} activeOpacity={0.7}>
+              <Text style={styles.historyClear}>Effacer</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.historyChips}>
+            {searchHistory.map((h, i) => (
+              <TouchableOpacity key={i} style={[styles.historyChip, { backgroundColor: theme.card, borderColor: theme.border }]} onPress={() => applyHistory(h)} activeOpacity={0.8}>
+                <IcClock size={12} color={theme.textMuted} />
+                <Text style={[styles.historyChipText, { color: theme.text }]}>{h}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       {isSearching ? (
         <View style={{ flex: 1 }}>
@@ -327,6 +378,18 @@ const styles = StyleSheet.create({
   emptyWrap: { alignItems: 'center', paddingTop: 60, gap: 10, backgroundColor: COLORS.bg },
   emptyTitle: { fontSize: FONT.size.lg, fontWeight: FONT.weight.semibold, color: COLORS.text },
   emptySubtitle: { fontSize: FONT.size.sm, color: COLORS.textMuted },
+
+  historyWrap: { paddingVertical: 12, borderBottomWidth: 1 },
+  historyHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.md, marginBottom: 8 },
+  historyTitle: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold },
+  historyClear: { fontSize: FONT.size.sm, color: COLORS.primary, fontWeight: FONT.weight.medium },
+  historyChips: { paddingHorizontal: SPACING.md, gap: 8 },
+  historyChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderRadius: RADIUS.full, borderWidth: 1,
+    paddingHorizontal: 12, paddingVertical: 6,
+  },
+  historyChipText: { fontSize: FONT.size.sm },
 
   sectionTitle: { fontSize: FONT.size.base, fontWeight: FONT.weight.bold },
   sugCard: { width: 90, alignItems: 'center', gap: 4 },
