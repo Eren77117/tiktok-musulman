@@ -12,7 +12,7 @@ import { api } from '../../api/client';
 import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, SPACING, RADIUS } from '../../constants/theme';
 import { useTheme } from '../../hooks/useTheme';
-import { IcSearch, IcClose, IcHeart, IcPlay, IcClock } from '../../components/ui/Icons';
+import { IcSearch, IcClose, IcHeart, IcPlay, IcClock, IcHash } from '../../components/ui/Icons';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -99,6 +99,13 @@ export default function ExploreScreen() {
     queryFn: () => api.get('/users/suggested', { params: { limit: 10 } }).then((r) => r.data).catch(() => ({ items: [] })),
     enabled: debouncedQ.length < 2,
     staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: trendingMeta } = useQuery<{ hashtags: { tag: string; count: number }[] }>({
+    queryKey: ['trending-meta'],
+    queryFn: () => api.get('/search/trending').then((r) => r.data as { hashtags: { tag: string; count: number }[] }).catch(() => ({ hashtags: [] })),
+    enabled: debouncedQ.length < 2,
+    staleTime: 10 * 60 * 1000,
   });
 
   const handleChange = (v: string) => {
@@ -256,6 +263,28 @@ export default function ExploreScreen() {
                   </TouchableOpacity>
                 ))}
               </ScrollView>
+
+              {/* Trending hashtags */}
+              {(trendingMeta?.hashtags?.length ?? 0) > 0 && (
+                <View style={{ paddingVertical: 10, backgroundColor: theme.bg }}>
+                  <Text style={[styles.sectionTitle, { color: theme.text, paddingHorizontal: SPACING.md, marginBottom: 8 }]}>Tendances</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: SPACING.md, gap: 8 }}>
+                    {trendingMeta!.hashtags.slice(0, 12).map((h) => (
+                      <TouchableOpacity
+                        key={h.tag}
+                        style={[styles.hashChip, { backgroundColor: theme.card, borderColor: theme.border }]}
+                        onPress={() => navigation.navigate('Hashtag', { tag: h.tag })}
+                        activeOpacity={0.8}
+                      >
+                        <IcHash size={12} color={COLORS.primary} />
+                        <Text style={[styles.hashChipText, { color: theme.text }]}>{h.tag}</Text>
+                        <Text style={[styles.hashChipCount, { color: theme.textSubtle }]}>{fmtNum(h.count)}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
               {(suggestedData?.items?.length ?? 0) > 0 && (
                 <View style={{ backgroundColor: theme.bg, paddingVertical: 12 }}>
                   <Text style={[styles.sectionTitle, { color: theme.text, paddingHorizontal: SPACING.md }]}>Comptes suggérés</Text>
@@ -390,6 +419,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 6,
   },
   historyChipText: { fontSize: FONT.size.sm },
+
+  hashChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    borderWidth: 1, borderRadius: RADIUS.full,
+    paddingHorizontal: 12, paddingVertical: 6,
+  },
+  hashChipText: { fontSize: FONT.size.sm, fontWeight: FONT.weight.medium },
+  hashChipCount: { fontSize: 10 },
 
   sectionTitle: { fontSize: FONT.size.base, fontWeight: FONT.weight.bold },
   sugCard: { width: 90, alignItems: 'center', gap: 4 },

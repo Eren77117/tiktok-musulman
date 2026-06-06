@@ -577,6 +577,14 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, o
         <View style={styles.holdSeekOverlay} pointerEvents="none">
           <Text style={styles.holdSeekArrow}>{holdSeekDirRef.current === -1 ? '◀' : '▶'}</Text>
           <Text style={styles.holdSeekTime}>Vitesse 2×</Text>
+          <Text style={styles.holdSeekSub}>{fmtDuration(seekTime)} / {fmtDuration(totalDurationRef.current)}</Text>
+        </View>
+      )}
+
+      {/* Time badge — visible when rate > 1 (speed badge active) */}
+      {rate > 1 && !holdSeeking && (
+        <View style={styles.timeBadge} pointerEvents="none">
+          <Text style={styles.timeBadgeText}>{fmtDuration(seekTime)} / {fmtDuration(totalDurationRef.current)}</Text>
         </View>
       )}
 
@@ -1058,6 +1066,16 @@ const styles = StyleSheet.create({
   },
   holdSeekArrow: { fontSize: 28, color: COLORS.white },
   holdSeekTime: { fontSize: 16, fontWeight: '700', color: COLORS.white, letterSpacing: 0.5 },
+  holdSeekSub: { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
+
+  timeBadge: {
+    position: 'absolute', top: 60, left: '50%', marginLeft: -55,
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 4,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+    width: 110, alignItems: 'center',
+  },
+  timeBadgeText: { fontSize: 12, fontWeight: '600', color: COLORS.white },
 
   muteBadge: {
     position: 'absolute', top: 60, left: 14,

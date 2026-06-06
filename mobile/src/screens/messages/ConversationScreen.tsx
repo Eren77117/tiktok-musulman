@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator,
-  Pressable, Animated, Modal, Alert, Image,
+  Pressable, Animated, Modal, Alert, Image, PanResponder,
 } from 'react-native';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -72,6 +73,44 @@ function TypingBubble({ theme }: { theme: ReturnType<typeof import('../../hooks/
         ))}
       </View>
     </View>
+  );
+}
+
+// Swipe-right-to-reply wrapper — slides bubble right, triggers onReply at 40px
+function SwipeableMessage({ children, onReply, disabled }: {
+  children: React.ReactNode;
+  onReply: () => void;
+  disabled?: boolean;
+}) {
+  const tx = useRef(new Animated.Value(0)).current;
+  const triggered = useRef(false);
+
+  const pan = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, g) =>
+      !disabled && g.dx > 6 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+    onPanResponderGrant: () => { triggered.current = false; },
+    onPanResponderMove: (_, g) => {
+      const val = Math.max(0, Math.min(55, g.dx));
+      tx.setValue(val);
+      if (!triggered.current && val >= 40) {
+        triggered.current = true;
+        ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
+        onReply();
+      }
+    },
+    onPanResponderRelease: () => {
+      Animated.spring(tx, { toValue: 0, useNativeDriver: true, tension: 300, friction: 14 }).start();
+    },
+    onPanResponderTerminate: () => {
+      Animated.spring(tx, { toValue: 0, useNativeDriver: true, tension: 300, friction: 14 }).start();
+    },
+  })).current;
+
+  return (
+    <Animated.View style={{ transform: [{ translateX: tx }] }} {...pan.panHandlers}>
+      {children}
+    </Animated.View>
   );
 }
 
@@ -252,6 +291,10 @@ export default function ConversationScreen({ route, navigation }: Props) {
     const rxList = m.reactions ? Object.entries(m.reactions).filter(([, e]) => e) : [];
 
     return (
+      <SwipeableMessage
+        onReply={() => { setReplyTo(m); setTimeout(() => inputRef.current?.focus(), 100); }}
+        disabled={deleted}
+      >
       <Pressable
         onLongPress={() => !deleted && setReactingTo(m)}
         delayLongPress={350}
@@ -336,6 +379,7 @@ export default function ConversationScreen({ route, navigation }: Props) {
           </TouchableOpacity>
         )}
       </Pressable>
+      </SwipeableMessage>
     );
   }, [user?.id, myReactions, theme]);
 
