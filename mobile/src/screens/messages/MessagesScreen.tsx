@@ -3,6 +3,7 @@ import {
   View, Text, FlatList, StyleSheet, TouchableOpacity, Image,
   ActivityIndicator, RefreshControl, ScrollView, ActionSheetIOS, Platform, Alert,
 } from 'react-native';
+import { ConversationSkeleton } from '../../components/ui/Skeleton';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -126,8 +127,8 @@ export default function MessagesScreen() {
       </View>
 
       {isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={COLORS.primary} size="large" />
+        <View>
+          {[0, 1, 2, 3, 4, 5].map(i => <ConversationSkeleton key={i} />)}
         </View>
       ) : (
         <FlatList
