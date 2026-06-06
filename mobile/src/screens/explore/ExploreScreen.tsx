@@ -71,6 +71,13 @@ export default function ExploreScreen() {
     enabled: debouncedQ.length < 2,
   });
 
+  const { data: suggestedData } = useQuery<{ items: UserResult[] }>({
+    queryKey: ['suggested-accounts'],
+    queryFn: () => api.get('/users/suggested', { params: { limit: 10 } }).then((r) => r.data).catch(() => ({ items: [] })),
+    enabled: debouncedQ.length < 2,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const handleChange = (v: string) => {
     setQuery(v);
     if (searchTimer.current) clearTimeout(searchTimer.current);
@@ -198,6 +205,32 @@ export default function ExploreScreen() {
                   </TouchableOpacity>
                 ))}
               </ScrollView>
+              {(suggestedData?.items?.length ?? 0) > 0 && (
+                <View style={{ backgroundColor: theme.bg, paddingVertical: 12 }}>
+                  <Text style={[styles.sectionTitle, { color: theme.text, paddingHorizontal: SPACING.md }]}>Comptes suggérés</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: SPACING.md, gap: 16, marginTop: 10 }}>
+                    {suggestedData!.items.map((u) => (
+                      <TouchableOpacity
+                        key={u.id}
+                        style={styles.sugCard}
+                        onPress={() => navigation.navigate('UserProfile', { userId: u.id, username: u.username })}
+                        activeOpacity={0.8}
+                      >
+                        {u.avatar_url ? (
+                          <Image source={{ uri: u.avatar_url }} style={styles.sugAvatar} />
+                        ) : (
+                          <View style={[styles.sugAvatar, { backgroundColor: COLORS.primaryLight, alignItems: 'center', justifyContent: 'center' }]}>
+                            <Text style={{ color: COLORS.white, fontWeight: '700', fontSize: 16 }}>{u.display_name[0]?.toUpperCase()}</Text>
+                          </View>
+                        )}
+                        <Text style={[styles.sugName, { color: theme.text }]} numberOfLines={1}>{u.display_name}</Text>
+                        <Text style={[styles.sugHandle, { color: theme.textMuted }]} numberOfLines={1}>@{u.username}</Text>
+                        <Text style={[styles.sugFollowers, { color: theme.textMuted }]}>{fmtNum(u.follower_count)} abonnés</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
             </View>
           }
           renderItem={renderGridItem}
@@ -294,4 +327,11 @@ const styles = StyleSheet.create({
   emptyWrap: { alignItems: 'center', paddingTop: 60, gap: 10, backgroundColor: COLORS.bg },
   emptyTitle: { fontSize: FONT.size.lg, fontWeight: FONT.weight.semibold, color: COLORS.text },
   emptySubtitle: { fontSize: FONT.size.sm, color: COLORS.textMuted },
+
+  sectionTitle: { fontSize: FONT.size.base, fontWeight: FONT.weight.bold },
+  sugCard: { width: 90, alignItems: 'center', gap: 4 },
+  sugAvatar: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#222' },
+  sugName: { fontSize: FONT.size.xs, fontWeight: FONT.weight.semibold, textAlign: 'center' },
+  sugHandle: { fontSize: 10, textAlign: 'center' },
+  sugFollowers: { fontSize: 10, textAlign: 'center' },
 });

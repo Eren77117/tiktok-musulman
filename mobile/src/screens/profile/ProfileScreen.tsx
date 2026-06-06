@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createThumbnail } from 'react-native-create-thumbnail';
 import {
-  View, Text, StyleSheet, Image, TouchableOpacity,
+  View, Text, StyleSheet, Image, TouchableOpacity, Dimensions,
   FlatList, ScrollView, Alert, ActivityIndicator, RefreshControl, Modal, ActionSheetIOS, Platform,
 } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -39,6 +39,13 @@ function getThumbUrl(post: Pick<Post, 'thumbnail_url' | 'video_url'>): string | 
       .replace(/\.(mp4|mov|avi|webm|mkv)$/i, '.jpg');
   }
   return null;
+}
+
+interface Collection {
+  id: string;
+  name: string;
+  thumbnail_url: string | null;
+  post_count: number;
 }
 
 interface Thread {
@@ -128,9 +135,9 @@ export default function ProfileScreen() {
     enabled: !!user?.id && activeTab === 2 && likeSubTab === 'Fils',
   });
 
-  const { data: favorites, isLoading: favLoading } = useQuery<{ items: Post[] }>({
-    queryKey: ['favorites'],
-    queryFn: () => api.get('/favorites').then((r) => r.data).catch(() => ({ items: [] })),
+  const { data: collections, isLoading: collectionsLoading } = useQuery<{ items: Collection[] }>({
+    queryKey: ['my-collections'],
+    queryFn: () => api.get('/collections').then((r) => r.data).catch(() => ({ items: [] })),
     enabled: !!user?.id && activeTab === 3,
   });
 
@@ -231,13 +238,11 @@ export default function ProfileScreen() {
 
   const gridData = activeTab === 0 ? posts?.items
     : activeTab === 2 && likeSubTab === 'Pour toi' ? liked?.items
-    : activeTab === 3 ? favorites?.items
     : null;
 
   const gridLoading = activeTab === 0 ? postsLoading
     : activeTab === 2 && likeSubTab === 'Pour toi' ? likedLoading
     : activeTab === 2 && likeSubTab === 'Fils' ? likedThreadsLoading
-    : activeTab === 3 ? favLoading
     : false;
 
   return (
@@ -360,6 +365,9 @@ export default function ProfileScreen() {
             <TouchableOpacity style={[styles.editBtn, { borderColor: theme.border, flex: 1 }]} onPress={() => setEditVisible(true)} activeOpacity={0.8}>
               <Text style={[styles.editBtnText, { color: theme.text }]}>Modifier le profil</Text>
             </TouchableOpacity>
+            <TouchableOpacity style={[styles.editBtn, { borderColor: theme.border, paddingHorizontal: 14 }]} onPress={() => navigation.navigate('Drafts')} activeOpacity={0.8}>
+              <IcEdit size={16} color={theme.text} />
+            </TouchableOpacity>
             {(!(user as any).cover_url || coverError) && (
               <TouchableOpacity style={[styles.editBtn, { borderColor: theme.border, paddingHorizontal: 12 }]} onPress={pickCover} activeOpacity={0.8} disabled={coverLoading}>
                 {coverLoading
@@ -403,6 +411,41 @@ export default function ProfileScreen() {
           <ThreadsTab threads={threads?.items} loading={threadsLoading} theme={theme} />
         ) : activeTab === 2 && likeSubTab === 'Fils' ? (
           <ThreadsTab threads={likedThreads?.items} loading={likedThreadsLoading} theme={theme} />
+        ) : activeTab === 3 ? (
+          collectionsLoading ? (
+            <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
+          ) : (
+            <FlatList
+              data={collections?.items ?? []}
+              numColumns={2}
+              keyExtractor={(c) => c.id}
+              scrollEnabled={false}
+              columnWrapperStyle={{ gap: 2, marginBottom: 2 }}
+              contentContainerStyle={{ paddingHorizontal: 2, paddingTop: 2 }}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={collSt.card}
+                  onPress={() => navigation.navigate('Collection', { collectionId: item.id, name: item.name })}
+                  activeOpacity={0.85}
+                >
+                  {item.thumbnail_url ? (
+                    <Image source={{ uri: item.thumbnail_url }} style={collSt.thumb} resizeMode="cover" />
+                  ) : (
+                    <View style={[collSt.thumb, { backgroundColor: theme.surface }]} />
+                  )}
+                  <View style={collSt.info}>
+                    <Text style={[collSt.name, { color: theme.text }]} numberOfLines={1}>{item.name}</Text>
+                    <Text style={[collSt.count, { color: theme.textMuted }]}>{item.post_count} vidéo{item.post_count !== 1 ? 's' : ''}</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <View style={{ alignItems: 'center', marginTop: 60 }}>
+                  <Text style={{ color: theme.textMuted, fontSize: FONT.size.md }}>Aucune collection</Text>
+                </View>
+              }
+            />
+          )
         ) : activeTab === 4 ? (
           repostsLoading ? (
             <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
@@ -686,6 +729,15 @@ const styles = StyleSheet.create({
   emptyWrap: { alignItems: 'center', paddingVertical: 60, gap: 8 },
   emptyTitle: { fontSize: FONT.size.lg, fontWeight: FONT.weight.semibold },
   emptySubtitle: { fontSize: FONT.size.sm, textAlign: 'center', paddingHorizontal: SPACING.xl },
+});
+
+const COLL_W = Math.round((Dimensions.get('window').width - 6) / 2);
+const collSt = StyleSheet.create({
+  card: { width: COLL_W, borderRadius: RADIUS.md, overflow: 'hidden' },
+  thumb: { width: '100%', aspectRatio: 1, backgroundColor: '#111' },
+  info: { padding: 8, gap: 2 },
+  name: { fontSize: FONT.size.md, fontWeight: '600' },
+  count: { fontSize: FONT.size.sm },
 });
 
 const previewSt = StyleSheet.create({

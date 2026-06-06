@@ -276,19 +276,20 @@
 - [x] `SaveToCollectionSheet.tsx` créé
 - [x] Paramètre `?postId=` sur `GET /collections` pour has_post
 - [x] Bouton Save → ouvre SaveToCollectionSheet
-- [ ] ProfileScreen onglet Favoris → grille de dossiers (TODO Phase 5)
-- [ ] Navigation vers une collection → FlatList videos (TODO Phase 5)
-- [ ] Testé : flow complet créer → sauvegarder → voir ✓
+- [x] ProfileScreen onglet Favoris → grille de dossiers 2 colonnes
+- [x] `CollectionScreen.tsx` créé (FlatList posts grille 3 colonnes)
+- [x] Navigation vers une collection → CollectionScreen
+- [ ] Testé iPhone ✓
 
 ### FEAT-02 : Brouillons
 - [x] `handleSaveDraft` dans UploadScreen
 - [x] Bouton "Brouillon" à côté de "Publier"
 - [x] AsyncStorage `nour_drafts` avec max 20
 - [x] `DraftsScreen.tsx` créé
-- [ ] Naviguer vers Drafts depuis profil (menu ou badge) (TODO Phase 5)
+- [x] Bouton brouillons (IcEdit) dans ProfileScreen action row → navigate('Drafts')
 - [x] Tap sur brouillon → reprendre dans UploadScreen
 - [x] Supprimer un brouillon
-- [ ] Testé : sauvegarder + reprendre fonctionne ✓
+- [ ] Testé iPhone ✓
 
 ### FEAT-03 : Recherche avancée
 - [x] `DiscoveryView` avec trending hashtags + comptes suggérés (existait déjà)
@@ -364,8 +365,8 @@
 
 ### ADV-06 : Recommandations comptes
 - [x] `GET /users/suggested` (amis-d'amis + populaires par followers)
-- [ ] Section dans Explore (TODO Phase 6)
-- [ ] Testé ✓
+- [x] Section "Comptes suggérés" dans ExploreScreen (horizontal scroll, avatars + nom)
+- [ ] Testé iPhone ✓
 
 ### ADV-07 : Messages vocaux
 - [ ] SKIP — AudioRecorderPlayer nécessite recompile native
@@ -406,17 +407,27 @@
 - [ ] Réponses inline depth=1 expandables (TODO Phase 7)
 - [ ] Testé ✓
 
-### DEEP-03 : Profil rétention (commit 47c3376)
+### DEEP-03 : Profil rétention
 - [x] Section "Comptes similaires" GET /users/:id/similar (shared followers + popular fallback)
-- [ ] Long-press preview dans grille (TODO Phase 7)
-- [ ] Sticky follow button (TODO Phase 7)
-- [ ] Testé ✓
+- [x] Long-press 350ms preview dans grille (ProfileScreen + UserProfileScreen)
+- [x] Sticky follow button dans header (UserProfileScreen, seuil 260px)
+- [ ] Testé iPhone ✓
 
-### DEEP-05 : Live immersif (commit 47c3376)
+### DEEP-04 : Messages améliorés
+- [x] Typing indicator auto-stop 2s (typingTimerRef)
+- [x] Double-tick read receipts (✓ envoyé / ✓✓ vert lu)
+- [x] Image inline preview (launchImageLibrary → /upload/image → media_url)
+- [x] Socket relay typing:start/stop + message:read depuis backend
+- [ ] Testé iPhone ✓
+
+### DEEP-05 : Live immersif
 - [x] Cœurs positions aléatoires toute la largeur (left: random * W)
 - [x] Couleurs variées, tailles variables
-- [ ] Badges MOD/TOP/LOYAL (TODO Phase 7)
-- [ ] Testé ✓
+- [x] LiveWatchHistory + LiveMute + LiveBan (Prisma + migration manuelle)
+- [x] Rang calculé au join (top 3 viewers = TOP, ≥5 watches = LOYAL)
+- [x] live:comment broadcast inclut rank
+- [x] Badges TOP (or) / LOYAL (vert) dans chat overlay LiveViewerScreen
+- [ ] Testé iPhone ✓
 
 ### DEEP-06 : Recherche discovery (commit 2ab100e)
 - [x] GET /search/suggestions (debounce 200ms, 2-char min, staleTime 30s)

@@ -24,7 +24,7 @@ const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 
 type Props = NativeStackScreenProps<RootStackParamList, 'LiveViewer'>;
 
-interface ChatMsg { id?: string; user: { id: string; display_name: string; avatar_url: string | null }; text: string; timestamp: number }
+interface ChatMsg { id?: string; user: { id: string; display_name: string; avatar_url: string | null }; text: string; timestamp: number; rank?: string | null }
 interface LiveSession {
   id: string; title: string; viewer_count: number; chat_enabled: boolean;
   user: { id: string; username: string; display_name: string; avatar_url: string | null };
@@ -253,6 +253,8 @@ export default function LiveViewerScreen({ route, navigation }: Props) {
             keyExtractor={(m, i) => m.id ?? `${i}`}
             renderItem={({ item: m }) => (
               <View style={styles.chatRow}>
+                {m.rank === 'top' && <View style={styles.rankBadgeTop}><Text style={styles.rankBadgeTxt}>TOP</Text></View>}
+                {m.rank === 'loyal' && <View style={styles.rankBadgeLoy}><Text style={styles.rankBadgeTxt}>LOYAL</Text></View>}
                 <Text style={styles.chatUser}>{m.user.display_name} </Text>
                 <Text style={styles.chatTxt}>{m.text}</Text>
               </View>
@@ -316,9 +318,12 @@ const styles = StyleSheet.create({
   closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
   liveTitle: { position: 'absolute', left: 14, right: 80, color: COLORS.white, fontSize: FONT.size.sm, fontWeight: '600', textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   chatArea: { position: 'absolute', bottom: 0, left: 0, right: 90, maxHeight: H * 0.4, padding: 14 },
-  chatRow: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: RADIUS.full, paddingHorizontal: 10, paddingVertical: 5, marginBottom: 4, alignSelf: 'flex-start' },
+  chatRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: RADIUS.full, paddingHorizontal: 10, paddingVertical: 5, marginBottom: 4, alignSelf: 'flex-start' },
   chatUser: { fontSize: 12, fontWeight: '700', color: COLORS.primaryLight },
   chatTxt: { fontSize: 12, color: COLORS.white },
+  rankBadgeTop: { backgroundColor: '#F59E0B', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1, marginRight: 4 },
+  rankBadgeLoy: { backgroundColor: '#10B981', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1, marginRight: 4 },
+  rankBadgeTxt: { fontSize: 9, fontWeight: '800', color: COLORS.white, letterSpacing: 0.5 },
   rightActions: { position: 'absolute', right: 14, flexDirection: 'column', gap: 16 },
   actionBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
   chatInputRow: { position: 'absolute', left: 14, right: 14, flexDirection: 'row', gap: 8 },
