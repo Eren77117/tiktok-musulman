@@ -10,7 +10,7 @@ import { api } from '../../api/client';
 import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, SPACING, RADIUS } from '../../constants/theme';
 import { useTheme } from '../../hooks/useTheme';
-import { IcSearch, IcBell, IcPlus, IcPin, IcArchive } from '../../components/ui/Icons';
+import { IcSearch, IcBell, IcPlus, IcPin, IcArchive, IcMail } from '../../components/ui/Icons';
 import { useQuery } from '@tanstack/react-query';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -217,8 +217,11 @@ export default function MessagesScreen() {
           ) : null}
           ListEmptyComponent={
             <View style={styles.empty}>
+              <View style={[styles.emptyIcon, { backgroundColor: theme.primaryBg }]}>
+                <IcMail size={28} color={COLORS.primary} strokeWidth={1.5} />
+              </View>
               <Text style={[styles.emptyTitle, { color: theme.text }]}>Aucune conversation</Text>
-              <Text style={[styles.emptySub, { color: theme.textMuted }]}>Tes messages apparaîtront ici</Text>
+              <Text style={[styles.emptySub, { color: theme.textMuted }]}>Commence une discussion avec quelqu'un que tu suis</Text>
             </View>
           }
         />
@@ -286,7 +289,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
   },
   badgeText: { color: COLORS.white, fontSize: 11, fontWeight: '700' },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80, gap: 8 },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80, gap: 12, paddingHorizontal: 40 },
+  emptyIcon: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   archivedRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, borderTopWidth: 1 },
   archivedText: { fontSize: FONT.size.sm },
   emptyTitle: { fontSize: FONT.size.lg, fontWeight: FONT.weight.semibold },

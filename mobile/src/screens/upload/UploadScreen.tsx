@@ -14,6 +14,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, getTokens } from '../../api/client';
 import { API_BASE_URL } from '../../constants';
+import { useTheme } from '../../hooks/useTheme';
 import { COLORS, FONT, SPACING, RADIUS, SHADOW } from '../../constants/theme';
 import { IcVideo, IcCreate, IcClose, IcImage, IcHash, IcAt, IcCheck, IcMusic, IcSave } from '../../components/ui/Icons';
 import { showToast } from '../../components/ui/Toast';
@@ -47,6 +48,7 @@ interface Draft { id: string; caption: string; videoUri: string | null; thumbnai
 export default function UploadScreen() {
   const insets = useSafeAreaInsets();
   const nav = useNavigation<any>();
+  const theme = useTheme();
   const qc = useQueryClient();
   const [media, setMedia] = useState<VideoFile | null>(null);
   const [caption, setCaption] = useState('');
@@ -321,23 +323,23 @@ export default function UploadScreen() {
   const popularHashtags = ['rappel', 'coran', 'motivation', 'islam', 'dua', 'lifestyle', 'famille'];
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Nouvelle publication</Text>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: theme.bg }]}>
+      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Nouvelle publication</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
         {/* ── Media picker ── */}
-        <TouchableOpacity style={[styles.picker, !!media && styles.pickerSelected]} onPress={handlePickPress} activeOpacity={0.8} disabled={uploading}>
+        <TouchableOpacity style={[styles.picker, { backgroundColor: theme.card, borderColor: !!media ? COLORS.primary : theme.border }, !!media && styles.pickerSelected]} onPress={handlePickPress} activeOpacity={0.8} disabled={uploading}>
           {media ? (
             <View style={styles.pickerInfo}>
               <View style={styles.pickerIconWrap}>
                 {media.isImage ? <IcImage size={22} color={COLORS.primary} /> : <IcVideo size={22} color={COLORS.primary} />}
               </View>
               <View style={styles.pickerDetails}>
-                <Text style={styles.pickerFileName} numberOfLines={1}>{media.name}</Text>
-                {sizeMB && <Text style={styles.pickerMeta}>{sizeMB} MB · Appuie pour changer</Text>}
+                <Text style={[styles.pickerFileName, { color: theme.text }]} numberOfLines={1}>{media.name}</Text>
+                {sizeMB && <Text style={[styles.pickerMeta, { color: theme.textMuted }]}>{sizeMB} MB · Appuie pour changer</Text>}
               </View>
               <TouchableOpacity onPress={() => !uploading && setMedia(null)} style={styles.clearBtn} hitSlop={{ top:12, bottom:12, left:12, right:12 }}>
                 <IcClose size={16} color={COLORS.textMuted} />
@@ -348,8 +350,8 @@ export default function UploadScreen() {
               <View style={styles.pickerEmptyIconWrap}>
                 <IcCreate size={28} color={COLORS.primary} strokeWidth={2} />
               </View>
-              <Text style={styles.pickerEmptyLabel}>Ajouter une vidéo ou photo</Text>
-              <Text style={styles.pickerEmptyHint}>Galerie · Fichiers · MP4, MOV, JPG, PNG</Text>
+              <Text style={[styles.pickerEmptyLabel, { color: theme.text }]}>Ajouter une vidéo ou photo</Text>
+              <Text style={[styles.pickerEmptyHint, { color: theme.textMuted }]}>Galerie · Fichiers · MP4, MOV, JPG, PNG</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -366,41 +368,41 @@ export default function UploadScreen() {
 
         {/* ── Caption with hashtag/mention support ── */}
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Description</Text>
+          <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>Description</Text>
           <TextInput
             ref={inputRef}
-            style={styles.textarea}
+            style={[styles.textarea, { backgroundColor: theme.card, borderColor: theme.border, color: theme.text }]}
             value={caption}
             onChangeText={(t) => handleCaptionChange(t)}
             onSelectionChange={(e) => handleCaptionChange(caption, e.nativeEvent.selection)}
             placeholder="Décris ta vidéo... #hashtag @mention"
-            placeholderTextColor={COLORS.textPlaceholder}
+            placeholderTextColor={theme.textSubtle}
             multiline
             maxLength={500}
             editable={!uploading}
           />
           {/* Live preview with colored hashtags/mentions */}
           {caption.length > 0 && (
-            <View style={styles.captionPreview}>
-              <Text style={styles.captionPreviewLabel}>Aperçu :</Text>
+            <View style={[styles.captionPreview, { backgroundColor: theme.primaryBg }]}>
+              <Text style={[styles.captionPreviewLabel, { color: theme.textMuted }]}>Aperçu :</Text>
               <Text style={styles.captionPreviewText}>{parseCaption(caption)}</Text>
             </View>
           )}
-          <Text style={styles.charCount}>{caption.length}/500</Text>
+          <Text style={[styles.charCount, { color: theme.textSubtle }]}>{caption.length}/500</Text>
         </View>
 
         {/* ── @Mention suggestions ── */}
         {showMentions && (mentionData?.users?.length ?? 0) > 0 && (
-          <View style={styles.suggestionsBox}>
+          <View style={[styles.suggestionsBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             {mentionData!.users!.slice(0, 5).map((u) => (
-              <TouchableOpacity key={u.id} style={styles.suggestionRow} onPress={() => insertMention(u.username)} activeOpacity={0.7}>
+              <TouchableOpacity key={u.id} style={[styles.suggestionRow, { borderBottomColor: theme.border }]} onPress={() => insertMention(u.username)} activeOpacity={0.7}>
                 {u.avatar_url
                   ? <Image source={{ uri: u.avatar_url }} style={styles.suggestionAvatar} />
                   : <View style={[styles.suggestionAvatar, styles.suggestionAvatarFallback]}><Text style={styles.suggestionAvatarText}>{u.display_name[0]?.toUpperCase()}</Text></View>
                 }
                 <View>
-                  <Text style={styles.suggestionName}>{u.display_name}</Text>
-                  <Text style={styles.suggestionUsername}>@{u.username}</Text>
+                  <Text style={[styles.suggestionName, { color: theme.text }]}>{u.display_name}</Text>
+                  <Text style={[styles.suggestionUsername, { color: theme.textMuted }]}>@{u.username}</Text>
                 </View>
               </TouchableOpacity>
             ))}
@@ -409,18 +411,18 @@ export default function UploadScreen() {
 
         {/* ── Visibility selector ── */}
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Qui peut voir</Text>
+          <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>Qui peut voir</Text>
           <View style={styles.visRow}>
             {(['public', 'followers', 'private'] as const).map((v) => {
               const labels = { public: 'Public', followers: 'Abonnés', private: 'Privé' };
               return (
                 <TouchableOpacity
                   key={v}
-                  style={[styles.visBtn, visibility === v && styles.visBtnActive]}
+                  style={[styles.visBtn, { borderColor: theme.border }, visibility === v && styles.visBtnActive]}
                   onPress={() => setVisibility(v)}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.visBtnText, visibility === v && styles.visBtnTextActive]}>
+                  <Text style={[styles.visBtnText, { color: theme.textMuted }, visibility === v && styles.visBtnTextActive]}>
                     {labels[v]}
                   </Text>
                 </TouchableOpacity>
@@ -432,18 +434,18 @@ export default function UploadScreen() {
         {/* ── Custom cover ── */}
         {media && !media.isImage && (
           <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Couverture</Text>
+            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>Couverture</Text>
             <TouchableOpacity style={styles.coverRow} onPress={pickCustomCover} activeOpacity={0.8}>
               {customCover ? (
                 <Image source={{ uri: customCover }} style={styles.coverThumb} resizeMode="cover" />
               ) : (
-                <View style={[styles.coverThumb, { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center' }]}>
-                  <IcImage size={22} color={COLORS.textMuted} />
+                <View style={[styles.coverThumb, { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' }]}>
+                  <IcImage size={22} color={theme.textMuted} />
                 </View>
               )}
               <View style={{ flex: 1 }}>
-                <Text style={styles.coverLabel}>{customCover ? 'Couverture personnalisée' : 'Choisir une image de couverture'}</Text>
-                <Text style={styles.coverHint}>{customCover ? 'Appuie pour changer' : 'Depuis votre galerie · sinon auto-générée'}</Text>
+                <Text style={[styles.coverLabel, { color: theme.text }]}>{customCover ? 'Couverture personnalisée' : 'Choisir une image de couverture'}</Text>
+                <Text style={[styles.coverHint, { color: theme.textMuted }]}>{customCover ? 'Appuie pour changer' : 'Depuis votre galerie · sinon auto-générée'}</Text>
               </View>
               {customCover && (
                 <TouchableOpacity onPress={() => setCustomCover(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -456,7 +458,7 @@ export default function UploadScreen() {
 
         {/* ── Quick hashtag chips ── */}
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Hashtags populaires</Text>
+          <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>Hashtags populaires</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hashtagRow}>
             {popularHashtags.map(tag => (
               <TouchableOpacity key={tag} style={styles.hashChip} onPress={() => insertHashtag(tag)} activeOpacity={0.8}>
@@ -468,12 +470,12 @@ export default function UploadScreen() {
         </View>
 
         {/* ── Tips ── */}
-        <View style={styles.tipsBox}>
-          <Text style={styles.tipTitle}>Conseils</Text>
-          <Text style={styles.tipItem}>· Utilise <Text style={styles.tipHighlight}>#hashtag</Text> pour apparaître dans Explorer</Text>
-          <Text style={styles.tipItem}>· Mentionne <Text style={styles.tipHighlight}>@utilisateur</Text> pour les notifier</Text>
-          <Text style={styles.tipItem}>· Vidéos verticales (9:16) recommandées</Text>
-          <Text style={styles.tipItem}>· Max 100 MB pour un upload rapide</Text>
+        <View style={[styles.tipsBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <Text style={[styles.tipTitle, { color: theme.text }]}>Conseils</Text>
+          <Text style={[styles.tipItem, { color: theme.textMuted }]}>· Utilise <Text style={styles.tipHighlight}>#hashtag</Text> pour apparaître dans Explorer</Text>
+          <Text style={[styles.tipItem, { color: theme.textMuted }]}>· Mentionne <Text style={styles.tipHighlight}>@utilisateur</Text> pour les notifier</Text>
+          <Text style={[styles.tipItem, { color: theme.textMuted }]}>· Vidéos verticales (9:16) recommandées</Text>
+          <Text style={[styles.tipItem, { color: theme.textMuted }]}>· Max 100 MB pour un upload rapide</Text>
         </View>
 
         {/* ── Buttons row ── */}
@@ -507,12 +509,12 @@ export default function UploadScreen() {
       {/* ── Success overlay ── */}
       {showSuccess && (
         <Animated.View style={[styles.successOverlay, { opacity: successOpacity }]} pointerEvents="none">
-          <Animated.View style={[styles.successCard, { transform: [{ scale: successScale }] }]}>
+          <Animated.View style={[styles.successCard, { backgroundColor: theme.surface, transform: [{ scale: successScale }] }]}>
             <View style={styles.successCheckWrap}>
               <IcCheck size={42} color={COLORS.white} strokeWidth={3} />
             </View>
-            <Text style={styles.successTitle}>Publiée !</Text>
-            <Text style={styles.successSub}>Ta vidéo est en ligne dans le feed</Text>
+            <Text style={[styles.successTitle, { color: theme.text }]}>Publiée !</Text>
+            <Text style={[styles.successSub, { color: theme.textMuted }]}>Ta vidéo est en ligne dans le feed</Text>
           </Animated.View>
         </Animated.View>
       )}
