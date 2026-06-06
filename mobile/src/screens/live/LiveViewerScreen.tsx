@@ -45,9 +45,12 @@ function FloatingHeartItem({ x }: { x: number }) {
       ]),
     ]).start();
   }, []);
+  const colors = ['#FF3B5C', '#FF9500', '#FF2D55', '#FF6B6B', '#C026D3'];
+  const color = colors[Math.floor(Math.abs(x * 7) % colors.length)];
+  const size = 22 + Math.floor(Math.abs(x * 3) % 14);
   return (
-    <Animated.View style={{ position: 'absolute', bottom: 100, right: x, transform: [{ translateY }, { scale }], opacity }}>
-      <IcHeartFill size={28} color="#FF3B5C" />
+    <Animated.View style={{ position: 'absolute', bottom: 100, left: x, transform: [{ translateY }, { scale }], opacity }}>
+      <IcHeartFill size={size} color={color} />
     </Animated.View>
   );
 }
@@ -182,9 +185,9 @@ export default function LiveViewerScreen({ route, navigation }: Props) {
   }, [sessionId, broadcasterId]);
 
   const addHeart = useCallback(() => {
-    const id = Date.now().toString();
-    const x = Math.random() * 60 + 20;
-    setHearts(prev => [...prev.slice(-15), { id, x }]);
+    const id = Date.now().toString() + Math.random().toString(36).slice(2);
+    const x = Math.random() * (W - 40) + 10;
+    setHearts(prev => [...prev.slice(-20), { id, x }]);
     setTimeout(() => setHearts(prev => prev.filter(h => h.id !== id)), 2500);
   }, []);
 

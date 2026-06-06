@@ -82,6 +82,7 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
   const [paused, setPaused] = useState(!isVisible);
   const [rate, setRate] = useState(1);
   const [buffering, setBuffering] = useState(true);
+  const [videoReady, setVideoReady] = useState(false);
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const [progress, setProgress] = useState(0); // 0–1
   const [soundSheetVisible, setSoundSheetVisible] = useState(false);
@@ -185,6 +186,7 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
   });
 
   useEffect(() => {
+    if (!isVisible) setVideoReady(false);
     setPaused(!isVisible);
     if (isVisible) {
       const now = Date.now();
@@ -397,11 +399,12 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
       style={[styles.container, { height: ITEM_H }, { transform: [{ translateX: swipeAnim }] }]}
       {...profilePanResponder.panHandlers}
     >
-      {/* LAYER 1 — Thumbnail */}
-      {/* Thumbnail — masqué en mode horizontal (fond noir pur) */}
-      {!isHorizontal && post.thumbnail_url
+      {/* LAYER 1 — Thumbnail (visible until video ready, prevents black flash) */}
+      {!isHorizontal && post.thumbnail_url && !videoReady
         ? <Image source={{ uri: post.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-        : <View style={[StyleSheet.absoluteFill, styles.fallback]} />
+        : !post.thumbnail_url && !videoReady
+          ? <View style={[StyleSheet.absoluteFill, styles.fallback]} />
+          : null
       }
 
       {/* LAYER 2 — Video */}
@@ -416,8 +419,10 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
           muted={muted}
           rate={rate}
           onBuffer={({ isBuffering }) => setBuffering(isBuffering)}
+          onReadyForDisplay={() => setVideoReady(true)}
           onLoad={({ duration, naturalSize }: any) => {
             setBuffering(false);
+            setVideoReady(true);
             if (duration > 0) totalDurationRef.current = duration;
             if (naturalSize?.width && naturalSize?.height) {
               setIsHorizontal(naturalSize.width > naturalSize.height);

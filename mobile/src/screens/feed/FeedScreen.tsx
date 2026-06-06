@@ -192,7 +192,7 @@ export default function FeedScreen() {
   );
 
   const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 60,
+    itemVisiblePercentThreshold: 80,
   });
 
   // Tap "Pour toi" again while already on it → refresh feed

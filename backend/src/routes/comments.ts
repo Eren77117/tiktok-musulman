@@ -60,8 +60,15 @@ export async function commentRoutes(app: FastifyInstance) {
     });
     const likedSet = new Set(likedIds.map(l => l.comment_id));
 
+    // Smart sort: pinned first, then likes×3 + replies×5 + recency
+    const scored = items.map(c => {
+      const ageH = (Date.now() - new Date(c.created_at).getTime()) / 3600000;
+      const score = c.is_pinned ? Infinity : (c.like_count * 3 + c._count.replies * 5 + Math.max(0, 48 - ageH));
+      return { ...c, score };
+    }).sort((a, b) => b.score - a.score);
+
     return reply.send({
-      items: items.map(c => ({
+      items: scored.map(c => ({
         ...c, is_liked: likedSet.has(c.id),
         like_count: c.like_count, reply_count: c._count.replies,
       })),
@@ -166,6 +173,18 @@ export async function commentRoutes(app: FastifyInstance) {
       prisma.comment.update({ where: { id }, data: { like_count: { increment: 1 } } }),
     ]);
     return reply.send({ liked: true });
+  });
+
+  // Creator pin/unpin
+  app.patch('/:id/pin', { preHandler: authenticate }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const comment = await prisma.comment.findUnique({ where: { id }, include: { post: { select: { user_id: true } } } });
+    if (!comment) return reply.code(404).send({ error: 'Not found' });
+    if (comment.post.user_id !== req.currentUser!.id) return reply.code(403).send({ error: 'Seul le créateur peut épingler' });
+    // Unpin all other comments on this post first
+    await prisma.comment.updateMany({ where: { post_id: comment.post_id, is_pinned: true }, data: { is_pinned: false } });
+    const updated = await prisma.comment.update({ where: { id }, data: { is_pinned: !comment.is_pinned } });
+    return reply.send({ is_pinned: updated.is_pinned });
   });
 
   app.delete('/:id', { preHandler: authenticate }, async (req, reply) => {

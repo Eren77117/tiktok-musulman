@@ -307,4 +307,43 @@ export async function userRoutes(app: FastifyInstance) {
 
     return reply.send({ items: [...fofUsers, ...popular] });
   });
+
+  // DEEP-03: similar accounts (shared followers + same category)
+  app.get('/:id/similar', { preHandler: authenticate }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const viewerId = req.currentUser!.id;
+
+    // Find users who follow the target and are followed by viewer
+    const targetFollowers = await prisma.follow.findMany({
+      where: { following_id: id },
+      select: { follower_id: true },
+    });
+    const targetFollowerIds = targetFollowers.map(f => f.follower_id);
+
+    const viewerFollowing = await prisma.follow.findMany({
+      where: { follower_id: viewerId },
+      select: { following_id: true },
+    });
+    const viewerFollowingIds = new Set(viewerFollowing.map(f => f.following_id));
+    viewerFollowingIds.add(viewerId);
+    viewerFollowingIds.add(id);
+
+    // Intersection = similar accounts
+    const sharedFollowers = targetFollowerIds.filter(fid => !viewerFollowingIds.has(fid));
+    const similar = sharedFollowers.length > 0
+      ? await prisma.user.findMany({
+          where: { id: { in: sharedFollowers.slice(0, 8) }, is_banned: false },
+          select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true, follower_count: true },
+          orderBy: { follower_count: 'desc' },
+          take: 8,
+        })
+      : await prisma.user.findMany({
+          where: { id: { notIn: [...viewerFollowingIds] }, is_banned: false },
+          orderBy: { follower_count: 'desc' },
+          take: 8,
+          select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true, follower_count: true },
+        });
+
+    return reply.send({ items: similar });
+  });
 }

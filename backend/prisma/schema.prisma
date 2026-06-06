@@ -264,14 +264,16 @@ model StoryReply {
 }
 
 model Comment {
-  id         String   @id @default(uuid())
-  post_id    String
-  user_id    String
-  parent_id  String?
-  content    String
-  like_count Int      @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  id            String   @id @default(uuid())
+  post_id       String
+  user_id       String
+  parent_id     String?
+  content       String
+  like_count    Int      @default(0)
+  is_pinned     Boolean  @default(false)
+  creator_liked Boolean  @default(false)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
 
   post     Post      @relation(fields: [post_id], references: [id], onDelete: Cascade)
   user     User      @relation(fields: [user_id], references: [id], onDelete: Cascade)

@@ -14,7 +14,7 @@ interface PreloadPost {
 export function useVideoPreloader(
   posts: PreloadPost[],
   currentIndex: number,
-  windowSize = 2
+  windowSize = 3
 ) {
   const preloadedRef = useRef<Set<string>>(new Set());
 
