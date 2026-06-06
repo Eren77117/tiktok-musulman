@@ -9,6 +9,7 @@ import { useAuthStore } from './stores/authStore';
 import { useThemeStore } from './stores/themeStore';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SplashScreen } from './components/ui/SplashScreen';
+import { ToastProvider } from './components/ui/Toast';
 import OnboardingScreen, { ONBOARDING_KEY } from './screens/onboarding/OnboardingScreen';
 import { api } from './api/client';
 
@@ -134,6 +135,7 @@ export default function App() {
         <SafeAreaProvider>
           <QueryClientProvider client={queryClient}>
             <AppRoot />
+            <ToastProvider />
           </QueryClientProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>

@@ -17,6 +17,8 @@ import {
   IcHeartFill, IcHeart, IcComment, IcShare, IcSave, IcSaveFill,
   IcMusic, IcPlay, IcVolume, IcMute, IcCheck, IcMaximize, IcRepeat,
 } from '../ui/Icons';
+import { AnimatedNumber } from '../ui/AnimatedNumber';
+import { MarqueeText } from '../ui/MarqueeText';
 import ShareSheet from './ShareSheet';
 
 const { width: W, height: H } = Dimensions.get('window');
@@ -577,9 +579,12 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
             activeOpacity={0.8}
           >
             <IcMusic size={13} color={COLORS.white} />
-            <Text style={styles.soundText} numberOfLines={1}>
-              {post.sound.title}{post.sound.artist ? ` · ${post.sound.artist}` : ''}
-            </Text>
+            <MarqueeText
+              text={`${post.sound.title}${post.sound.artist ? ` · ${post.sound.artist}` : ''}`}
+              style={styles.soundText}
+              containerWidth={W * 0.45}
+              speed={35}
+            />
           </TouchableOpacity>
         )}
       </View>
@@ -610,15 +615,13 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
         </TouchableOpacity>
 
         {/* Like */}
-        <ActionBtn
-          icon={liked ? <IcHeartFill size={32} color="#FF3B5C" /> : <IcHeart size={32} color={COLORS.white} />}
-          count={fmt(likeCount)}
-          onPress={handleLikePress}
-          countColor={liked ? '#FF3B5C' : COLORS.white}
-        />
+        <TouchableOpacity style={styles.actionBtn} onPress={handleLikePress} activeOpacity={0.8}>
+          {liked ? <IcHeartFill size={32} color="#FF3B5C" /> : <IcHeart size={32} color={COLORS.white} />}
+          <AnimatedNumber value={likeCount} style={{ ...styles.actionCount, color: liked ? '#FF3B5C' : COLORS.white }} />
+        </TouchableOpacity>
 
         {/* Comment */}
-        <ActionBtn icon={<IcComment size={30} color={COLORS.white} />} count={fmt(post.comment_count)} onPress={onComment} />
+        <ActionBtn icon={<IcComment size={30} color={COLORS.white} />} count={fmt(post.comment_count)} onPress={() => { watchDataRef.current.interacted = true; onComment(); }} />
 
         {/* Save */}
         <ActionBtn
@@ -673,6 +676,29 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
           }}
         />
       )}
+      {/* Swipe profile hint — pill visible pendant le swipe */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.swipeHintPill,
+          {
+            opacity: swipeAnim.interpolate({ inputRange: [-W * 0.2, -20, 0], outputRange: [1, 0.6, 0] }),
+            transform: [{ translateX: swipeAnim.interpolate({ inputRange: [-W * 0.2, 0], outputRange: [0, 40] }) }],
+          },
+        ]}
+      >
+        {post.user.avatar_url
+          ? <Image source={{ uri: post.user.avatar_url }} style={styles.swipeHintAvatar} />
+          : <View style={[styles.swipeHintAvatar, { backgroundColor: COLORS.primaryBg, alignItems: 'center', justifyContent: 'center' }]}>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: COLORS.primary }}>
+                {post.user.display_name[0]?.toUpperCase()}
+              </Text>
+            </View>
+        }
+        <Text style={styles.swipeHintText}>@{post.user.username}</Text>
+        <Text style={styles.swipeHintArrow}>→</Text>
+      </Animated.View>
+
       {/* Share Sheet */}
       <ShareSheet
         post={post}
@@ -956,6 +982,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 5,
   },
   seekTimeText: { fontSize: 12, color: COLORS.white, fontWeight: FONT.weight.semibold },
+
+  swipeHintPill: {
+    position: 'absolute', right: 16, top: '45%',
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 100, paddingHorizontal: 12, paddingVertical: 8,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+  },
+  swipeHintAvatar: { width: 24, height: 24, borderRadius: 12 },
+  swipeHintText: { fontSize: 13, fontWeight: '600', color: COLORS.white },
+  swipeHintArrow: { fontSize: 14, color: COLORS.white },
 
   fullscreenBtn: {
     position: 'absolute',
