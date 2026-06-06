@@ -53,6 +53,7 @@ interface Props {
   isVisible: boolean;
   onComment: () => void;
   onNotInterested?: () => void;
+  onSeekingChange?: (seeking: boolean) => void;
   /** Height allocated for this item (screen H minus tab bar) */
   itemHeight?: number;
 }
@@ -69,7 +70,7 @@ function fmtDuration(s: number) {
   return `${m}:${sec.toString().padStart(2, '0')}`;
 }
 
-export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, itemHeight }: Props) {
+export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, onSeekingChange, itemHeight }: Props) {
   const ITEM_H = itemHeight ?? H;
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const videoRef = useRef<VideoRef>(null);
@@ -134,6 +135,22 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
 
   const thumbScale = useRef(new Animated.Value(1)).current;
 
+  // Callback ref for seek state — avoids stale closure in seekPanResponder
+  const onSeekingChangeRef = useRef(onSeekingChange);
+  useEffect(() => { onSeekingChangeRef.current = onSeekingChange; }, [onSeekingChange]);
+
+  // Flash overlay for double-tap seek (left=-5s, right=+5s)
+  const seekFlashAnim = useRef(new Animated.Value(0)).current;
+  const seekFlashSideRef = useRef<'left' | 'right'>('left');
+  const seekFlashAmount = useRef(0);
+
+  const fireSeekFlash = useCallback((side: 'left' | 'right', amount: number) => {
+    seekFlashSideRef.current = side;
+    seekFlashAmount.current = amount;
+    seekFlashAnim.setValue(1);
+    Animated.timing(seekFlashAnim, { toValue: 0, duration: 700, useNativeDriver: true }).start();
+  }, [seekFlashAnim]);
+
   const seekPanResponder = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
@@ -142,6 +159,7 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
     onPanResponderTerminationRequest: () => false,
     onPanResponderGrant: (evt) => {
       setSeeking(true);
+      onSeekingChangeRef.current?.(true);
       Animated.spring(thumbScale, { toValue: 1.8, useNativeDriver: true, tension: 400, friction: 10 }).start();
       const pct = Math.max(0, Math.min(1, evt.nativeEvent.pageX / W));
       const time = pct * totalDurationRef.current;
@@ -158,10 +176,12 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
     },
     onPanResponderRelease: () => {
       setSeeking(false);
+      onSeekingChangeRef.current?.(false);
       Animated.spring(thumbScale, { toValue: 1, useNativeDriver: true, tension: 300, friction: 10 }).start();
     },
     onPanResponderTerminate: () => {
       setSeeking(false);
+      onSeekingChangeRef.current?.(false);
       Animated.spring(thumbScale, { toValue: 1, useNativeDriver: true, tension: 300, friction: 10 }).start();
     },
   })).current;
@@ -341,18 +361,40 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
     Animated.timing(speedAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start();
   }, [speedAnim]);
 
-  // ── Tap handler (shared across all zones) ────────────────────────────────
-  // Double tap = instant like; single tap = toggle pause (after 300ms)
-  const handleZoneTap = useCallback((x: number, y: number) => {
+  // ── Tap handler — zone-aware ──────────────────────────────────────────────
+  // Left double-tap  → seek -5s
+  // Right double-tap → seek +5s
+  // Center double-tap → like animation
+  // Single tap (any zone) → toggle pause after 200ms
+  const handleZoneTap = useCallback((x: number, y: number, zone: 'left' | 'middle' | 'right') => {
     const now = Date.now();
     if (now - lastTapRef.current < 300) {
-      // Double tap — fire immediately, cancel pending single-tap
+      // Double tap
       if (singleTapTimerRef.current) {
         clearTimeout(singleTapTimerRef.current);
         singleTapTimerRef.current = null;
       }
-      triggerLike(x, y);
       lastTapRef.current = 0;
+      if (zone === 'left') {
+        const t = Math.max(0, seekTimeRef.current - 5);
+        seekTimeRef.current = t;
+        videoRef.current?.seek(t);
+        setSeekTime(t);
+        setProgress(totalDurationRef.current > 0 ? t / totalDurationRef.current : 0);
+        ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
+        fireSeekFlash('left', -5);
+      } else if (zone === 'right') {
+        const t = Math.min(totalDurationRef.current, seekTimeRef.current + 5);
+        seekTimeRef.current = t;
+        videoRef.current?.seek(t);
+        setSeekTime(t);
+        setProgress(totalDurationRef.current > 0 ? t / totalDurationRef.current : 0);
+        ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
+        fireSeekFlash('right', 5);
+      } else {
+        // Center → like
+        triggerLike(x, y);
+      }
     } else {
       lastTapRef.current = now;
       singleTapTimerRef.current = setTimeout(() => {
@@ -361,11 +403,12 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
         setPaused(p => { showPauseIndicator(); return !p; });
       }, 200);
     }
-  }, [triggerLike, showPauseIndicator]);
+  }, [triggerLike, showPauseIndicator, fireSeekFlash]);
 
   // ── Long press handlers ───────────────────────────────────────────────────
+  // Left/right long-press → 2× speed while held
+  // Middle long-press → pause while held
   const handleLongPress = useCallback((zone: 'left' | 'middle' | 'right') => {
-    // Cancel any pending single-tap
     if (singleTapTimerRef.current) {
       clearTimeout(singleTapTimerRef.current);
       singleTapTimerRef.current = null;
@@ -374,24 +417,10 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
     longPressZoneRef.current = zone;
 
     if (zone === 'left' || zone === 'right') {
-      const dir: -1 | 1 = zone === 'left' ? -1 : 1;
-      holdSeekDirRef.current = dir;
+      holdSeekDirRef.current = zone === 'left' ? -1 : 1;
       setHoldSeeking(true);
-      ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
-      // Immediate first seek
-      const t0 = Math.max(0, Math.min(totalDurationRef.current, seekTimeRef.current + dir * 10));
-      seekTimeRef.current = t0;
-      videoRef.current?.seek(t0);
-      setSeekTime(t0);
-      setProgress(totalDurationRef.current > 0 ? t0 / totalDurationRef.current : 0);
-      // Continuous seek every 400ms while held
-      holdSeekIntervalRef.current = setInterval(() => {
-        const next = Math.max(0, Math.min(totalDurationRef.current, seekTimeRef.current + dir * 10));
-        seekTimeRef.current = next;
-        videoRef.current?.seek(next);
-        setSeekTime(next);
-        setProgress(totalDurationRef.current > 0 ? next / totalDurationRef.current : 0);
-      }, 400);
+      setRate(2);
+      ReactNativeHapticFeedback.trigger('impactMedium', { enableVibrateFallback: true });
     } else {
       pausedBeforeLongRef.current = paused;
       setPaused(true);
@@ -403,11 +432,8 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
     if (longPressZoneRef.current === zone) {
       longPressZoneRef.current = null;
       if (zone === 'left' || zone === 'right') {
-        if (holdSeekIntervalRef.current) {
-          clearInterval(holdSeekIntervalRef.current);
-          holdSeekIntervalRef.current = null;
-        }
         setHoldSeeking(false);
+        setRate(1);
       } else {
         setPaused(pausedBeforeLongRef.current);
       }
@@ -468,7 +494,7 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
           }}
           onError={() => { setBuffering(false); }}
           onProgress={({ currentTime, seekableDuration }) => {
-            if (!seeking && !holdSeeking && seekableDuration > 0) {
+            if (!seeking && seekableDuration > 0) {
               seekTimeRef.current = currentTime;
               setProgress(currentTime / seekableDuration);
               setSeekTime(currentTime);
@@ -501,29 +527,29 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
       {/* LAYER 3 — Gesture zones (behind UI elements) */}
       <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
         <View style={styles.zonesRow} pointerEvents="box-none">
-          {/* Left zone — long press = 2x speed */}
+          {/* Left zone — double-tap = -5s  |  long-press = 2× speed */}
           <Pressable
             style={styles.zoneLeft}
-            onPress={e => handleZoneTap(e.nativeEvent.locationX, e.nativeEvent.locationY)}
+            onPress={e => handleZoneTap(e.nativeEvent.locationX, e.nativeEvent.locationY, 'left')}
             onLongPress={() => handleLongPress('left')}
             onPressOut={() => handlePressOut('left')}
-            delayLongPress={200}
+            delayLongPress={250}
           />
-          {/* Middle zone — long press = pause while held */}
+          {/* Middle zone — double-tap = like  |  long-press = pause */}
           <Pressable
             style={styles.zoneMiddle}
-            onPress={e => handleZoneTap(e.nativeEvent.locationX + W * 0.35, e.nativeEvent.locationY)}
+            onPress={e => handleZoneTap(e.nativeEvent.locationX + W * 0.35, e.nativeEvent.locationY, 'middle')}
             onLongPress={() => handleLongPress('middle')}
             onPressOut={() => handlePressOut('middle')}
-            delayLongPress={200}
+            delayLongPress={250}
           />
-          {/* Right zone — long press = 2x speed */}
+          {/* Right zone — double-tap = +5s  |  long-press = 2× speed */}
           <Pressable
             style={styles.zoneRight}
-            onPress={e => handleZoneTap(e.nativeEvent.locationX + W * 0.65, e.nativeEvent.locationY)}
+            onPress={e => handleZoneTap(e.nativeEvent.locationX + W * 0.65, e.nativeEvent.locationY, 'right')}
             onLongPress={() => handleLongPress('right')}
             onPressOut={() => handlePressOut('right')}
-            delayLongPress={200}
+            delayLongPress={250}
           />
         </View>
       </View>
@@ -546,12 +572,30 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
       </Animated.View>
 
       {/* Hold-seek indicator */}
+      {/* 2× speed indicator — shown while holding left/right */}
       {holdSeeking && (
         <View style={styles.holdSeekOverlay} pointerEvents="none">
-          <Text style={styles.holdSeekArrow}>{holdSeekDirRef.current === -1 ? '◀◀' : '▶▶'}</Text>
-          <Text style={styles.holdSeekTime}>{fmtDuration(seekTime)} / {fmtDuration(totalDurationRef.current)}</Text>
+          <Text style={styles.holdSeekArrow}>{holdSeekDirRef.current === -1 ? '◀' : '▶'}</Text>
+          <Text style={styles.holdSeekTime}>Vitesse 2×</Text>
         </View>
       )}
+
+      {/* Seek flash — brief overlay on double-tap left/right */}
+      <Animated.View
+        style={[
+          styles.seekFlash,
+          seekFlashSideRef.current === 'left' ? styles.seekFlashLeft : styles.seekFlashRight,
+          { opacity: seekFlashAnim },
+        ]}
+        pointerEvents="none"
+      >
+        <Text style={styles.seekFlashArrow}>
+          {seekFlashSideRef.current === 'left' ? '◀◀' : '▶▶'}
+        </Text>
+        <Text style={styles.seekFlashText}>
+          {seekFlashSideRef.current === 'left' ? '-5s' : '+5s'}
+        </Text>
+      </Animated.View>
 
       {/* Floating heart on double-tap — TikTok bounce */}
       <Animated.View
@@ -996,6 +1040,16 @@ const styles = StyleSheet.create({
   },
   pauseBars: { flexDirection: 'row', gap: 6 },
   pauseBar: { width: 6, height: 26, backgroundColor: COLORS.white, borderRadius: 3 },
+
+  seekFlash: {
+    position: 'absolute', top: '35%', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 16,
+    paddingHorizontal: 18, paddingVertical: 12,
+  },
+  seekFlashLeft: { left: 20 },
+  seekFlashRight: { right: 20 },
+  seekFlashArrow: { fontSize: 22, color: COLORS.white },
+  seekFlashText: { fontSize: 13, fontWeight: '700', color: COLORS.white },
 
   holdSeekOverlay: {
     position: 'absolute', top: '40%', alignSelf: 'center',

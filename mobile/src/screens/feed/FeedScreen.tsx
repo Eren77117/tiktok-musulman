@@ -56,6 +56,8 @@ export default function FeedScreen() {
   const [commentsPostId, setCommentsPostId] = useState<string | null>(null);
   const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
   const hidePost = useCallback((id: string) => setHiddenPostIds(prev => new Set([...prev, id])), []);
+  // Disable FlatList scroll while user drags progress bar (prevents accidental swipe to next video)
+  const [scrollEnabled, setScrollEnabled] = useState(true);
 
   // Height = actual FlatList rendered height (measured via onLayout — avoids calculation bugs)
   const tabBarHeight = useBottomTabBarHeight();
@@ -272,10 +274,12 @@ export default function FeedScreen() {
               isVisible={effectiveVisibleId === item.id}
               onComment={() => setCommentsPostId(item.id)}
               onNotInterested={() => hidePost(item.id)}
+              onSeekingChange={s => setScrollEnabled(!s)}
               itemHeight={ITEM_H}
             />
           )}
           pagingEnabled
+          scrollEnabled={scrollEnabled}
           decelerationRate="fast"
           showsVerticalScrollIndicator={false}
           onViewableItemsChanged={onViewableItemsChanged}
@@ -339,11 +343,13 @@ export default function FeedScreen() {
                 isVisible={effectiveVisibleId === item.data.id}
                 onComment={() => setCommentsPostId(item.data.id)}
                 onNotInterested={() => hidePost(item.data.id)}
+                onSeekingChange={s => setScrollEnabled(!s)}
                 itemHeight={ITEM_H}
               />
             );
           }}
           pagingEnabled
+          scrollEnabled={scrollEnabled}
           decelerationRate="fast"
           showsVerticalScrollIndicator={false}
           onViewableItemsChanged={onViewableItemsChanged}
