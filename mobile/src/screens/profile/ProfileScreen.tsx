@@ -49,9 +49,16 @@ interface Thread {
   created_at: string;
 }
 
-const TABS = ['Vidéos', 'Fils', "J'aime", 'Favoris', 'Reposts'];
+const TABS = ['Vidéos', 'Fils', "J'aime", 'Favoris', 'Reposts', 'Collections'];
 const LIKE_SUBTABS = ['Pour toi', 'Fils'] as const;
 type LikeSubTab = typeof LIKE_SUBTABS[number];
+
+interface Collection {
+  id: string;
+  name: string;
+  thumbnail_url: string | null;
+  post_count: number;
+}
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -137,6 +144,12 @@ export default function ProfileScreen() {
     queryKey: ['user-reposts', user?.id],
     queryFn: () => api.get(`/posts/user/${user?.id}/reposts`).then((r) => r.data).catch(() => ({ items: [] })),
     enabled: !!user?.id && activeTab === 4,
+  });
+
+  const { data: collections, isLoading: collectionsLoading } = useQuery<{ items: Collection[] }>({
+    queryKey: ['my-collections'],
+    queryFn: () => api.get('/collections').then((r) => r.data).catch(() => ({ items: [] })),
+    enabled: !!user?.id && activeTab === 5,
   });
 
   if (!user) return null;
@@ -422,6 +435,16 @@ export default function ProfileScreen() {
               ListEmptyComponent={<EmptyTab tab={4} theme={theme} />}
             />
           )
+        ) : activeTab === 5 ? (
+          collectionsLoading ? (
+            <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
+          ) : (
+            <CollectionsGrid
+              collections={collections?.items ?? []}
+              onOpen={(c) => navigation.navigate('CollectionDetail', { collectionId: c.id, name: c.name })}
+              theme={theme}
+            />
+          )
         ) : gridLoading ? (
           <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
         ) : (
@@ -511,6 +534,55 @@ function ThreadsTab({ threads, loading, theme }: { threads?: Thread[]; loading: 
         </View>
       ))}
     </View>
+  );
+}
+
+function CollectionsGrid({ collections, onOpen, theme }: {
+  collections: Collection[];
+  onOpen: (c: Collection) => void;
+  theme: any;
+}) {
+  const { width } = require('react-native').Dimensions.get('window');
+  const COLS = 2;
+  const CELL_W = (width - 3) / COLS;
+  const CELL_H = CELL_W * 0.75;
+
+  if (collections.length === 0) {
+    return (
+      <View style={styles.emptyWrap}>
+        <Text style={[styles.emptyTitle, { color: theme.text }]}>Aucune collection</Text>
+        <Text style={[styles.emptySubtitle, { color: theme.textMuted }]}>Sauvegardez des vidéos dans des collections</Text>
+      </View>
+    );
+  }
+  return (
+    <FlatList
+      data={collections}
+      keyExtractor={c => c.id}
+      numColumns={COLS}
+      scrollEnabled={false}
+      columnWrapperStyle={{ gap: 1, marginBottom: 1 }}
+      renderItem={({ item }) => (
+        <TouchableOpacity
+          style={{ width: CELL_W, height: CELL_H, backgroundColor: theme.card }}
+          activeOpacity={0.8}
+          onPress={() => onOpen(item)}
+        >
+          {item.thumbnail_url
+            ? <Image source={{ uri: item.thumbnail_url }} style={{ width: '100%', height: '100%' }} />
+            : <View style={{ flex: 1, backgroundColor: theme.card, alignItems: 'center', justifyContent: 'center' }}>
+                <IcGrid size={28} color={theme.textMuted} />
+              </View>}
+          <View style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0,
+            backgroundColor: 'rgba(0,0,0,0.55)', padding: 8,
+          }}>
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }} numberOfLines={1}>{item.name}</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }}>{item.post_count} vidéo{item.post_count !== 1 ? 's' : ''}</Text>
+          </View>
+        </TouchableOpacity>
+      )}
+    />
   );
 }
 

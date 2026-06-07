@@ -52,7 +52,7 @@ export async function seriesRoutes(app: FastifyInstance) {
 
   // Create series
   app.post('/', { preHandler: [authenticate] }, async (req, reply) => {
-    const userId = (req as any).userId as string;
+    const userId = req.currentUser!.id;
     const parsed = createSeriesSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const series = await prisma.series.create({
@@ -64,7 +64,7 @@ export async function seriesRoutes(app: FastifyInstance) {
   // Add episode to series
   app.post('/:id/episodes', { preHandler: [authenticate] }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    const userId = (req as any).userId as string;
+    const userId = req.currentUser!.id;
     const parsed = addEpisodeSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
@@ -83,7 +83,7 @@ export async function seriesRoutes(app: FastifyInstance) {
   // Delete series
   app.delete('/:id', { preHandler: [authenticate] }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    const userId = (req as any).userId as string;
+    const userId = req.currentUser!.id;
     const series = await prisma.series.findUnique({ where: { id } });
     if (!series || series.user_id !== userId) return reply.code(403).send({ error: 'Interdit' });
     await prisma.series.delete({ where: { id } });

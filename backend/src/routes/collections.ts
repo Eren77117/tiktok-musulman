@@ -72,6 +72,18 @@ export async function collectionRoutes(app: FastifyInstance) {
     return reply.send({ ok: true });
   });
 
+  // GET /collections/:id — single collection info
+  app.get('/:id', { preHandler: authenticate }, async (req, reply) => {
+    const userId = req.currentUser!.id;
+    const { id } = req.params as { id: string };
+    const coll = await prisma.collection.findFirst({
+      where: { id, user_id: userId },
+      include: { _count: { select: { posts: true } } },
+    });
+    if (!coll) return reply.status(404).send({ error: 'Collection not found' });
+    return reply.send({ ...coll, post_count: coll._count.posts, _count: undefined });
+  });
+
   // DELETE /collections/:id/posts/:postId — remove post from collection
   app.delete('/:id/posts/:postId', { preHandler: authenticate }, async (req, reply) => {
     const userId = req.currentUser!.id;
