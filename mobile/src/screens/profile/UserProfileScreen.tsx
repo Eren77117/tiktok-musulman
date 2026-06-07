@@ -25,6 +25,7 @@ interface Profile {
   display_name: string;
   bio: string | null;
   bio_links: string[];
+  profile_category: string | null;
   avatar_url: string | null;
   is_verified: boolean;
   is_following: boolean;
@@ -328,6 +329,11 @@ export default function UserProfileScreen({ route, navigation }: Props) {
             </TouchableOpacity>
 
             <Text style={[styles.displayName, { color: theme.text }]}>{profile.display_name}</Text>
+            {profile.profile_category ? (
+              <View style={[styles.categoryBadge, { backgroundColor: `${COLORS.primary}18` }]}>
+                <Text style={[styles.categoryText, { color: COLORS.primary }]}>{profile.profile_category}</Text>
+              </View>
+            ) : null}
             {profile.bio ? <BioText bio={profile.bio} theme={theme} /> : null}
             {profile.bio_links?.length > 0 && (
               <View style={styles.bioLinksRow}>
@@ -668,6 +674,8 @@ const styles = StyleSheet.create({
   liveText: { fontSize: 9, fontWeight: FONT.weight.bold, color: COLORS.white, letterSpacing: 0.3 },
 
   displayName: { fontSize: FONT.size.xxl, fontWeight: FONT.weight.bold, letterSpacing: -0.3 },
+  categoryBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3, marginTop: 4, alignSelf: 'center' },
+  categoryText: { fontSize: FONT.size.xs, fontWeight: '700', letterSpacing: 0.3 },
   bio: { fontSize: FONT.size.sm, textAlign: 'center', lineHeight: 20 },
   bioLinksRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 6 },
   bioLinkPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,176,90,0.12)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },

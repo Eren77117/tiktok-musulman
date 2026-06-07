@@ -1,18 +1,24 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  Modal, Animated, Easing, ActivityIndicator, KeyboardAvoidingView, Platform,
+  Modal, Animated, Easing, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { COLORS, FONT, RADIUS, SPACING } from '../../constants/theme';
 import { IcClose, IcLink } from '../../components/ui/Icons';
 
+const CATEGORIES = [
+  'Islam & Foi', 'Coran & Hadith', 'Famille', 'Éducation', 'Humour Halal',
+  'Sport & Santé', 'Cuisine Halale', 'Voyage', 'Tech & Science', 'Business',
+  'Art & Créativité', 'Autre',
+];
+
 interface Props {
   visible: boolean;
   onClose: () => void;
-  user: { display_name: string; bio?: string | null; username: string; bio_links?: string[] } | null;
-  onSave: (data: { display_name: string; bio: string; bio_links: string[] }) => Promise<void>;
+  user: { display_name: string; bio?: string | null; username: string; bio_links?: string[]; profile_category?: string | null } | null;
+  onSave: (data: { display_name: string; bio: string; bio_links: string[]; profile_category: string | null }) => Promise<void>;
 }
 
 export function EditProfileSheet({ visible, onClose, user, onSave }: Props) {
@@ -23,6 +29,7 @@ export function EditProfileSheet({ visible, onClose, user, onSave }: Props) {
   const [bio, setBio] = useState('');
   const [linkInput, setLinkInput] = useState('');
   const [bioLinks, setBioLinks] = useState<string[]>([]);
+  const [category, setCategory] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -30,6 +37,7 @@ export function EditProfileSheet({ visible, onClose, user, onSave }: Props) {
       setDisplayName(user.display_name);
       setBio(user.bio ?? '');
       setBioLinks(user.bio_links ?? []);
+      setCategory(user.profile_category ?? null);
       setLinkInput('');
     }
   }, [visible, user]);
@@ -68,7 +76,7 @@ export function EditProfileSheet({ visible, onClose, user, onSave }: Props) {
     if (!displayName.trim()) return;
     setSaving(true);
     try {
-      await onSave({ display_name: displayName.trim(), bio: bio.trim(), bio_links: bioLinks });
+      await onSave({ display_name: displayName.trim(), bio: bio.trim(), bio_links: bioLinks, profile_category: category });
     } finally {
       setSaving(false);
     }
@@ -82,6 +90,7 @@ export function EditProfileSheet({ visible, onClose, user, onSave }: Props) {
         <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
 
         <Animated.View style={[styles.sheet, { backgroundColor: theme.surface, transform: [{ translateY }] }]}>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={[styles.handle, { backgroundColor: theme.border }]} />
 
           <Text style={[styles.title, { color: theme.text }]}>Modifier le profil</Text>
@@ -139,6 +148,26 @@ export function EditProfileSheet({ visible, onClose, user, onSave }: Props) {
             </View>
           )}
 
+          {/* Catégorie */}
+          <Text style={[styles.label, { color: theme.textMuted }]}>Catégorie</Text>
+          <View style={styles.categoriesWrap}>
+            {CATEGORIES.map(cat => (
+              <TouchableOpacity
+                key={cat}
+                onPress={() => setCategory(category === cat ? null : cat)}
+                style={[
+                  styles.catChip,
+                  category === cat
+                    ? { backgroundColor: COLORS.primary }
+                    : { backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1 },
+                ]}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.catText, { color: category === cat ? '#fff' : theme.textMuted }]}>{cat}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
           {/* Username read-only */}
           <Text style={[styles.usernameNote, { color: theme.textSubtle }]}>
             @{user?.username} — le nom d'utilisateur n'est pas modifiable
@@ -158,6 +187,7 @@ export function EditProfileSheet({ visible, onClose, user, onSave }: Props) {
           </TouchableOpacity>
 
           <View style={{ height: Math.max(insets.bottom, 24) }} />
+          </ScrollView>
         </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
@@ -195,6 +225,9 @@ const styles = StyleSheet.create({
     width: 44, alignItems: 'center', justifyContent: 'center',
   },
   linkAddBtnTxt: { color: '#fff', fontSize: 22, fontWeight: '300', lineHeight: 28 },
+  categoriesWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  catChip: { borderRadius: 100, paddingHorizontal: 12, paddingVertical: 6 },
+  catText: { fontSize: 12, fontWeight: '600' },
   usernameNote: { fontSize: 12, marginBottom: 24, marginTop: 8 },
   saveBtn: {
     backgroundColor: COLORS.primary, borderRadius: 100,

@@ -347,6 +347,11 @@ export default function ProfileScreen() {
           </View>
 
           <Text style={[styles.displayName, { color: theme.text }]}>{user.display_name}</Text>
+          {(user as any).profile_category ? (
+            <View style={[styles.categoryBadge, { backgroundColor: `${COLORS.primary}18` }]}>
+              <Text style={[styles.categoryText, { color: COLORS.primary }]}>{(user as any).profile_category}</Text>
+            </View>
+          ) : null}
           {user.bio ? <Text style={[styles.bio, { color: theme.textMuted }]}>{user.bio}</Text> : null}
           {(user as any).bio_links?.length > 0 && (
             <View style={styles.bioLinksRow}>
@@ -697,6 +702,8 @@ const styles = StyleSheet.create({
   },
 
   displayName: { fontSize: FONT.size.xxl, fontWeight: FONT.weight.bold, letterSpacing: -0.5 },
+  categoryBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3, marginTop: 4, alignSelf: 'center' },
+  categoryText: { fontSize: FONT.size.xs, fontWeight: '700', letterSpacing: 0.3 },
   bio: { fontSize: FONT.size.sm, textAlign: 'center', lineHeight: 20 },
   bioLinksRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 6 },
   bioLinkPill: { backgroundColor: 'rgba(0,176,90,0.12)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
