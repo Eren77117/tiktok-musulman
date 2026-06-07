@@ -7,10 +7,10 @@ import { z } from 'zod';
 const updateProfileSchema = z.object({
   display_name: z.string().min(1).max(50).optional(),
   bio: z.string().max(300).optional().nullable(),
-  avatar_url: z.string().optional().nullable(),
-  cover_url: z.string().optional().nullable(),
   bio_links: z.array(z.string().url()).max(5).optional(),
   profile_category: z.string().max(50).optional().nullable(),
+  avatar_url: z.string().optional().nullable(),
+  cover_url: z.string().optional().nullable(),
 }).passthrough(); // allow extra keys from mobile settings
 
 const USER_SELECT_PUBLIC = {
@@ -77,10 +77,10 @@ export async function userRoutes(app: FastifyInstance) {
     const updateData: Record<string, unknown> = {};
     if (display_name !== undefined) updateData.display_name = display_name;
     if (bio !== undefined) updateData.bio = bio;
-    if (avatar_url !== undefined) updateData.avatar_url = avatar_url;
-    if (cover_url !== undefined) updateData.cover_url = cover_url;
     if (bio_links !== undefined) updateData.bio_links = bio_links;
     if (profile_category !== undefined) updateData.profile_category = profile_category;
+    if (avatar_url !== undefined) updateData.avatar_url = avatar_url;
+    if (cover_url !== undefined) updateData.cover_url = cover_url;
 
     const ME_SELECT = {
       id: true, username: true, display_name: true, bio: true,
@@ -89,7 +89,6 @@ export async function userRoutes(app: FastifyInstance) {
     } as const;
 
     if (Object.keys(updateData).length === 0) {
-      // Nothing to update in DB (e.g. settings-only patch)
       const me = await prisma.user.findUnique({ where: { id: req.currentUser!.id }, select: ME_SELECT });
       return reply.send(me);
     }
@@ -197,35 +196,43 @@ export async function userRoutes(app: FastifyInstance) {
   // ── CREATOR STATS ────────────────────────────────────────────────────────────
   app.get('/me/stats', { preHandler: authenticate }, async (req, reply) => {
     const userId = req.currentUser!.id;
-    const [posts, views] = await Promise.all([
+    const { period = '7' } = req.query as { period?: string };
+    const days = period === '30' ? 30 : 7;
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    const [posts, user, views, viewsSince, likesSince, newFollowers] = await Promise.all([
       prisma.post.findMany({
         where: { user_id: userId },
-        select: { id: true, caption: true, view_count: true, like_count: true, comment_count: true, share_count: true, thumbnail_url: true, created_at: true },
+        select: { id: true, caption: true, view_count: true, like_count: true, comment_count: true, thumbnail_url: true, created_at: true },
         orderBy: { view_count: 'desc' },
-        take: 20,
+        take: 10,
       }),
+      prisma.user.findUnique({ where: { id: userId }, select: { follower_count: true, following_count: true, post_count: true } }),
       prisma.postView.aggregate({
         where: { post: { user_id: userId } },
-        _count: { id: true },
-        _sum: { watch_time_ms: true },
+        _count: { id: true }, _sum: { watch_time_ms: true },
       }),
+      prisma.postView.count({ where: { post: { user_id: userId }, viewed_at: { gte: since } } }),
+      prisma.like.count({ where: { post: { user_id: userId }, created_at: { gte: since } } }).catch(() => 0),
+      prisma.follow.count({ where: { following_id: userId, created_at: { gte: since } } }).catch(() => 0),
     ]);
 
-    const completedViews = await prisma.postView.count({
-      where: { post: { user_id: userId }, completed: true },
-    });
-
-    const totalViews = views._count.id;
-    const completionRate = totalViews > 0 ? Math.round((completedViews / totalViews) * 100) : 0;
-    const totalWatchMs = views._sum.watch_time_ms ?? 0;
+    const totalViewCount = views._count.id;
+    const completedViews = await prisma.postView.count({ where: { post: { user_id: userId }, completed: true } });
+    const completionRate = totalViewCount > 0 ? Math.round((completedViews / totalViewCount) * 100) : 0;
 
     return reply.send({
       total_views: posts.reduce((s, p) => s + p.view_count, 0),
       total_likes: posts.reduce((s, p) => s + p.like_count, 0),
-      total_comments: posts.reduce((s, p) => s + p.comment_count, 0),
+      total_followers: user?.follower_count ?? 0,
+      total_posts: user?.post_count ?? 0,
+      views_period: viewsSince,
+      likes_period: likesSince,
+      followers_period: newFollowers,
       completion_rate: completionRate,
-      total_watch_ms: totalWatchMs,
-      top_posts: posts.slice(0, 10),
+      avg_watch_sec: totalViewCount > 0 ? Math.round((views._sum.watch_time_ms ?? 0) / totalViewCount / 1000) : 0,
+      top_posts: posts,
+      period: days,
     });
   });
 

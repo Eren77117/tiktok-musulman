@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createThumbnail } from 'react-native-create-thumbnail';
 import {
   View, Text, StyleSheet, Image, TouchableOpacity, Modal, Pressable,
   FlatList, ActivityIndicator, Alert, Dimensions, ActionSheetIOS, Platform,
-  Share, Linking,
+  Share, Linking, NativeScrollEvent, NativeSyntheticEvent,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -14,7 +14,6 @@ import { useTheme } from '../../hooks/useTheme';
 import { api } from '../../api/client';
 import { COLORS, FONT, SPACING, RADIUS, SHADOW } from '../../constants/theme';
 import { IcBack, IcFollow, IcFollowing, IcMail, IcHeart, IcPlay, IcCheck, IcMore, IcShare, IcRepeat } from '../../components/ui/Icons';
-import { Link } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { Skeleton } from '../../components/ui/Skeleton';
 
@@ -26,9 +25,7 @@ interface Profile {
   display_name: string;
   bio: string | null;
   bio_links: string[];
-  profile_category: string | null;
   avatar_url: string | null;
-  cover_url: string | null;
   is_verified: boolean;
   is_following: boolean;
   follower_count: number;
@@ -151,6 +148,13 @@ export default function UserProfileScreen({ route, navigation }: Props) {
   const [verseModalVisible, setVerseModalVisible] = useState(false);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
+  const [previewPost, setPreviewPost] = useState<Post | null>(null);
+  const [showStickyFollow, setShowStickyFollow] = useState(false);
+  const headerThreshold = 260;
+
+  const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    setShowStickyFollow(e.nativeEvent.contentOffset.y > headerThreshold);
+  }, []);
 
   const handleBlock = async () => {
     if (!profile) return;
@@ -260,11 +264,25 @@ export default function UserProfileScreen({ route, navigation }: Props) {
           <IcBack size={24} color={theme.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.text }]}>@{profile.username}</Text>
-        {!isOwnProfile && (
-          <TouchableOpacity onPress={() => setOptionsVisible(true)} style={styles.backBtn} activeOpacity={0.7}>
-            <IcMore size={22} color={theme.text} />
-          </TouchableOpacity>
-        )}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          {!isOwnProfile && showStickyFollow && (
+            <TouchableOpacity
+              style={[styles.stickyFollowBtn, profile.is_following && styles.stickyFollowingBtn]}
+              onPress={() => { ReactNativeHapticFeedback.trigger('impactMedium', { enableVibrateFallback: true }); followMutation.mutate(); }}
+              disabled={followMutation.isPending}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.stickyFollowText, profile.is_following && { color: COLORS.primary }]}>
+                {profile.is_following ? 'Suivi' : "S'abonner"}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {!isOwnProfile && (
+            <TouchableOpacity onPress={() => setOptionsVisible(true)} style={styles.backBtn} activeOpacity={0.7}>
+              <IcMore size={22} color={theme.text} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <FlatList
@@ -274,6 +292,8 @@ export default function UserProfileScreen({ route, navigation }: Props) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ gap: 1, paddingBottom: 40 }}
         columnWrapperStyle={{ gap: 1 }}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         ListHeaderComponent={
           <View style={[styles.hero, { backgroundColor: theme.surface, borderBottomColor: theme.borderLight }]}>
             {/* Avatar — ring story vert ou ring live rouge */}
@@ -308,24 +328,16 @@ export default function UserProfileScreen({ route, navigation }: Props) {
             </TouchableOpacity>
 
             <Text style={[styles.displayName, { color: theme.text }]}>{profile.display_name}</Text>
-            {profile.profile_category ? (
-              <View style={[styles.categoryBadge, { backgroundColor: `${COLORS.primary}18` }]}>
-                <Text style={[styles.categoryText, { color: COLORS.primary }]}>{profile.profile_category}</Text>
-              </View>
-            ) : null}
             {profile.bio ? <BioText bio={profile.bio} theme={theme} /> : null}
-            {profile.bio_links?.[0] ? (
-              <TouchableOpacity
-                style={styles.bioLinkRow}
-                onPress={() => Linking.openURL(profile.bio_links[0]).catch(() => {})}
-                activeOpacity={0.7}
-              >
-                <Link size={13} color={COLORS.primary} strokeWidth={2} />
-                <Text style={[styles.bioLinkText, { color: COLORS.primary }]} numberOfLines={1}>
-                  {profile.bio_links[0].replace(/^https?:\/\/(www\.)?/, '')}
-                </Text>
-              </TouchableOpacity>
-            ) : null}
+            {profile.bio_links?.length > 0 && (
+              <View style={styles.bioLinksRow}>
+                {profile.bio_links.map((link, i) => (
+                  <TouchableOpacity key={i} onPress={() => Linking.openURL(link).catch(() => {})} activeOpacity={0.75} style={styles.bioLinkPill}>
+                    <Text style={styles.bioLinkText} numberOfLines={1}>{link.replace(/^https?:\/\//, '')}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
             {/* Stats */}
             <View style={styles.statsRow}>
@@ -411,6 +423,7 @@ export default function UserProfileScreen({ route, navigation }: Props) {
             theme={theme}
             showRepostBadge={activeTab === 1}
             onPress={() => navigation.navigate('VideoPlayer', { postId: p.id })}
+            onLongPress={() => { ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true }); setPreviewPost(p); }}
           />
         )}
         ListEmptyComponent={
@@ -500,13 +513,46 @@ export default function UserProfileScreen({ route, navigation }: Props) {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Long-press video preview */}
+      <Modal visible={!!previewPost} transparent animationType="fade" onRequestClose={() => setPreviewPost(null)}>
+        <Pressable style={previewStyles.backdrop} onPress={() => setPreviewPost(null)}>
+          <Pressable style={[previewStyles.card, { backgroundColor: theme.surface }]}>
+            {previewPost && (
+              <>
+                <Image
+                  source={{ uri: getThumbUrl(previewPost) ?? undefined }}
+                  style={previewStyles.thumb}
+                  resizeMode="cover"
+                />
+                {previewPost.caption ? (
+                  <Text style={[previewStyles.caption, { color: theme.text }]} numberOfLines={2}>{previewPost.caption}</Text>
+                ) : null}
+                <View style={previewStyles.stats}>
+                  <IcPlay size={13} color={theme.textMuted} />
+                  <Text style={[previewStyles.stat, { color: theme.textMuted }]}>{fmtNum(previewPost.view_count)}</Text>
+                  <IcHeart size={13} color={theme.textMuted} />
+                  <Text style={[previewStyles.stat, { color: theme.textMuted }]}>{fmtNum(previewPost.like_count)}</Text>
+                </View>
+                <TouchableOpacity
+                  style={previewStyles.viewBtn}
+                  onPress={() => { setPreviewPost(null); navigation.navigate('VideoPlayer', { postId: previewPost.id }); }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={previewStyles.viewBtnText}>Voir la vidéo</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
 
 const USER_THUMB_CACHE = new Map<string, string>();
 
-function LazyVideoCell({ post: p, theme, onPress, showRepostBadge }: { post: Post; theme: any; onPress: () => void; showRepostBadge?: boolean }) {
+function LazyVideoCell({ post: p, theme, onPress, onLongPress, showRepostBadge }: { post: Post; theme: any; onPress: () => void; onLongPress?: () => void; showRepostBadge?: boolean }) {
   const precomputed = getThumbUrl(p);
   const [thumb, setThumb] = useState<string | null>(precomputed ?? USER_THUMB_CACHE.get(p.id) ?? null);
   const [loading, setLoading] = useState(!thumb && !!p.video_url);
@@ -521,7 +567,7 @@ function LazyVideoCell({ post: p, theme, onPress, showRepostBadge }: { post: Pos
   }, [p.id]);
 
   return (
-    <TouchableOpacity style={[styles.cell, { backgroundColor: theme.surface }]} onPress={onPress} activeOpacity={0.85}>
+    <TouchableOpacity style={[styles.cell, { backgroundColor: theme.surface }]} onPress={onPress} onLongPress={onLongPress} delayLongPress={350} activeOpacity={0.85}>
       {thumb ? (
         <Image source={{ uri: thumb }} style={styles.cellImg} resizeMode="cover" />
       ) : loading ? (
@@ -622,11 +668,10 @@ const styles = StyleSheet.create({
   liveText: { fontSize: 9, fontWeight: FONT.weight.bold, color: COLORS.white, letterSpacing: 0.3 },
 
   displayName: { fontSize: FONT.size.xxl, fontWeight: FONT.weight.bold, letterSpacing: -0.3 },
-  categoryBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, marginTop: -4 },
-  categoryText: { fontSize: FONT.size.xs, fontWeight: FONT.weight.semibold },
   bio: { fontSize: FONT.size.sm, textAlign: 'center', lineHeight: 20 },
-  bioLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: -2 },
-  bioLinkText: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold, textDecorationLine: 'underline', maxWidth: 220 },
+  bioLinksRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 6 },
+  bioLinkPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,176,90,0.12)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  bioLinkText: { fontSize: FONT.size.xs, color: COLORS.primary, fontWeight: FONT.weight.semibold, maxWidth: 160 },
 
   statsRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.lg, marginTop: 4 },
   statItem: { alignItems: 'center', gap: 2, minWidth: 70 },
@@ -641,6 +686,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28, paddingVertical: 10, ...SHADOW.green,
   },
   followText: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold, color: COLORS.white },
+  stickyFollowBtn: {
+    backgroundColor: COLORS.primary, borderRadius: RADIUS.full,
+    paddingHorizontal: 14, paddingVertical: 6,
+  },
+  stickyFollowingBtn: {
+    backgroundColor: 'transparent', borderWidth: 1.5, borderColor: COLORS.primary,
+  },
+  stickyFollowText: { fontSize: 12, fontWeight: '700', color: COLORS.white },
   messageBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     borderRadius: RADIUS.full, paddingHorizontal: 20, paddingVertical: 10,
@@ -737,4 +790,18 @@ const verseStyles = StyleSheet.create({
     borderRadius: 12, paddingVertical: 12, paddingHorizontal: 32,
   },
   btnText: { color: COLORS.white, fontSize: 15, fontWeight: '600' },
+});
+
+const previewStyles = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  card: { width: '100%', borderRadius: 20, overflow: 'hidden', gap: 12, paddingBottom: 16 },
+  thumb: { width: '100%', aspectRatio: 9 / 16, maxHeight: 400 },
+  caption: { fontSize: 14, lineHeight: 20, paddingHorizontal: 16 },
+  stats: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16 },
+  stat: { fontSize: 13 },
+  viewBtn: {
+    marginHorizontal: 16, backgroundColor: COLORS.primary, borderRadius: RADIUS.full,
+    paddingVertical: 12, alignItems: 'center',
+  },
+  viewBtnText: { color: COLORS.white, fontWeight: '700', fontSize: 15 },
 });

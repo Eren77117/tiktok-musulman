@@ -10,6 +10,8 @@ import { useMutation } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'react-native-linear-gradient';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import Reanimated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { api } from '../../api/client';
 import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, RADIUS } from '../../constants/theme';
@@ -88,6 +90,8 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
   const [soundSheetVisible, setSoundSheetVisible] = useState(false);
   const [isHorizontal, setIsHorizontal] = useState(false);
   const [shareSheetVisible, setShareSheetVisible] = useState(false);
+  const [showReplay, setShowReplay] = useState(false);
+  const replayAnim = useRef(new Animated.Value(0)).current;
 
   // Vinyl spinning animation
   const vinylRotation = useRef(new Animated.Value(0)).current;
@@ -113,7 +117,20 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
   // Seek state
   const [seeking, setSeeking] = useState(false);
   const [seekTime, setSeekTime] = useState(0);
+  const seekTimeRef = useRef(0);
   const totalDurationRef = useRef(post.duration || 0);
+
+  // Hold-seek (long-press left/right)
+  const holdSeekIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [holdSeeking, setHoldSeeking] = useState(false);
+  const holdSeekDirRef = useRef<-1 | 1>(1);
+
+  // Pinch-to-zoom
+  const zoomScale = useSharedValue(1);
+  const pinchGesture = Gesture.Pinch()
+    .onUpdate(e => { zoomScale.value = Math.max(1, Math.min(3, e.scale)); })
+    .onEnd(() => { zoomScale.value = withSpring(1, { damping: 18 }); });
+  const zoomStyle = useAnimatedStyle(() => ({ transform: [{ scale: zoomScale.value }] }));
 
   const thumbScale = useRef(new Animated.Value(1)).current;
 
@@ -357,26 +374,45 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
     longPressZoneRef.current = zone;
 
     if (zone === 'left' || zone === 'right') {
-      setRate(2);
-      showSpeedIndicator();
+      const dir: -1 | 1 = zone === 'left' ? -1 : 1;
+      holdSeekDirRef.current = dir;
+      setHoldSeeking(true);
+      ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
+      // Immediate first seek
+      const t0 = Math.max(0, Math.min(totalDurationRef.current, seekTimeRef.current + dir * 10));
+      seekTimeRef.current = t0;
+      videoRef.current?.seek(t0);
+      setSeekTime(t0);
+      setProgress(totalDurationRef.current > 0 ? t0 / totalDurationRef.current : 0);
+      // Continuous seek every 400ms while held
+      holdSeekIntervalRef.current = setInterval(() => {
+        const next = Math.max(0, Math.min(totalDurationRef.current, seekTimeRef.current + dir * 10));
+        seekTimeRef.current = next;
+        videoRef.current?.seek(next);
+        setSeekTime(next);
+        setProgress(totalDurationRef.current > 0 ? next / totalDurationRef.current : 0);
+      }, 400);
     } else {
       pausedBeforeLongRef.current = paused;
       setPaused(true);
       showPauseIndicator();
     }
-  }, [paused, showPauseIndicator, showSpeedIndicator]);
+  }, [paused, showPauseIndicator]);
 
   const handlePressOut = useCallback((zone: 'left' | 'middle' | 'right') => {
     if (longPressZoneRef.current === zone) {
       longPressZoneRef.current = null;
       if (zone === 'left' || zone === 'right') {
-        setRate(1);
-        hideSpeedIndicator();
+        if (holdSeekIntervalRef.current) {
+          clearInterval(holdSeekIntervalRef.current);
+          holdSeekIntervalRef.current = null;
+        }
+        setHoldSeeking(false);
       } else {
         setPaused(pausedBeforeLongRef.current);
       }
     }
-  }, [hideSpeedIndicator]);
+  }, []);
 
   const goToProfile = () => nav.navigate('UserProfile', { userId: post.user.id, username: post.user.username });
 
@@ -407,8 +443,10 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
           : null
       }
 
-      {/* LAYER 2 — Video */}
+      {/* LAYER 2 — Video (wrapped for pinch-to-zoom) */}
       {isVideo && (
+        <GestureDetector gesture={pinchGesture}>
+          <Reanimated.View style={[StyleSheet.absoluteFill, zoomStyle]}>
         <Video
           ref={videoRef}
           source={{ uri: post.video_url }}
@@ -430,7 +468,8 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
           }}
           onError={() => { setBuffering(false); }}
           onProgress={({ currentTime, seekableDuration }) => {
-            if (!seeking && seekableDuration > 0) {
+            if (!seeking && !holdSeeking && seekableDuration > 0) {
+              seekTimeRef.current = currentTime;
               setProgress(currentTime / seekableDuration);
               setSeekTime(currentTime);
             }
@@ -439,12 +478,24 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
             videoRef.current?.seek(0);
             setProgress(0);
             setSeekTime(0);
+            const dur = totalDurationRef.current;
+            if (dur > 10) {
+              setShowReplay(true);
+              replayAnim.setValue(0);
+              Animated.sequence([
+                Animated.timing(replayAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+                Animated.delay(1200),
+                Animated.timing(replayAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+              ]).start(() => setShowReplay(false));
+            }
           }}
           ignoreSilentSwitch="ignore"
           playInBackground={false}
           playWhenInactive={false}
           bufferConfig={{ minBufferMs: 1500, maxBufferMs: 10000, bufferForPlaybackMs: 500, bufferForPlaybackAfterRebufferMs: 1000 }}
         />
+          </Reanimated.View>
+        </GestureDetector>
       )}
 
       {/* LAYER 3 — Gesture zones (behind UI elements) */}
@@ -494,10 +545,13 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
         </View>
       </Animated.View>
 
-      {/* 2x speed indicator */}
-      <Animated.View style={[styles.speedBadge, { opacity: speedAnim }]} pointerEvents="none">
-        <Text style={styles.speedText}>2x</Text>
-      </Animated.View>
+      {/* Hold-seek indicator */}
+      {holdSeeking && (
+        <View style={styles.holdSeekOverlay} pointerEvents="none">
+          <Text style={styles.holdSeekArrow}>{holdSeekDirRef.current === -1 ? '◀◀' : '▶▶'}</Text>
+          <Text style={styles.holdSeekTime}>{fmtDuration(seekTime)} / {fmtDuration(totalDurationRef.current)}</Text>
+        </View>
+      )}
 
       {/* Floating heart on double-tap — TikTok bounce */}
       <Animated.View
@@ -510,6 +564,14 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
       >
         <IcHeartFill size={112} color="#FF3B5C" />
       </Animated.View>
+
+      {/* Replay indicator */}
+      {showReplay && (
+        <Animated.View pointerEvents="none" style={[styles.replayOverlay, { opacity: replayAnim }]}>
+          <IcRepeat size={32} color={COLORS.white} />
+          <Text style={styles.replayText}>Revoir</Text>
+        </Animated.View>
+      )}
 
       {/* Seekable progress bar — interactive, above tab bar */}
       <View style={styles.seekBarHit} {...seekPanResponder.panHandlers}>
@@ -569,11 +631,15 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, i
 
       {/* Series episode badge */}
       {post.series_episode && (
-        <View style={styles.seriesBadge} pointerEvents="none">
+        <TouchableOpacity
+          style={styles.seriesBadge}
+          onPress={() => nav.navigate('SeriesPlayer', { seriesId: post.series_episode!.series_id, startEpisode: Math.max(0, (post.series_episode!.episode_num ?? 1) - 1) })}
+          activeOpacity={0.85}
+        >
           <Text style={styles.seriesBadgeText}>
             Série · Ép. {post.series_episode.episode_num}
           </Text>
-        </View>
+        </TouchableOpacity>
       )}
 
       {/* Bottom left — username + caption */}
@@ -901,6 +967,14 @@ const styles = StyleSheet.create({
   pauseBars: { flexDirection: 'row', gap: 6 },
   pauseBar: { width: 6, height: 26, backgroundColor: COLORS.white, borderRadius: 3 },
 
+  holdSeekOverlay: {
+    position: 'absolute', top: '40%', alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.72)', borderRadius: 14,
+    paddingHorizontal: 20, paddingVertical: 12, alignItems: 'center', gap: 4,
+  },
+  holdSeekArrow: { fontSize: 28, color: COLORS.white },
+  holdSeekTime: { fontSize: 16, fontWeight: '700', color: COLORS.white, letterSpacing: 0.5 },
+
   speedBadge: {
     position: 'absolute', top: '45%', alignSelf: 'center',
     left: W / 2 - 36,
@@ -911,6 +985,13 @@ const styles = StyleSheet.create({
   speedText: { fontSize: 22, fontWeight: '800', color: '#00C26E', letterSpacing: 0.5 },
 
   floatingHeart: { position: 'absolute', width: 112, height: 112 },
+  replayOverlay: {
+    position: 'absolute', top: '50%', alignSelf: 'center',
+    marginTop: -40, alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 16,
+    paddingHorizontal: 20, paddingVertical: 14,
+  },
+  replayText: { color: COLORS.white, fontSize: 13, fontWeight: '600' },
 
 
   repostBadge: {

@@ -6,6 +6,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.0.0',
+    date: '2026-06-06 · 19h00',
+    changes: [
+      'Lecteur vidéo : hold gauche/droite = seek ±10s continu',
+      'Lecteur vidéo : pinch-to-zoom (x1 → x3, spring reset)',
+      'Lecteur vidéo : overlay MM:SS / MM:SS pendant le seek',
+      'Feed : mémorisation de la position au changement de tab',
+      'Profil : bouton Partager le profil (Share sheet natif)',
+      'Upload : sélecteur visibilité Public / Abonnés / Privé',
+      'Upload : couverture personnalisée depuis la galerie',
+      'Stats créateur : toggle 7j / 30j, taux de complétion, top vidéos',
+      'Messagerie : épingler / archiver une conversation (appui long)',
+      'Live : badges rang TOP (or) / LOYAL (vert) dans le chat',
+      'Live : timer HH:MM:SS + liste spectateurs',
+    ],
+  },
+  {
     version: '2.2.0',
     date: '2026-06-05 · 22h00',
     changes: [

@@ -49,6 +49,8 @@ export default function UploadScreen() {
   const qc = useQueryClient();
   const [media, setMedia] = useState<VideoFile | null>(null);
   const [caption, setCaption] = useState('');
+  const [visibility, setVisibility] = useState<'public' | 'followers' | 'private'>('public');
+  const [customCover, setCustomCover] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadStep, setUploadStep] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -141,6 +143,12 @@ export default function UploadScreen() {
     Animated.timing(progressAnim, { toValue: to, duration: 300, useNativeDriver: false }).start();
   };
 
+  const pickCustomCover = async () => {
+    const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.9 });
+    if (result.didCancel || !result.assets?.[0]?.uri) return;
+    setCustomCover(result.assets[0].uri);
+  };
+
   const handleSaveDraft = async () => {
     try {
       const stored = await AsyncStorage.getItem('nour_drafts');
@@ -204,8 +212,23 @@ export default function UploadScreen() {
       if (!uploadData?.url) throw new Error('URL manquante — vérifiez la configuration Cloudinary');
       const videoUrl = uploadData.url.startsWith('http') ? uploadData.url : `${API_BASE_URL.replace('/api', '')}${uploadData.url}`;
 
-      // ── Thumbnail — priorité: backend Cloudinary → local extract → fallback ──
-      let thumbnailUrl: string | undefined = uploadData.thumbnail_url ?? undefined;
+      // ── Thumbnail — priorité: custom cover → backend Cloudinary → local extract → fallback ──
+      let thumbnailUrl: string | undefined = undefined;
+
+      // Custom cover selected by user
+      if (customCover) {
+        try {
+          const coverForm = new FormData();
+          coverForm.append('file', { uri: customCover, type: 'image/jpeg', name: 'cover.jpg' } as any);
+          const coverRes = await fetch(`${API_BASE_URL}/upload/image`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${tokens.access}` },
+            body: coverForm,
+          });
+          if (coverRes.ok) { const cd = await coverRes.json(); if (cd?.url) thumbnailUrl = cd.url; }
+        } catch {}
+      }
+      if (!thumbnailUrl) thumbnailUrl = uploadData.thumbnail_url ?? undefined;
 
       if (media.isImage) {
         thumbnailUrl = videoUrl;
@@ -246,7 +269,8 @@ export default function UploadScreen() {
         thumbnail_url: thumbnailUrl,
         caption: caption.trim() || undefined,
         duration: 1,
-        is_public: true,
+        is_public: visibility === 'public',
+        visibility,
       });
 
       animateProgress(100);
@@ -362,6 +386,53 @@ export default function UploadScreen() {
                 </View>
               </TouchableOpacity>
             ))}
+          </View>
+        )}
+
+        {/* ── Visibility selector ── */}
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Qui peut voir</Text>
+          <View style={styles.visRow}>
+            {(['public', 'followers', 'private'] as const).map((v) => {
+              const labels = { public: 'Public', followers: 'Abonnés', private: 'Privé' };
+              return (
+                <TouchableOpacity
+                  key={v}
+                  style={[styles.visBtn, visibility === v && styles.visBtnActive]}
+                  onPress={() => setVisibility(v)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.visBtnText, visibility === v && styles.visBtnTextActive]}>
+                    {labels[v]}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* ── Custom cover ── */}
+        {media && !media.isImage && (
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Couverture</Text>
+            <TouchableOpacity style={styles.coverRow} onPress={pickCustomCover} activeOpacity={0.8}>
+              {customCover ? (
+                <Image source={{ uri: customCover }} style={styles.coverThumb} resizeMode="cover" />
+              ) : (
+                <View style={[styles.coverThumb, { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center' }]}>
+                  <IcImage size={22} color={COLORS.textMuted} />
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={styles.coverLabel}>{customCover ? 'Couverture personnalisée' : 'Choisir une image de couverture'}</Text>
+                <Text style={styles.coverHint}>{customCover ? 'Appuie pour changer' : 'Depuis votre galerie · sinon auto-générée'}</Text>
+              </View>
+              {customCover && (
+                <TouchableOpacity onPress={() => setCustomCover(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <IcClose size={16} color={COLORS.textMuted} />
+                </TouchableOpacity>
+              )}
+            </TouchableOpacity>
           </View>
         )}
 
@@ -504,6 +575,20 @@ const styles = StyleSheet.create({
   tipTitle: { fontSize: FONT.size.sm, fontWeight: FONT.weight.bold, color: COLORS.text, marginBottom: 4 },
   tipItem: { fontSize: FONT.size.xs, color: COLORS.textMuted, lineHeight: 18 },
   tipHighlight: { color: COLORS.primary, fontWeight: FONT.weight.semibold },
+
+  visRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  visBtn: {
+    flex: 1, borderRadius: RADIUS.full, borderWidth: 1, borderColor: COLORS.border,
+    paddingVertical: 8, alignItems: 'center',
+  },
+  visBtnActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  visBtnText: { fontSize: FONT.size.sm, fontWeight: '600', color: COLORS.textMuted },
+  visBtnTextActive: { color: COLORS.white },
+
+  coverRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  coverThumb: { width: 56, height: 74, borderRadius: 6, backgroundColor: '#111' },
+  coverLabel: { fontSize: FONT.size.sm, fontWeight: '600', color: COLORS.text },
+  coverHint: { fontSize: FONT.size.xs, color: COLORS.textMuted, marginTop: 2 },
 
   btnRow: { flexDirection: 'row', gap: 12 },
   draftBtn: {

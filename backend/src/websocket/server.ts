@@ -16,6 +16,7 @@ export function createSocketServer(httpServer: HttpServer) {
 
   setIo(io);
   const userSockets = new Map<string, Set<string>>();
+  const liveRanks = new Map<string, string | null>(); // userId → rank
 
   io.use(async (socket: AuthSocket, next) => {
     const token = socket.handshake.auth.token as string;
@@ -65,6 +66,20 @@ export function createSocketServer(httpServer: HttpServer) {
       socket.leave(`conversation:${conversationId}`);
     });
 
+    socket.on('typing:start', (conversationId: string) => {
+      socket.to(`conversation:${conversationId}`).emit('typing:start', { userId });
+    });
+
+    socket.on('typing:stop', (conversationId: string) => {
+      socket.to(`conversation:${conversationId}`).emit('typing:stop', { userId });
+    });
+
+    socket.on('message:reaction', (data: { conversationId: string; msgId: string; emoji: string }) => {
+      socket.to(`conversation:${data.conversationId}`).emit('message:reaction', {
+        msgId: data.msgId, userId, emoji: data.emoji,
+      });
+    });
+
     socket.on('message:send', async (data: { conversationId: string; content: string }) => {
       const conversation = await prisma.conversation.findUnique({
         where: { id: data.conversationId },
@@ -91,12 +106,45 @@ export function createSocketServer(httpServer: HttpServer) {
 
     socket.on('live:join', async (sessionId: string) => {
       socket.join(`live:${sessionId}`);
-      const session = await prisma.liveSession.update({
-        where: { id: sessionId },
-        data: { viewer_count: { increment: 1 } },
-        select: { viewer_count: true },
-      }).catch(() => null);
-      if (session) io.to(`live:${sessionId}`).emit('live:viewer:count', session.viewer_count);
+      const [session] = await Promise.all([
+        prisma.liveSession.update({
+          where: { id: sessionId },
+          data: { viewer_count: { increment: 1 } },
+          select: { viewer_count: true, user_id: true },
+        }).catch(() => null),
+        // Record watch history + compute rank
+        (async () => {
+          try {
+            await prisma.liveWatchHistory.upsert({
+              where: { viewer_id_session_id: { viewer_id: userId, session_id: sessionId } },
+              create: { viewer_id: userId, session_id: sessionId },
+              update: {},
+            });
+          } catch {}
+        })(),
+      ]);
+      if (session) {
+        io.to(`live:${sessionId}`).emit('live:viewer:count', session.viewer_count);
+        // Compute viewer rank for badge
+        const creatorId = session.user_id;
+        const [watchCount, topViewers] = await Promise.all([
+          prisma.liveWatchHistory.count({
+            where: { viewer_id: userId, session: { user_id: creatorId } },
+          }).catch(() => 0),
+          prisma.liveWatchHistory.groupBy({
+            by: ['viewer_id'],
+            where: { session: { user_id: creatorId } },
+            _count: { viewer_id: true },
+            orderBy: { _count: { viewer_id: 'desc' } },
+            take: 3,
+          }).catch(() => []),
+        ]);
+        let rank: string | null = null;
+        if (topViewers.some((t: any) => t.viewer_id === userId)) rank = 'top';
+        else if (watchCount >= 5) rank = 'loyal';
+        liveRanks.set(userId, rank);
+        socket.emit('live:viewer:rank', { rank });
+      }
     });
 
     socket.on('live:leave', async (sessionId: string) => {
@@ -121,6 +169,7 @@ export function createSocketServer(httpServer: HttpServer) {
       }).catch(() => null);
       io.to(`live:${data.sessionId}`).emit('live:comment', {
         id: msg?.id, user, text: data.text.trim(), timestamp: Date.now(),
+        rank: liveRanks.get(userId) ?? null,
       });
     });
 

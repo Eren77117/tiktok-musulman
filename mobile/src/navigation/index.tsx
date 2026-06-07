@@ -50,7 +50,9 @@ import StoryCreateScreen from '../screens/stories/StoryCreateScreen';
 import StoryViewerScreen from '../screens/stories/StoryViewerScreen';
 import StoryArchiveScreen from '../screens/stories/StoryArchiveScreen';
 import DraftsScreen from '../screens/upload/DraftsScreen';
+import CollectionScreen from '../screens/profile/CollectionScreen';
 import CollectionDetailScreen from '../screens/profile/CollectionDetailScreen';
+import SeriesPlayerScreen from '../screens/feed/SeriesPlayerScreen';
 import SeriesDetailScreen from '../screens/profile/SeriesDetailScreen';
 
 export type RootStackParamList = {
@@ -78,9 +80,11 @@ export type RootStackParamList = {
   StoryViewer: { groups: any[]; initialGroupIndex?: number };
   StoryArchive: undefined;
   Drafts: undefined;
-  Upload: { draft?: any } | undefined;
+  Collection: { collectionId: string; name: string };
   CollectionDetail: { collectionId: string; name: string };
+  SeriesPlayer: { seriesId: string; startEpisode?: number };
   SeriesDetail: { seriesId: string };
+  Upload: { draft?: any } | undefined;
 };
 
 export type AuthStackParamList = {
@@ -357,14 +361,18 @@ export function AppNavigator() {
               options={{ animation: 'fade', presentation: 'fullScreenModal', headerShown: false }} />
             <RootStack.Screen name="StoryArchive" component={StoryArchiveScreen}
               options={{ animation: 'slide_from_right' }} />
+            <RootStack.Screen name="Collection" component={CollectionScreen}
+              options={{ headerShown: false, animation: 'slide_from_right' }} />
+            <RootStack.Screen name="CollectionDetail" component={CollectionDetailScreen}
+              options={{ headerShown: false, animation: 'slide_from_right' }} />
+            <RootStack.Screen name="SeriesPlayer" component={SeriesPlayerScreen}
+              options={{ headerShown: false, animation: 'slide_from_bottom' }} />
+            <RootStack.Screen name="SeriesDetail" component={SeriesDetailScreen}
+              options={{ headerShown: false, animation: 'slide_from_right' }} />
             <RootStack.Screen name="Drafts" component={DraftsScreen}
               options={{ animation: 'slide_from_right', headerShown: false }} />
             <RootStack.Screen name="Upload" component={CreateScreen}
               options={{ animation: 'slide_from_bottom', presentation: 'modal', headerShown: false }} />
-            <RootStack.Screen name="CollectionDetail" component={CollectionDetailScreen}
-              options={{ animation: 'slide_from_right', headerShown: false }} />
-            <RootStack.Screen name="SeriesDetail" component={SeriesDetailScreen}
-              options={{ animation: 'slide_from_right', headerShown: false }} />
           </>
         ) : (
           <RootStack.Screen name="Auth" component={AuthNavigator} />

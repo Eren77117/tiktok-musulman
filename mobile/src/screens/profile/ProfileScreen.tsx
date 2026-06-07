@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createThumbnail } from 'react-native-create-thumbnail';
 import {
-  View, Text, StyleSheet, Image, TouchableOpacity,
-  FlatList, ScrollView, Alert, ActivityIndicator, RefreshControl, Modal, ActionSheetIOS, Platform, Linking,
+  View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, Linking, Share,
+  FlatList, ScrollView, Alert, ActivityIndicator, RefreshControl, Modal, ActionSheetIOS, Platform,
 } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
@@ -14,8 +14,7 @@ import { api, getTokens } from '../../api/client';
 import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, SPACING, RADIUS, SHADOW, API_BASE_URL } from '../../constants/theme';
 import { useTheme } from '../../hooks/useTheme';
-import { IcSettings, IcMenu, IcSave, IcCheck, IcHeart, IcGrid, IcEdit, IcCamera, IcChart, IcPlay, IcRepeat, IcBell } from '../../components/ui/Icons';
-import { Link } from 'lucide-react-native';
+import { IcSettings, IcMenu, IcSave, IcCheck, IcHeart, IcGrid, IcEdit, IcCamera, IcChart, IcPlay, IcRepeat, IcBell, IcShare } from '../../components/ui/Icons';
 import { LinearGradient } from 'react-native-linear-gradient';
 import { EditProfileSheet } from './EditProfileSheet';
 
@@ -42,6 +41,13 @@ function getThumbUrl(post: Pick<Post, 'thumbnail_url' | 'video_url'>): string | 
   return null;
 }
 
+interface Collection {
+  id: string;
+  name: string;
+  thumbnail_url: string | null;
+  post_count: number;
+}
+
 interface Thread {
   id: string;
   content: string;
@@ -50,16 +56,9 @@ interface Thread {
   created_at: string;
 }
 
-const TABS = ['Vidéos', 'Fils', "J'aime", 'Favoris', 'Reposts', 'Collections'];
+const TABS = ['Vidéos', 'Fils', "J'aime", 'Favoris', 'Reposts'];
 const LIKE_SUBTABS = ['Pour toi', 'Fils'] as const;
 type LikeSubTab = typeof LIKE_SUBTABS[number];
-
-interface Collection {
-  id: string;
-  name: string;
-  thumbnail_url: string | null;
-  post_count: number;
-}
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -82,6 +81,7 @@ export default function ProfileScreen() {
   const [avatarLoading, setAvatarLoading] = useState(false);
   const [coverLoading, setCoverLoading] = useState(false);
   const [coverError, setCoverError] = useState(false);
+  const [previewPost, setPreviewPost] = useState<Post | null>(null);
 
   // Notif count (badge cloche)
   const { data: notifData } = useQuery<{ count: number }>({
@@ -135,9 +135,9 @@ export default function ProfileScreen() {
     enabled: !!user?.id && activeTab === 2 && likeSubTab === 'Fils',
   });
 
-  const { data: favorites, isLoading: favLoading } = useQuery<{ items: Post[] }>({
-    queryKey: ['favorites'],
-    queryFn: () => api.get('/favorites').then((r) => r.data).catch(() => ({ items: [] })),
+  const { data: collections, isLoading: collectionsLoading } = useQuery<{ items: Collection[] }>({
+    queryKey: ['my-collections'],
+    queryFn: () => api.get('/collections').then((r) => r.data).catch(() => ({ items: [] })),
     enabled: !!user?.id && activeTab === 3,
   });
 
@@ -145,12 +145,6 @@ export default function ProfileScreen() {
     queryKey: ['user-reposts', user?.id],
     queryFn: () => api.get(`/posts/user/${user?.id}/reposts`).then((r) => r.data).catch(() => ({ items: [] })),
     enabled: !!user?.id && activeTab === 4,
-  });
-
-  const { data: collections, isLoading: collectionsLoading } = useQuery<{ items: Collection[] }>({
-    queryKey: ['my-collections'],
-    queryFn: () => api.get('/collections').then((r) => r.data).catch(() => ({ items: [] })),
-    enabled: !!user?.id && activeTab === 5,
   });
 
   if (!user) return null;
@@ -244,13 +238,11 @@ export default function ProfileScreen() {
 
   const gridData = activeTab === 0 ? posts?.items
     : activeTab === 2 && likeSubTab === 'Pour toi' ? liked?.items
-    : activeTab === 3 ? favorites?.items
     : null;
 
   const gridLoading = activeTab === 0 ? postsLoading
     : activeTab === 2 && likeSubTab === 'Pour toi' ? likedLoading
     : activeTab === 2 && likeSubTab === 'Fils' ? likedThreadsLoading
-    : activeTab === 3 ? favLoading
     : false;
 
   return (
@@ -260,8 +252,8 @@ export default function ProfileScreen() {
         onClose={() => setEditVisible(false)}
         user={user}
         onSave={async (data) => {
-          const res = await api.patch('/users/me', data);
-          updateUser({ ...data, ...(res.data ?? {}) } as any);
+          await api.patch('/users/me', data);
+          updateUser(data as any);
           await loadMe();
           setEditVisible(false);
           qc.invalidateQueries({ queryKey: ['me'] });
@@ -355,24 +347,16 @@ export default function ProfileScreen() {
           </View>
 
           <Text style={[styles.displayName, { color: theme.text }]}>{user.display_name}</Text>
-          {(user as any).profile_category ? (
-            <View style={[styles.categoryBadge, { backgroundColor: `${COLORS.primary}18` }]}>
-              <Text style={[styles.categoryText, { color: COLORS.primary }]}>{(user as any).profile_category}</Text>
-            </View>
-          ) : null}
           {user.bio ? <Text style={[styles.bio, { color: theme.textMuted }]}>{user.bio}</Text> : null}
-          {(user as any).bio_links?.[0] ? (
-            <TouchableOpacity
-              style={styles.bioLinkRow}
-              onPress={() => Linking.openURL((user as any).bio_links[0]).catch(() => {})}
-              activeOpacity={0.7}
-            >
-              <Link size={13} color={COLORS.primary} strokeWidth={2} />
-              <Text style={[styles.bioLinkText, { color: COLORS.primary }]} numberOfLines={1}>
-                {(user as any).bio_links[0].replace(/^https?:\/\/(www\.)?/, '')}
-              </Text>
-            </TouchableOpacity>
-          ) : null}
+          {(user as any).bio_links?.length > 0 && (
+            <View style={styles.bioLinksRow}>
+              {((user as any).bio_links as string[]).map((link: string, i: number) => (
+                <TouchableOpacity key={i} onPress={() => Linking.openURL(link).catch(() => {})} activeOpacity={0.75} style={styles.bioLinkPill}>
+                  <Text style={styles.bioLinkText} numberOfLines={1}>{link.replace(/^https?:\/\//, '')}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
           <View style={styles.statsRow}>
             <TouchableOpacity onPress={() => navigation.navigate('Followers', { userId: user.id, username: user.username, type: 'following' })} activeOpacity={0.7}>
@@ -389,6 +373,16 @@ export default function ProfileScreen() {
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <TouchableOpacity style={[styles.editBtn, { borderColor: theme.border, flex: 1 }]} onPress={() => setEditVisible(true)} activeOpacity={0.8}>
               <Text style={[styles.editBtnText, { color: theme.text }]}>Modifier le profil</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.editBtn, { borderColor: theme.border, paddingHorizontal: 14 }]} onPress={() => navigation.navigate('Drafts')} activeOpacity={0.8}>
+              <IcEdit size={16} color={theme.text} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.editBtn, { borderColor: theme.border, paddingHorizontal: 14 }]}
+              onPress={() => Share.share({ message: `Suis-moi sur Nour ! @${user.username}`, url: `https://nour.app/@${user.username}` })}
+              activeOpacity={0.8}
+            >
+              <IcShare size={16} color={theme.text} />
             </TouchableOpacity>
             {(!(user as any).cover_url || coverError) && (
               <TouchableOpacity style={[styles.editBtn, { borderColor: theme.border, paddingHorizontal: 12 }]} onPress={pickCover} activeOpacity={0.8} disabled={coverLoading}>
@@ -433,6 +427,41 @@ export default function ProfileScreen() {
           <ThreadsTab threads={threads?.items} loading={threadsLoading} theme={theme} />
         ) : activeTab === 2 && likeSubTab === 'Fils' ? (
           <ThreadsTab threads={likedThreads?.items} loading={likedThreadsLoading} theme={theme} />
+        ) : activeTab === 3 ? (
+          collectionsLoading ? (
+            <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
+          ) : (
+            <FlatList
+              data={collections?.items ?? []}
+              numColumns={2}
+              keyExtractor={(c) => c.id}
+              scrollEnabled={false}
+              columnWrapperStyle={{ gap: 2, marginBottom: 2 }}
+              contentContainerStyle={{ paddingHorizontal: 2, paddingTop: 2 }}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={collSt.card}
+                  onPress={() => navigation.navigate('Collection', { collectionId: item.id, name: item.name })}
+                  activeOpacity={0.85}
+                >
+                  {item.thumbnail_url ? (
+                    <Image source={{ uri: item.thumbnail_url }} style={collSt.thumb} resizeMode="cover" />
+                  ) : (
+                    <View style={[collSt.thumb, { backgroundColor: theme.surface }]} />
+                  )}
+                  <View style={collSt.info}>
+                    <Text style={[collSt.name, { color: theme.text }]} numberOfLines={1}>{item.name}</Text>
+                    <Text style={[collSt.count, { color: theme.textMuted }]}>{item.post_count} vidéo{item.post_count !== 1 ? 's' : ''}</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <View style={{ alignItems: 'center', marginTop: 60 }}>
+                  <Text style={{ color: theme.textMuted, fontSize: FONT.size.md }}>Aucune collection</Text>
+                </View>
+              }
+            />
+          )
         ) : activeTab === 4 ? (
           repostsLoading ? (
             <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
@@ -447,20 +476,11 @@ export default function ProfileScreen() {
                 <GridItem
                   item={item}
                   onPress={() => navigation.navigate('VideoPlayer', { postId: item.id })}
+                  onLongPress={() => setPreviewPost(item)}
                   repostBadge
                 />
               )}
               ListEmptyComponent={<EmptyTab tab={4} theme={theme} />}
-            />
-          )
-        ) : activeTab === 5 ? (
-          collectionsLoading ? (
-            <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
-          ) : (
-            <CollectionsGrid
-              collections={collections?.items ?? []}
-              onOpen={(c) => navigation.navigate('CollectionDetail', { collectionId: c.id, name: c.name })}
-              theme={theme}
             />
           )
         ) : gridLoading ? (
@@ -472,11 +492,41 @@ export default function ProfileScreen() {
             keyExtractor={(p) => p.id}
             scrollEnabled={false}
             columnWrapperStyle={styles.gridRow}
-            renderItem={({ item }) => <GridItem item={item} onPress={() => navigation.navigate('VideoPlayer', { postId: item.id })} />}
+            renderItem={({ item }) => <GridItem item={item} onPress={() => navigation.navigate('VideoPlayer', { postId: item.id })} onLongPress={() => setPreviewPost(item)} />}
             ListEmptyComponent={<EmptyTab tab={activeTab} theme={theme} />}
           />
         )}
       </ScrollView>
+
+      {/* Long-press video preview */}
+      <Modal visible={!!previewPost} transparent animationType="fade" onRequestClose={() => setPreviewPost(null)}>
+        <TouchableOpacity style={previewSt.backdrop} activeOpacity={1} onPress={() => setPreviewPost(null)}>
+          <View style={[previewSt.card, { backgroundColor: theme.surface }]}>
+            {previewPost && (
+              <>
+                <Image
+                  source={{ uri: getThumbUrl(previewPost) ?? undefined }}
+                  style={previewSt.thumb}
+                  resizeMode="cover"
+                />
+                <View style={previewSt.stats}>
+                  <IcPlay size={13} color={theme.textMuted} />
+                  <Text style={[previewSt.stat, { color: theme.textMuted }]}>{fmtNum(previewPost.view_count)}</Text>
+                  <IcHeart size={13} color={theme.textMuted} />
+                  <Text style={[previewSt.stat, { color: theme.textMuted }]}>{fmtNum(previewPost.like_count)}</Text>
+                </View>
+                <TouchableOpacity
+                  style={previewSt.viewBtn}
+                  onPress={() => { setPreviewPost(null); navigation.navigate('VideoPlayer', { postId: previewPost.id }); }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={previewSt.viewBtnText}>Voir la vidéo</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -484,7 +534,7 @@ export default function ProfileScreen() {
 // In-memory thumbnail cache (persists for app session)
 const THUMB_CACHE = new Map<string, string>();
 
-function GridItem({ item, onPress, repostBadge }: { item: Post & { _repostedBy?: any }; onPress: () => void; repostBadge?: boolean }) {
+function GridItem({ item, onPress, onLongPress, repostBadge }: { item: Post & { _repostedBy?: any }; onPress: () => void; onLongPress?: () => void; repostBadge?: boolean }) {
   const precomputed = getThumbUrl(item);
   const [thumb, setThumb] = useState<string | null>(precomputed ?? THUMB_CACHE.get(item.id) ?? null);
   const [loading, setLoading] = useState(!thumb && !!item.video_url);
@@ -508,7 +558,7 @@ function GridItem({ item, onPress, repostBadge }: { item: Post & { _repostedBy?:
   }, [item.id]);
 
   return (
-    <TouchableOpacity style={styles.gridItem} activeOpacity={0.8} onPress={onPress}>
+    <TouchableOpacity style={styles.gridItem} activeOpacity={0.8} onPress={onPress} onLongPress={onLongPress} delayLongPress={350}>
       {thumb ? (
         <Image source={{ uri: thumb }} style={styles.gridThumb} resizeMode="cover" />
       ) : loading ? (
@@ -552,55 +602,6 @@ function ThreadsTab({ threads, loading, theme }: { threads?: Thread[]; loading: 
         </View>
       ))}
     </View>
-  );
-}
-
-function CollectionsGrid({ collections, onOpen, theme }: {
-  collections: Collection[];
-  onOpen: (c: Collection) => void;
-  theme: any;
-}) {
-  const { width } = require('react-native').Dimensions.get('window');
-  const COLS = 2;
-  const CELL_W = (width - 3) / COLS;
-  const CELL_H = CELL_W * 0.75;
-
-  if (collections.length === 0) {
-    return (
-      <View style={styles.emptyWrap}>
-        <Text style={[styles.emptyTitle, { color: theme.text }]}>Aucune collection</Text>
-        <Text style={[styles.emptySubtitle, { color: theme.textMuted }]}>Sauvegardez des vidéos dans des collections</Text>
-      </View>
-    );
-  }
-  return (
-    <FlatList
-      data={collections}
-      keyExtractor={c => c.id}
-      numColumns={COLS}
-      scrollEnabled={false}
-      columnWrapperStyle={{ gap: 1, marginBottom: 1 }}
-      renderItem={({ item }) => (
-        <TouchableOpacity
-          style={{ width: CELL_W, height: CELL_H, backgroundColor: theme.card }}
-          activeOpacity={0.8}
-          onPress={() => onOpen(item)}
-        >
-          {item.thumbnail_url
-            ? <Image source={{ uri: item.thumbnail_url }} style={{ width: '100%', height: '100%' }} />
-            : <View style={{ flex: 1, backgroundColor: theme.card, alignItems: 'center', justifyContent: 'center' }}>
-                <IcGrid size={28} color={theme.textMuted} />
-              </View>}
-          <View style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0,
-            backgroundColor: 'rgba(0,0,0,0.55)', padding: 8,
-          }}>
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }} numberOfLines={1}>{item.name}</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }}>{item.post_count} vidéo{item.post_count !== 1 ? 's' : ''}</Text>
-          </View>
-        </TouchableOpacity>
-      )}
-    />
   );
 }
 
@@ -696,11 +697,10 @@ const styles = StyleSheet.create({
   },
 
   displayName: { fontSize: FONT.size.xxl, fontWeight: FONT.weight.bold, letterSpacing: -0.5 },
-  categoryBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, marginTop: -4 },
-  categoryText: { fontSize: FONT.size.xs, fontWeight: FONT.weight.semibold },
   bio: { fontSize: FONT.size.sm, textAlign: 'center', lineHeight: 20 },
-  bioLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: -2 },
-  bioLinkText: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold, textDecorationLine: 'underline', maxWidth: 200 },
+  bioLinksRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 6 },
+  bioLinkPill: { backgroundColor: 'rgba(0,176,90,0.12)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  bioLinkText: { fontSize: FONT.size.xs, color: COLORS.primary, fontWeight: FONT.weight.semibold, maxWidth: 160 },
 
   statsRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.lg, marginTop: 4 },
   statItem: { alignItems: 'center', gap: 2 },
@@ -748,4 +748,23 @@ const styles = StyleSheet.create({
   emptyWrap: { alignItems: 'center', paddingVertical: 60, gap: 8 },
   emptyTitle: { fontSize: FONT.size.lg, fontWeight: FONT.weight.semibold },
   emptySubtitle: { fontSize: FONT.size.sm, textAlign: 'center', paddingHorizontal: SPACING.xl },
+});
+
+const COLL_W = Math.round((Dimensions.get('window').width - 6) / 2);
+const collSt = StyleSheet.create({
+  card: { width: COLL_W, borderRadius: RADIUS.md, overflow: 'hidden' },
+  thumb: { width: '100%', aspectRatio: 1, backgroundColor: '#111' },
+  info: { padding: 8, gap: 2 },
+  name: { fontSize: FONT.size.md, fontWeight: '600' },
+  count: { fontSize: FONT.size.sm },
+});
+
+const previewSt = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  card: { width: '100%', borderRadius: 20, overflow: 'hidden', gap: 12, paddingBottom: 16 },
+  thumb: { width: '100%', aspectRatio: 9 / 16, maxHeight: 380 },
+  stats: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16 },
+  stat: { fontSize: 13 },
+  viewBtn: { marginHorizontal: 16, backgroundColor: COLORS.primary, borderRadius: RADIUS.full, paddingVertical: 12, alignItems: 'center' },
+  viewBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 });

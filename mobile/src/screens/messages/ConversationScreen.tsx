@@ -5,7 +5,7 @@ import {
   Pressable, Animated, Modal, Alert, Image,
 } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { io, Socket } from 'socket.io-client';
@@ -13,8 +13,8 @@ import { RootStackParamList } from '../../navigation';
 import { api, getTokens } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
 import { useTheme } from '../../hooks/useTheme';
-import { COLORS, SPACING, WS_URL, FONT, RADIUS, API_BASE_URL } from '../../constants';
-import { IcSend, IcCornerUpLeft, IcTrash, IcClose, IcCamera } from '../../components/ui/Icons';
+import { COLORS, SPACING, WS_URL, FONT, RADIUS } from '../../constants';
+import { IcSend, IcCornerUpLeft, IcTrash, IcClose, IcImage } from '../../components/ui/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Conversation'>;
 
@@ -22,8 +22,9 @@ interface Message {
   id: string;
   content: string;
   media_url?: string | null;
+  is_read: boolean;
   created_at: string;
-  reactions?: Record<string, string>; // userId → emoji
+  reactions?: Record<string, string>;
   reply_to?: { id: string; content: string; sender_name: string } | null;
   sender: { id: string; username: string; display_name: string; avatar_url: string | null };
 }
@@ -35,23 +36,56 @@ function fmtTime(iso: string) {
   return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
 
+function TypingBubble({ theme }: { theme: ReturnType<typeof import('../../hooks/useTheme').useTheme> }) {
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const anim = (dot: Animated.Value, delay: number) =>
+      Animated.loop(Animated.sequence([
+        Animated.delay(delay),
+        Animated.timing(dot, { toValue: -4, duration: 300, useNativeDriver: true }),
+        Animated.timing(dot, { toValue: 0, duration: 300, useNativeDriver: true }),
+        Animated.delay(600),
+      ]));
+    const a1 = anim(dot1, 0);
+    const a2 = anim(dot2, 200);
+    const a3 = anim(dot3, 400);
+    a1.start(); a2.start(); a3.start();
+    return () => { a1.stop(); a2.stop(); a3.stop(); };
+  }, []);
+
+  return (
+    <View style={[styles.bubbleRowThem, { marginVertical: 2, alignSelf: 'flex-start' }]}>
+      <View style={[styles.bubble, styles.bubbleThem, { backgroundColor: theme.card, borderColor: theme.borderLight, borderWidth: 1, flexDirection: 'row', gap: 4, paddingVertical: 14 }]}>
+        {[dot1, dot2, dot3].map((dot, i) => (
+          <Animated.View key={i} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.textMuted, transform: [{ translateY: dot }] }} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export default function ConversationScreen({ route, navigation }: Props) {
   const { conversationId, otherUser } = route.params;
   const { user } = useAuthStore();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const qc = useQueryClient();
 
   const [text, setText] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [reactingTo, setReactingTo] = useState<Message | null>(null);
   const [myReactions, setMyReactions] = useState<Record<string, string>>({});
-  const [imageUploading, setImageUploading] = useState(false);
+  const [isOtherTyping, setIsOtherTyping] = useState(false);
+  const [attachLoading, setAttachLoading] = useState(false);
 
   const socketRef = useRef<Socket | null>(null);
   const flatRef = useRef<FlatList>(null);
   const inputRef = useRef<TextInput>(null);
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isTypingRef = useRef(false);
 
   const { isLoading, isError, data: msgData } = useQuery<{ items: Message[] }>({
     queryKey: ['messages', conversationId],
@@ -61,14 +95,10 @@ export default function ConversationScreen({ route, navigation }: Props) {
 
   useEffect(() => {
     if (msgData?.items) {
-      const sorted = [...msgData.items].reverse();
-      setMessages(sorted);
-      // Load my reactions
+      setMessages([...msgData.items].reverse());
       const rx: Record<string, string> = {};
-      sorted.forEach(m => {
-        if (m.reactions && user?.id && m.reactions[user.id]) {
-          rx[m.id] = m.reactions[user.id];
-        }
+      [...msgData.items].reverse().forEach(m => {
+        if (m.reactions && user?.id && m.reactions[user.id]) rx[m.id] = m.reactions[user.id];
       });
       setMyReactions(rx);
     }
@@ -87,35 +117,69 @@ export default function ConversationScreen({ route, navigation }: Props) {
       if (!tokens) return;
       socket = io(WS_URL, { auth: { token: tokens.access }, transports: ['websocket'] });
       socket.emit('join:conversation', conversationId);
+
       socket.on('message:new', (msg: Message) => {
         setMessages(prev => {
           if (prev.find(m => m.id === msg.id)) return prev;
           return [...prev, msg];
         });
+        setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
       });
-      socket.on('message:reaction', ({ msgId, userId, emoji }: { msgId: string; userId: string; emoji: string }) => {
+
+      socket.on('message:reaction', ({ msgId, userId: uid, emoji }: { msgId: string; userId: string; emoji: string }) => {
         setMessages(prev => prev.map(m =>
-          m.id === msgId
-            ? { ...m, reactions: { ...(m.reactions ?? {}), [userId]: emoji } }
-            : m
+          m.id === msgId ? { ...m, reactions: { ...(m.reactions ?? {}), [uid]: emoji } } : m
         ));
       });
+
+      socket.on('message:read', ({ conversationId: cId }: { conversationId: string }) => {
+        if (cId === conversationId) {
+          setMessages(prev => prev.map(m => m.sender.id === user?.id ? { ...m, is_read: true } : m));
+        }
+      });
+
+      socket.on('typing:start', ({ userId: uid }: { userId: string }) => {
+        if (uid !== user?.id) setIsOtherTyping(true);
+      });
+
+      socket.on('typing:stop', ({ userId: uid }: { userId: string }) => {
+        if (uid !== user?.id) setIsOtherTyping(false);
+      });
+
       socketRef.current = socket;
     })();
 
     return () => {
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
       socketRef.current?.emit('leave:conversation', conversationId);
       socketRef.current?.disconnect();
     };
   }, [conversationId, theme.surface, theme.text]);
 
+  const handleTextChange = useCallback((val: string) => {
+    setText(val);
+    if (!socketRef.current) return;
+    if (!isTypingRef.current) {
+      isTypingRef.current = true;
+      socketRef.current.emit('typing:start', conversationId);
+    }
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => {
+      isTypingRef.current = false;
+      socketRef.current?.emit('typing:stop', conversationId);
+    }, 2000);
+  }, [conversationId]);
+
   const sendMutation = useMutation({
-    mutationFn: (payload: { content: string; reply_to_id?: string }) =>
+    mutationFn: (payload: { content: string; media_url?: string; reply_to_id?: string }) =>
       api.post(`/messages/conversations/${conversationId}/messages`, payload),
     onSuccess: res => {
       setMessages(prev => [...prev, res.data]);
       setText('');
       setReplyTo(null);
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      isTypingRef.current = false;
+      socketRef.current?.emit('typing:stop', conversationId);
       setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
     },
     onError: () => Alert.alert('Erreur', "Impossible d'envoyer le message."),
@@ -124,48 +188,36 @@ export default function ConversationScreen({ route, navigation }: Props) {
   const handleSend = useCallback(() => {
     const trimmed = text.trim();
     if (!trimmed || sendMutation.isPending) return;
-    sendMutation.mutate({ content: trimmed } as any);
-  }, [text, sendMutation]);
+    sendMutation.mutate({ content: trimmed, reply_to_id: replyTo?.id });
+  }, [text, replyTo, sendMutation]);
 
-  const handlePickImage = useCallback(async () => {
-    const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.9, maxWidth: 1200, maxHeight: 1200 });
-    if (result.didCancel || !result.assets?.[0]?.uri) return;
-    setImageUploading(true);
+  const handleAttach = useCallback(async () => {
+    const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.8 });
+    if (result.didCancel || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    setAttachLoading(true);
     try {
-      const asset = result.assets[0];
-      const tokens = await getTokens();
-      if (!tokens) throw new Error('Non authentifié');
-      const formData = new FormData();
-      formData.append('file', { uri: asset.uri, type: asset.type ?? 'image/jpeg', name: 'img.jpg' } as any);
-      const uploadRes = await fetch(`${API_BASE_URL}/upload/image`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${tokens.access}` },
-        body: formData,
-      });
-      if (!uploadRes.ok) throw new Error(`Upload error ${uploadRes.status}`);
-      const { url: media_url } = await uploadRes.json();
-      sendMutation.mutate({ content: '', media_url } as any);
-    } catch (e: any) {
-      Alert.alert('Erreur', e?.message ?? "Impossible d'envoyer l'image.");
+      const form = new FormData();
+      form.append('file', { uri: asset.uri!, type: asset.type ?? 'image/jpeg', name: asset.fileName ?? 'photo.jpg' } as any);
+      const res = await api.post('/upload/image', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      sendMutation.mutate({ content: '', media_url: res.data.url, reply_to_id: replyTo?.id });
+    } catch {
+      Alert.alert('Erreur', "Impossible d'envoyer l'image.");
     } finally {
-      setImageUploading(false);
+      setAttachLoading(false);
     }
-  }, [sendMutation]);
+  }, [replyTo, sendMutation]);
 
   const handleReact = useCallback(async (emoji: string) => {
     if (!reactingTo || !user?.id) return;
     const msgId = reactingTo.id;
     const prev = myReactions[msgId];
     const newEmoji = prev === emoji ? '' : emoji;
-
     setMyReactions(r => ({ ...r, [msgId]: newEmoji }));
     setMessages(msgs => msgs.map(m =>
-      m.id === msgId
-        ? { ...m, reactions: { ...(m.reactions ?? {}), [user.id]: newEmoji } }
-        : m
+      m.id === msgId ? { ...m, reactions: { ...(m.reactions ?? {}), [user.id]: newEmoji } } : m
     ));
     setReactingTo(null);
-
     try {
       await api.post(`/messages/conversations/${conversationId}/messages/${msgId}/react`, { emoji: newEmoji });
       socketRef.current?.emit('message:reaction', { conversationId, msgId, emoji: newEmoji });
@@ -177,9 +229,7 @@ export default function ConversationScreen({ route, navigation }: Props) {
       { text: 'Annuler', style: 'cancel' },
       {
         text: 'Supprimer', style: 'destructive', onPress: async () => {
-          setMessages(msgs => msgs.map(m =>
-            m.id === msgId ? { ...m, content: '[DELETED]' } : m
-          ));
+          setMessages(msgs => msgs.map(m => m.id === msgId ? { ...m, content: '[DELETED]' } : m));
           try { await api.delete(`/messages/conversations/${conversationId}/messages/${msgId}`); } catch {}
         },
       },
@@ -191,8 +241,6 @@ export default function ConversationScreen({ route, navigation }: Props) {
     const isMe = m.sender.id === user?.id;
     const deleted = m.content === '[DELETED]' || m.content === '[HIDDEN]';
     const myRx = myReactions[m.id];
-
-    // Collect visible reactions
     const rxList = m.reactions ? Object.entries(m.reactions).filter(([, e]) => e) : [];
 
     return (
@@ -205,56 +253,48 @@ export default function ConversationScreen({ route, navigation }: Props) {
           pressed && { opacity: 0.85 },
         ]}
       >
-        {/* Reply preview */}
         {m.reply_to && (
           <View style={[styles.replyPreview, { borderLeftColor: COLORS.primary, backgroundColor: theme.card }]}>
-            <Text style={[styles.replyName, { color: COLORS.primary }]} numberOfLines={1}>
-              {m.reply_to.sender_name}
-            </Text>
-            <Text style={[styles.replyText, { color: theme.textMuted }]} numberOfLines={1}>
-              {m.reply_to.content}
-            </Text>
+            <Text style={[styles.replyName, { color: COLORS.primary }]} numberOfLines={1}>{m.reply_to.sender_name}</Text>
+            <Text style={[styles.replyText, { color: theme.textMuted }]} numberOfLines={1}>{m.reply_to.content}</Text>
           </View>
         )}
 
         <View style={[
           styles.bubble,
-          isMe ? [styles.bubbleMe, { backgroundColor: m.media_url && !deleted ? 'transparent' : COLORS.primary }]
-               : [styles.bubbleThem, { backgroundColor: m.media_url && !deleted ? 'transparent' : theme.card, borderColor: theme.borderLight, borderWidth: m.media_url && !deleted ? 0 : 1 }],
+          isMe ? [styles.bubbleMe, { backgroundColor: COLORS.primary }]
+               : [styles.bubbleThem, { backgroundColor: theme.card, borderColor: theme.borderLight, borderWidth: 1 }],
           deleted && { opacity: 0.55 },
         ]}>
-          {m.media_url && !deleted ? (
-            <>
-              <Image source={{ uri: m.media_url }} style={styles.bubbleImg} resizeMode="cover" />
-              <Text style={[styles.timeText, { color: theme.textSubtle, textAlign: isMe ? 'right' : 'left', paddingTop: 4 }]}>
-                {fmtTime(m.created_at)}
-              </Text>
-            </>
-          ) : (
-            <>
-              <Text style={[styles.bubbleText, { color: isMe ? '#fff' : theme.text }]}>
-                {deleted ? 'Message supprimé' : m.content}
-              </Text>
-              <Text style={[styles.timeText, { color: isMe ? 'rgba(255,255,255,0.6)' : theme.textMuted }]}>
-                {fmtTime(m.created_at)}
-              </Text>
-            </>
+          {m.media_url && !deleted && (
+            <Image source={{ uri: m.media_url }} style={styles.mediaThumb} resizeMode="cover" />
           )}
+          {(m.content.trim().length > 0 || deleted) && (
+            <Text style={[styles.bubbleText, { color: isMe ? '#fff' : theme.text }]}>
+              {deleted ? 'Message supprimé' : m.content}
+            </Text>
+          )}
+          <View style={styles.metaRow}>
+            <Text style={[styles.timeText, { color: isMe ? 'rgba(255,255,255,0.6)' : theme.textMuted }]}>
+              {fmtTime(m.created_at)}
+            </Text>
+            {isMe && !deleted && (
+              <Text style={[styles.tickText, { color: m.is_read ? '#4CD964' : 'rgba(255,255,255,0.55)' }]}>
+                {m.is_read ? '✓✓' : '✓'}
+              </Text>
+            )}
+          </View>
         </View>
 
-        {/* Reactions display */}
         {rxList.length > 0 && (
           <View style={[styles.rxRow, isMe ? styles.rxRowMe : styles.rxRowThem]}>
             {rxList.slice(0, 5).map(([uid, emoji]) => (
               <Text key={uid} style={styles.rxEmoji}>{emoji}</Text>
             ))}
-            {rxList.length > 5 && (
-              <Text style={[styles.rxCount, { color: theme.textMuted }]}>+{rxList.length - 5}</Text>
-            )}
+            {rxList.length > 5 && <Text style={[styles.rxCount, { color: theme.textMuted }]}>+{rxList.length - 5}</Text>}
           </View>
         )}
 
-        {/* Swipe-to-reply hint (right side for them, left for me) */}
         {!deleted && (
           <TouchableOpacity
             style={[styles.replyBtn, isMe ? styles.replyBtnMe : styles.replyBtnThem]}
@@ -274,17 +314,13 @@ export default function ConversationScreen({ route, navigation }: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={88}
     >
-      {/* Reaction picker modal */}
       <Modal visible={!!reactingTo} transparent animationType="fade" onRequestClose={() => setReactingTo(null)}>
         <Pressable style={styles.rxBackdrop} onPress={() => setReactingTo(null)}>
           <View style={[styles.rxPicker, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             {REACTIONS.map(emoji => (
               <TouchableOpacity
                 key={emoji}
-                style={[
-                  styles.rxBtn,
-                  reactingTo && myReactions[reactingTo.id] === emoji && { backgroundColor: theme.primaryBg },
-                ]}
+                style={[styles.rxBtn, reactingTo && myReactions[reactingTo.id] === emoji && { backgroundColor: theme.primaryBg }]}
                 onPress={() => handleReact(emoji)}
                 activeOpacity={0.7}
               >
@@ -305,7 +341,7 @@ export default function ConversationScreen({ route, navigation }: Props) {
       ) : isError ? (
         <View style={styles.center}>
           <Text style={{ color: COLORS.primary, fontSize: 15, fontWeight: '600', textAlign: 'center', paddingHorizontal: 32 }}>
-            Impossible de charger la conversation. Vérifie ta connexion.
+            Impossible de charger la conversation.
           </Text>
         </View>
       ) : (
@@ -317,28 +353,22 @@ export default function ConversationScreen({ route, navigation }: Props) {
           onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: false })}
           showsVerticalScrollIndicator={false}
           renderItem={renderItem}
+          ListFooterComponent={isOtherTyping ? <TypingBubble theme={theme} /> : null}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-                Envoie ton premier message
-              </Text>
+              <Text style={[styles.emptyText, { color: theme.textMuted }]}>Envoie ton premier message</Text>
             </View>
           }
         />
       )}
 
-      {/* Reply banner */}
       {replyTo && (
         <View style={[styles.replyBanner, { backgroundColor: theme.card, borderTopColor: theme.borderLight }]}>
           <View style={styles.replyBannerLeft}>
             <IcCornerUpLeft size={14} color={COLORS.primary} />
             <View style={{ flex: 1, marginLeft: 8 }}>
-              <Text style={[styles.replyBannerName, { color: COLORS.primary }]} numberOfLines={1}>
-                {replyTo.sender.display_name}
-              </Text>
-              <Text style={[styles.replyBannerText, { color: theme.textMuted }]} numberOfLines={1}>
-                {replyTo.content}
-              </Text>
+              <Text style={[styles.replyBannerName, { color: COLORS.primary }]} numberOfLines={1}>{replyTo.sender.display_name}</Text>
+              <Text style={[styles.replyBannerText, { color: theme.textMuted }]} numberOfLines={1}>{replyTo.content}</Text>
             </View>
           </View>
           <TouchableOpacity onPress={() => setReplyTo(null)} style={{ padding: 4 }}>
@@ -347,34 +377,19 @@ export default function ConversationScreen({ route, navigation }: Props) {
         </View>
       )}
 
-      {/* Input row */}
       <View style={[styles.inputRow, {
         backgroundColor: theme.surface,
         borderTopColor: theme.borderLight,
         paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
       }]}>
-        {/* Image button */}
-        <TouchableOpacity
-          style={[styles.mediaBtn, { backgroundColor: theme.card }]}
-          onPress={handlePickImage}
-          disabled={imageUploading || sendMutation.isPending}
-          activeOpacity={0.7}
-        >
-          {imageUploading
-            ? <ActivityIndicator size="small" color={COLORS.primary} />
-            : <IcCamera size={20} color={theme.textMuted} />
-          }
+        <TouchableOpacity style={styles.attachBtn} onPress={handleAttach} disabled={attachLoading} activeOpacity={0.7}>
+          {attachLoading ? <ActivityIndicator size="small" color={COLORS.primary} /> : <IcImage size={22} color={theme.textMuted} />}
         </TouchableOpacity>
-
         <TextInput
           ref={inputRef}
-          style={[styles.input, {
-            backgroundColor: theme.card,
-            color: theme.text,
-            borderColor: theme.border,
-          }]}
+          style={[styles.input, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
           value={text}
-          onChangeText={setText}
+          onChangeText={handleTextChange}
           placeholder="Message..."
           placeholderTextColor={theme.textMuted}
           multiline
@@ -406,20 +421,17 @@ const styles = StyleSheet.create({
   bubbleRowMe: { alignSelf: 'flex-end', alignItems: 'flex-end' },
   bubbleRowThem: { alignSelf: 'flex-start', alignItems: 'flex-start' },
 
-  bubble: {
-    borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10,
-    borderBottomRightRadius: 4,
-  },
+  bubble: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10, borderBottomRightRadius: 4 },
   bubbleMe: { borderBottomRightRadius: 4, borderBottomLeftRadius: 18 },
   bubbleThem: { borderBottomRightRadius: 18, borderBottomLeftRadius: 4 },
   bubbleText: { fontSize: 15, lineHeight: 22 },
-  bubbleImg: { width: 220, height: 180, borderRadius: 12 },
-  timeText: { fontSize: 10, marginTop: 2, textAlign: 'right' },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2, justifyContent: 'flex-end' },
+  timeText: { fontSize: 10 },
+  tickText: { fontSize: 10, fontWeight: '700' },
 
-  replyPreview: {
-    borderLeftWidth: 3, paddingLeft: 8, paddingVertical: 4,
-    marginBottom: 4, borderRadius: 4,
-  },
+  mediaThumb: { width: 200, height: 200, borderRadius: 12, marginBottom: 6 },
+
+  replyPreview: { borderLeftWidth: 3, paddingLeft: 8, paddingVertical: 4, marginBottom: 4, borderRadius: 4 },
   replyName: { fontSize: 11, fontWeight: '700', marginBottom: 1 },
   replyText: { fontSize: 12 },
 
@@ -433,40 +445,19 @@ const styles = StyleSheet.create({
   replyBtnMe: { left: -32 },
   replyBtnThem: { right: -32 },
 
-  replyBanner: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: SPACING.md, paddingVertical: 8,
-    borderTopWidth: 1, gap: 8,
-  },
+  replyBanner: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingVertical: 8, borderTopWidth: 1, gap: 8 },
   replyBannerLeft: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   replyBannerName: { fontSize: 12, fontWeight: '700' },
   replyBannerText: { fontSize: 12 },
 
-  inputRow: {
-    flexDirection: 'row', gap: 8,
-    paddingHorizontal: SPACING.md, paddingTop: 8,
-    borderTopWidth: 1, alignItems: 'flex-end',
-  },
-  input: {
-    flex: 1, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 10,
-    fontSize: 15, maxHeight: 120, borderWidth: 1,
-  },
-  mediaBtn: {
-    width: 38, height: 38, borderRadius: 19,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  sendBtn: {
-    width: 42, height: 42, borderRadius: 21,
-    backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center',
-  },
+  inputRow: { flexDirection: 'row', gap: 8, paddingHorizontal: SPACING.md, paddingTop: 8, borderTopWidth: 1, alignItems: 'flex-end' },
+  attachBtn: { width: 36, height: 42, alignItems: 'center', justifyContent: 'center' },
+  input: { flex: 1, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, maxHeight: 120, borderWidth: 1 },
+  sendBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
   sendBtnDisabled: { opacity: 0.4 },
 
   rxBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
-  rxPicker: {
-    flexDirection: 'row', borderRadius: 20, padding: 8, gap: 4,
-    borderWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 12,
-  },
+  rxPicker: { flexDirection: 'row', borderRadius: 20, padding: 8, gap: 4, borderWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12 },
   rxBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   rxBtnEmoji: { fontSize: 24 },
 
