@@ -22,6 +22,20 @@ const USER_SELECT_PUBLIC = {
 } as const;
 
 export async function userRoutes(app: FastifyInstance) {
+  // BE-01 : lookup by username (for @mention taps)
+  app.get('/by-username/:username', { preHandler: authenticate }, async (req, reply) => {
+    const { username } = req.params as { username: string };
+    const user = await prisma.user.findUnique({
+      where: { username: username.toLowerCase() },
+      select: {
+        id: true, username: true, display_name: true,
+        avatar_url: true, bio: true, is_verified: true, follower_count: true,
+      },
+    });
+    if (!user) return reply.status(404).send({ error: 'Utilisateur non trouvé' });
+    return reply.send(user);
+  });
+
   app.get('/search', { preHandler: authenticate }, async (req, reply) => {
     const { q, cursor, limit = '20' } = req.query as { q: string; cursor?: string; limit?: string };
     if (!q) return reply.status(400).send({ error: 'Query required' });
@@ -212,7 +226,7 @@ export async function userRoutes(app: FastifyInstance) {
         where: { post: { user_id: userId } },
         _count: { id: true }, _sum: { watch_time_ms: true },
       }),
-      prisma.postView.count({ where: { post: { user_id: userId }, viewed_at: { gte: since } } }),
+      prisma.postView.count({ where: { post: { user_id: userId }, created_at: { gte: since } } }),
       prisma.like.count({ where: { post: { user_id: userId }, created_at: { gte: since } } }).catch(() => 0),
       prisma.follow.count({ where: { following_id: userId, created_at: { gte: since } } }).catch(() => 0),
     ]);

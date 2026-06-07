@@ -111,6 +111,7 @@ model User {
   collections        Collection[]
   series             Series[]
   live_watch_history LiveWatchHistory[]
+  hashtag_follows    HashtagFollow[]
 
   @@index([username])
   @@index([email])
@@ -706,4 +707,15 @@ model LiveBan {
 
   @@unique([session_id, user_id])
   @@index([session_id])
+}
+
+model HashtagFollow {
+  user_id    String
+  tag        String
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([user_id, tag])
+  @@index([tag])
 }

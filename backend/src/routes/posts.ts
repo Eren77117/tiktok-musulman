@@ -346,7 +346,7 @@ export async function postRoutes(app: FastifyInstance) {
       comment_count: p.comment_count,
       is_liked: likedSet.has(p.id),
       is_saved: savedSet.has(p.id),
-      categories: p.post_categories.map(pc => pc.category),
+      categories: p.post_categories.map((pc: any) => pc.category),
       post_categories: undefined,
       user: { ...p.user, is_following: followedSet.has(p.user.id) },
     }));
@@ -409,7 +409,7 @@ export async function postRoutes(app: FastifyInstance) {
         ...p,
         is_liked: likedSet.has(p.id),
         is_saved: savedSet.has(p.id),
-        categories: p.post_categories.map(pc => pc.category),
+        categories: p.post_categories.map((pc: any) => pc.category),
         post_categories: undefined,
         user: { ...p.user, is_following: followedSet.has(p.user.id), has_story: storyUserSet.has(p.user.id) },
       })),

@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../config/database';
 import { authenticate } from '../middleware/auth';
+import { NotificationType } from '@prisma/client';
 
 export async function notificationRoutes(app: FastifyInstance) {
   app.get('/', { preHandler: authenticate }, async (req, reply) => {
@@ -9,10 +10,10 @@ export async function notificationRoutes(app: FastifyInstance) {
     };
 
     // tab filter: 'likes' | 'comments' | 'follows' | undefined (all)
-    let typeFilter: string[] | undefined;
-    if (tab === 'likes')    typeFilter = ['LIKE'];
-    if (tab === 'comments') typeFilter = ['COMMENT', 'MENTION'];
-    if (tab === 'follows')  typeFilter = ['FOLLOW'];
+    let typeFilter: NotificationType[] | undefined;
+    if (tab === 'likes')    typeFilter = [NotificationType.LIKE];
+    if (tab === 'comments') typeFilter = [NotificationType.COMMENT, NotificationType.MENTION];
+    if (tab === 'follows')  typeFilter = [NotificationType.FOLLOW];
 
     const notifications = await prisma.notification.findMany({
       where: {

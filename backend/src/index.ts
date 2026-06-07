@@ -30,6 +30,7 @@ import { soundRoutes } from './routes/sounds';
 import { collectionRoutes } from './routes/collections';
 import { analyticsRoutes } from './routes/analytics';
 import { seriesRoutes } from './routes/series';
+import { hashtagRoutes } from './routes/hashtags';
 
 process.stdout.write(`[STARTUP] Node ${process.version}\n`);
 
@@ -82,6 +83,7 @@ async function bootstrap() {
   await app.register(collectionRoutes, { prefix: '/api/collections' });
   await app.register(analyticsRoutes, { prefix: '/api/analytics' });
   await app.register(seriesRoutes, { prefix: '/api/series' });
+  await app.register(hashtagRoutes, { prefix: '/api/hashtags' });
 
   app.setErrorHandler((error, _req, reply) => {
     app.log.error(error);
