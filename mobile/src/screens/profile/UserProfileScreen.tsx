@@ -14,6 +14,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { api } from '../../api/client';
 import { COLORS, FONT, SPACING, RADIUS, SHADOW } from '../../constants/theme';
 import { IcBack, IcFollow, IcFollowing, IcMail, IcHeart, IcPlay, IcCheck, IcMore, IcShare, IcRepeat } from '../../components/ui/Icons';
+import { Link } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { Skeleton } from '../../components/ui/Skeleton';
 
@@ -24,7 +25,10 @@ interface Profile {
   username: string;
   display_name: string;
   bio: string | null;
+  bio_links: string[];
+  profile_category: string | null;
   avatar_url: string | null;
+  cover_url: string | null;
   is_verified: boolean;
   is_following: boolean;
   follower_count: number;
@@ -304,7 +308,24 @@ export default function UserProfileScreen({ route, navigation }: Props) {
             </TouchableOpacity>
 
             <Text style={[styles.displayName, { color: theme.text }]}>{profile.display_name}</Text>
+            {profile.profile_category ? (
+              <View style={[styles.categoryBadge, { backgroundColor: `${COLORS.primary}18` }]}>
+                <Text style={[styles.categoryText, { color: COLORS.primary }]}>{profile.profile_category}</Text>
+              </View>
+            ) : null}
             {profile.bio ? <BioText bio={profile.bio} theme={theme} /> : null}
+            {profile.bio_links?.[0] ? (
+              <TouchableOpacity
+                style={styles.bioLinkRow}
+                onPress={() => Linking.openURL(profile.bio_links[0]).catch(() => {})}
+                activeOpacity={0.7}
+              >
+                <Link size={13} color={COLORS.primary} strokeWidth={2} />
+                <Text style={[styles.bioLinkText, { color: COLORS.primary }]} numberOfLines={1}>
+                  {profile.bio_links[0].replace(/^https?:\/\/(www\.)?/, '')}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
 
             {/* Stats */}
             <View style={styles.statsRow}>
@@ -601,7 +622,11 @@ const styles = StyleSheet.create({
   liveText: { fontSize: 9, fontWeight: FONT.weight.bold, color: COLORS.white, letterSpacing: 0.3 },
 
   displayName: { fontSize: FONT.size.xxl, fontWeight: FONT.weight.bold, letterSpacing: -0.3 },
+  categoryBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, marginTop: -4 },
+  categoryText: { fontSize: FONT.size.xs, fontWeight: FONT.weight.semibold },
   bio: { fontSize: FONT.size.sm, textAlign: 'center', lineHeight: 20 },
+  bioLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: -2 },
+  bioLinkText: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold, textDecorationLine: 'underline', maxWidth: 220 },
 
   statsRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.lg, marginTop: 4 },
   statItem: { alignItems: 'center', gap: 2, minWidth: 70 },

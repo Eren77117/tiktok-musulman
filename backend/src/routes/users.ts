@@ -9,7 +9,17 @@ const updateProfileSchema = z.object({
   bio: z.string().max(300).optional().nullable(),
   avatar_url: z.string().optional().nullable(),
   cover_url: z.string().optional().nullable(),
+  bio_links: z.array(z.string().url()).max(5).optional(),
+  profile_category: z.string().max(50).optional().nullable(),
 }).passthrough(); // allow extra keys from mobile settings
+
+const USER_SELECT_PUBLIC = {
+  id: true, username: true, display_name: true, bio: true,
+  bio_links: true, profile_category: true,
+  avatar_url: true, cover_url: true, is_verified: true, gender: true,
+  follower_count: true, following_count: true, post_count: true,
+  like_count: true, created_at: true,
+} as const;
 
 export async function userRoutes(app: FastifyInstance) {
   app.get('/search', { preHandler: authenticate }, async (req, reply) => {
@@ -41,12 +51,7 @@ export async function userRoutes(app: FastifyInstance) {
     const { username } = req.params as { username: string };
     const user = await prisma.user.findUnique({
       where: { username },
-      select: {
-        id: true, username: true, display_name: true, bio: true,
-        avatar_url: true, cover_url: true, is_verified: true, gender: true,
-        follower_count: true, following_count: true, post_count: true,
-        like_count: true, created_at: true,
-      },
+      select: USER_SELECT_PUBLIC,
     });
     if (!user) return reply.status(404).send({ error: 'User not found' });
 
@@ -68,23 +73,31 @@ export async function userRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
     // Only update fields that exist in User model
-    const { display_name, bio, avatar_url, cover_url } = parsed.data;
+    const { display_name, bio, avatar_url, cover_url, bio_links, profile_category } = parsed.data;
     const updateData: Record<string, unknown> = {};
     if (display_name !== undefined) updateData.display_name = display_name;
     if (bio !== undefined) updateData.bio = bio;
     if (avatar_url !== undefined) updateData.avatar_url = avatar_url;
     if (cover_url !== undefined) updateData.cover_url = cover_url;
+    if (bio_links !== undefined) updateData.bio_links = bio_links;
+    if (profile_category !== undefined) updateData.profile_category = profile_category;
+
+    const ME_SELECT = {
+      id: true, username: true, display_name: true, bio: true,
+      bio_links: true, profile_category: true,
+      avatar_url: true, cover_url: true, is_verified: true,
+    } as const;
 
     if (Object.keys(updateData).length === 0) {
       // Nothing to update in DB (e.g. settings-only patch)
-      const me = await prisma.user.findUnique({ where: { id: req.currentUser!.id }, select: { id: true, username: true, display_name: true, bio: true, avatar_url: true, cover_url: true, is_verified: true } });
+      const me = await prisma.user.findUnique({ where: { id: req.currentUser!.id }, select: ME_SELECT });
       return reply.send(me);
     }
 
     const user = await prisma.user.update({
       where: { id: req.currentUser!.id },
       data: updateData,
-      select: { id: true, username: true, display_name: true, bio: true, avatar_url: true, cover_url: true, is_verified: true },
+      select: ME_SELECT,
     });
     return reply.send(user);
   });

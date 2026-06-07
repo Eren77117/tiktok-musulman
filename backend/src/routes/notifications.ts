@@ -4,10 +4,21 @@ import { authenticate } from '../middleware/auth';
 
 export async function notificationRoutes(app: FastifyInstance) {
   app.get('/', { preHandler: authenticate }, async (req, reply) => {
-    const { cursor, limit = '20' } = req.query as { cursor?: string; limit?: string };
+    const { cursor, limit = '20', tab } = req.query as {
+      cursor?: string; limit?: string; tab?: string;
+    };
+
+    // tab filter: 'likes' | 'comments' | 'follows' | undefined (all)
+    let typeFilter: string[] | undefined;
+    if (tab === 'likes')    typeFilter = ['LIKE'];
+    if (tab === 'comments') typeFilter = ['COMMENT', 'MENTION'];
+    if (tab === 'follows')  typeFilter = ['FOLLOW'];
 
     const notifications = await prisma.notification.findMany({
-      where: { user_id: req.currentUser!.id },
+      where: {
+        user_id: req.currentUser!.id,
+        ...(typeFilter ? { type: { in: typeFilter } } : {}),
+      },
       take: parseInt(limit) + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       orderBy: { created_at: 'desc' },

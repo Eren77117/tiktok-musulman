@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createThumbnail } from 'react-native-create-thumbnail';
 import {
   View, Text, StyleSheet, Image, TouchableOpacity,
-  FlatList, ScrollView, Alert, ActivityIndicator, RefreshControl, Modal, ActionSheetIOS, Platform,
+  FlatList, ScrollView, Alert, ActivityIndicator, RefreshControl, Modal, ActionSheetIOS, Platform, Linking,
 } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
@@ -15,6 +15,7 @@ import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, SPACING, RADIUS, SHADOW, API_BASE_URL } from '../../constants/theme';
 import { useTheme } from '../../hooks/useTheme';
 import { IcSettings, IcMenu, IcSave, IcCheck, IcHeart, IcGrid, IcEdit, IcCamera, IcChart, IcPlay, IcRepeat, IcBell } from '../../components/ui/Icons';
+import { Link } from 'lucide-react-native';
 import { LinearGradient } from 'react-native-linear-gradient';
 import { EditProfileSheet } from './EditProfileSheet';
 
@@ -259,8 +260,8 @@ export default function ProfileScreen() {
         onClose={() => setEditVisible(false)}
         user={user}
         onSave={async (data) => {
-          await api.patch('/users/me', data);
-          updateUser(data as any);
+          const res = await api.patch('/users/me', data);
+          updateUser({ ...data, ...(res.data ?? {}) } as any);
           await loadMe();
           setEditVisible(false);
           qc.invalidateQueries({ queryKey: ['me'] });
@@ -354,7 +355,24 @@ export default function ProfileScreen() {
           </View>
 
           <Text style={[styles.displayName, { color: theme.text }]}>{user.display_name}</Text>
+          {(user as any).profile_category ? (
+            <View style={[styles.categoryBadge, { backgroundColor: `${COLORS.primary}18` }]}>
+              <Text style={[styles.categoryText, { color: COLORS.primary }]}>{(user as any).profile_category}</Text>
+            </View>
+          ) : null}
           {user.bio ? <Text style={[styles.bio, { color: theme.textMuted }]}>{user.bio}</Text> : null}
+          {(user as any).bio_links?.[0] ? (
+            <TouchableOpacity
+              style={styles.bioLinkRow}
+              onPress={() => Linking.openURL((user as any).bio_links[0]).catch(() => {})}
+              activeOpacity={0.7}
+            >
+              <Link size={13} color={COLORS.primary} strokeWidth={2} />
+              <Text style={[styles.bioLinkText, { color: COLORS.primary }]} numberOfLines={1}>
+                {(user as any).bio_links[0].replace(/^https?:\/\/(www\.)?/, '')}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
 
           <View style={styles.statsRow}>
             <TouchableOpacity onPress={() => navigation.navigate('Followers', { userId: user.id, username: user.username, type: 'following' })} activeOpacity={0.7}>
@@ -678,7 +696,11 @@ const styles = StyleSheet.create({
   },
 
   displayName: { fontSize: FONT.size.xxl, fontWeight: FONT.weight.bold, letterSpacing: -0.5 },
+  categoryBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, marginTop: -4 },
+  categoryText: { fontSize: FONT.size.xs, fontWeight: FONT.weight.semibold },
   bio: { fontSize: FONT.size.sm, textAlign: 'center', lineHeight: 20 },
+  bioLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: -2 },
+  bioLinkText: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold, textDecorationLine: 'underline', maxWidth: 200 },
 
   statsRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.lg, marginTop: 4 },
   statItem: { alignItems: 'center', gap: 2 },
