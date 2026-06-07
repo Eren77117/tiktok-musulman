@@ -8,7 +8,10 @@ const requestSchema = z.object({ recipient_id: z.string().uuid() });
 const messageSchema = z.object({
   content: z.string().max(2000).default(''),
   media_url: z.string().url().optional(),
-}).refine(d => d.content.trim().length > 0 || !!d.media_url, { message: 'content or media_url required' });
+  shared_post_id: z.string().uuid().optional(),
+}).refine(d => d.content.trim().length > 0 || !!d.media_url || !!d.shared_post_id, {
+  message: 'content, media_url, or shared_post_id required',
+});
 
 export async function messageRoutes(app: FastifyInstance) {
   // ── Direct conversation (same gender = no restriction) ──────────────────────
@@ -202,6 +205,12 @@ export async function messageRoutes(app: FastifyInstance) {
       orderBy: { created_at: 'desc' },
       include: {
         sender: { select: { id: true, username: true, display_name: true, avatar_url: true } },
+        shared_post: {
+          select: {
+            id: true, thumbnail_url: true, caption: true,
+            user: { select: { id: true, username: true, display_name: true } },
+          },
+        },
       },
     });
 
@@ -241,6 +250,12 @@ export async function messageRoutes(app: FastifyInstance) {
         data: { conversation_id: id, sender_id: userId, ...parsed.data },
         include: {
           sender: { select: { id: true, username: true, display_name: true, avatar_url: true } },
+          shared_post: {
+            select: {
+              id: true, thumbnail_url: true, caption: true,
+              user: { select: { id: true, username: true, display_name: true } },
+            },
+          },
         },
       });
       await tx.conversation.update({ where: { id }, data: { updated_at: new Date() } });

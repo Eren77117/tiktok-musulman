@@ -14,14 +14,22 @@ import { api, getTokens } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
 import { useTheme } from '../../hooks/useTheme';
 import { COLORS, SPACING, WS_URL, FONT, RADIUS } from '../../constants';
-import { IcSend, IcCornerUpLeft, IcTrash, IcClose, IcImage } from '../../components/ui/Icons';
+import { IcSend, IcCornerUpLeft, IcTrash, IcClose, IcImage, IcPlay } from '../../components/ui/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Conversation'>;
+
+interface SharedPost {
+  id: string;
+  thumbnail_url: string | null;
+  caption: string | null;
+  user: { id: string; username: string; display_name: string };
+}
 
 interface Message {
   id: string;
   content: string;
   media_url?: string | null;
+  shared_post?: SharedPost | null;
   is_read: boolean;
   created_at: string;
   reactions?: Record<string, string>;
@@ -269,6 +277,29 @@ export default function ConversationScreen({ route, navigation }: Props) {
           {m.media_url && !deleted && (
             <Image source={{ uri: m.media_url }} style={styles.mediaThumb} resizeMode="cover" />
           )}
+          {m.shared_post && !deleted && (
+            <TouchableOpacity
+              style={[styles.sharedPostCard, { borderColor: isMe ? 'rgba(255,255,255,0.2)' : theme.borderLight }]}
+              onPress={() => navigation.navigate('VideoPlayer', { postId: m.shared_post!.id })}
+              activeOpacity={0.85}
+            >
+              {m.shared_post.thumbnail_url ? (
+                <Image source={{ uri: m.shared_post.thumbnail_url }} style={styles.sharedPostThumb} resizeMode="cover" />
+              ) : (
+                <View style={[styles.sharedPostThumb, { backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' }]}>
+                  <IcPlay size={20} color="rgba(255,255,255,0.5)" />
+                </View>
+              )}
+              <View style={styles.sharedPostInfo}>
+                <Text style={[styles.sharedPostCaption, { color: isMe ? '#fff' : theme.text }]} numberOfLines={2}>
+                  {m.shared_post.caption ?? 'Vidéo'}
+                </Text>
+                <Text style={[styles.sharedPostUser, { color: isMe ? 'rgba(255,255,255,0.7)' : theme.textMuted }]}>
+                  @{m.shared_post.user.username}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
           {(m.content.trim().length > 0 || deleted) && (
             <Text style={[styles.bubbleText, { color: isMe ? '#fff' : theme.text }]}>
               {deleted ? 'Message supprimé' : m.content}
@@ -430,6 +461,15 @@ const styles = StyleSheet.create({
   tickText: { fontSize: 10, fontWeight: '700' },
 
   mediaThumb: { width: 200, height: 200, borderRadius: 12, marginBottom: 6 },
+  sharedPostCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderRadius: 10, borderWidth: 1, overflow: 'hidden',
+    width: 220, marginBottom: 6,
+  },
+  sharedPostThumb: { width: 64, height: 64 },
+  sharedPostInfo: { flex: 1, paddingRight: 8, paddingVertical: 4 },
+  sharedPostCaption: { fontSize: FONT.size.xs, fontWeight: '600', lineHeight: 15 },
+  sharedPostUser: { fontSize: 10, marginTop: 2 },
 
   replyPreview: { borderLeftWidth: 3, paddingLeft: 8, paddingVertical: 4, marginBottom: 4, borderRadius: 4 },
   replyName: { fontSize: 11, fontWeight: '700', marginBottom: 1 },
