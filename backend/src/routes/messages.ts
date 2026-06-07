@@ -5,8 +5,10 @@ import { z } from 'zod';
 
 const requestSchema = z.object({ recipient_id: z.string().uuid() });
 const messageSchema = z.object({
-  content: z.string().min(1).max(2000),
+  content: z.string().max(2000).optional().default(''),
   media_url: z.string().url().optional(),
+}).refine(d => (d.content && d.content.length > 0) || d.media_url, {
+  message: 'content ou media_url requis',
 });
 
 export async function messageRoutes(app: FastifyInstance) {

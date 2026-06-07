@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator,
-  Pressable, Animated, Modal, Alert,
+  Pressable, Animated, Modal, Alert, Image,
 } from 'react-native';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,14 +13,15 @@ import { RootStackParamList } from '../../navigation';
 import { api, getTokens } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
 import { useTheme } from '../../hooks/useTheme';
-import { COLORS, SPACING, WS_URL, FONT, RADIUS } from '../../constants';
-import { IcSend, IcCornerUpLeft, IcTrash, IcClose } from '../../components/ui/Icons';
+import { COLORS, SPACING, WS_URL, FONT, RADIUS, API_BASE_URL } from '../../constants';
+import { IcSend, IcCornerUpLeft, IcTrash, IcClose, IcCamera } from '../../components/ui/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Conversation'>;
 
 interface Message {
   id: string;
   content: string;
+  media_url?: string | null;
   created_at: string;
   reactions?: Record<string, string>; // userId → emoji
   reply_to?: { id: string; content: string; sender_name: string } | null;
@@ -45,6 +47,7 @@ export default function ConversationScreen({ route, navigation }: Props) {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [reactingTo, setReactingTo] = useState<Message | null>(null);
   const [myReactions, setMyReactions] = useState<Record<string, string>>({});
+  const [imageUploading, setImageUploading] = useState(false);
 
   const socketRef = useRef<Socket | null>(null);
   const flatRef = useRef<FlatList>(null);
@@ -121,8 +124,33 @@ export default function ConversationScreen({ route, navigation }: Props) {
   const handleSend = useCallback(() => {
     const trimmed = text.trim();
     if (!trimmed || sendMutation.isPending) return;
-    sendMutation.mutate({ content: trimmed, reply_to_id: replyTo?.id });
-  }, [text, replyTo, sendMutation]);
+    sendMutation.mutate({ content: trimmed } as any);
+  }, [text, sendMutation]);
+
+  const handlePickImage = useCallback(async () => {
+    const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.9, maxWidth: 1200, maxHeight: 1200 });
+    if (result.didCancel || !result.assets?.[0]?.uri) return;
+    setImageUploading(true);
+    try {
+      const asset = result.assets[0];
+      const tokens = await getTokens();
+      if (!tokens) throw new Error('Non authentifié');
+      const formData = new FormData();
+      formData.append('file', { uri: asset.uri, type: asset.type ?? 'image/jpeg', name: 'img.jpg' } as any);
+      const uploadRes = await fetch(`${API_BASE_URL}/upload/image`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokens.access}` },
+        body: formData,
+      });
+      if (!uploadRes.ok) throw new Error(`Upload error ${uploadRes.status}`);
+      const { url: media_url } = await uploadRes.json();
+      sendMutation.mutate({ content: '', media_url } as any);
+    } catch (e: any) {
+      Alert.alert('Erreur', e?.message ?? "Impossible d'envoyer l'image.");
+    } finally {
+      setImageUploading(false);
+    }
+  }, [sendMutation]);
 
   const handleReact = useCallback(async (emoji: string) => {
     if (!reactingTo || !user?.id) return;
@@ -191,16 +219,27 @@ export default function ConversationScreen({ route, navigation }: Props) {
 
         <View style={[
           styles.bubble,
-          isMe ? [styles.bubbleMe, { backgroundColor: COLORS.primary }]
-               : [styles.bubbleThem, { backgroundColor: theme.card, borderColor: theme.borderLight, borderWidth: 1 }],
+          isMe ? [styles.bubbleMe, { backgroundColor: m.media_url && !deleted ? 'transparent' : COLORS.primary }]
+               : [styles.bubbleThem, { backgroundColor: m.media_url && !deleted ? 'transparent' : theme.card, borderColor: theme.borderLight, borderWidth: m.media_url && !deleted ? 0 : 1 }],
           deleted && { opacity: 0.55 },
         ]}>
-          <Text style={[styles.bubbleText, { color: isMe ? '#fff' : theme.text }]}>
-            {deleted ? 'Message supprimé' : m.content}
-          </Text>
-          <Text style={[styles.timeText, { color: isMe ? 'rgba(255,255,255,0.6)' : theme.textMuted }]}>
-            {fmtTime(m.created_at)}
-          </Text>
+          {m.media_url && !deleted ? (
+            <>
+              <Image source={{ uri: m.media_url }} style={styles.bubbleImg} resizeMode="cover" />
+              <Text style={[styles.timeText, { color: theme.textSubtle, textAlign: isMe ? 'right' : 'left', paddingTop: 4 }]}>
+                {fmtTime(m.created_at)}
+              </Text>
+            </>
+          ) : (
+            <>
+              <Text style={[styles.bubbleText, { color: isMe ? '#fff' : theme.text }]}>
+                {deleted ? 'Message supprimé' : m.content}
+              </Text>
+              <Text style={[styles.timeText, { color: isMe ? 'rgba(255,255,255,0.6)' : theme.textMuted }]}>
+                {fmtTime(m.created_at)}
+              </Text>
+            </>
+          )}
         </View>
 
         {/* Reactions display */}
@@ -314,6 +353,19 @@ export default function ConversationScreen({ route, navigation }: Props) {
         borderTopColor: theme.borderLight,
         paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
       }]}>
+        {/* Image button */}
+        <TouchableOpacity
+          style={[styles.mediaBtn, { backgroundColor: theme.card }]}
+          onPress={handlePickImage}
+          disabled={imageUploading || sendMutation.isPending}
+          activeOpacity={0.7}
+        >
+          {imageUploading
+            ? <ActivityIndicator size="small" color={COLORS.primary} />
+            : <IcCamera size={20} color={theme.textMuted} />
+          }
+        </TouchableOpacity>
+
         <TextInput
           ref={inputRef}
           style={[styles.input, {
@@ -361,6 +413,7 @@ const styles = StyleSheet.create({
   bubbleMe: { borderBottomRightRadius: 4, borderBottomLeftRadius: 18 },
   bubbleThem: { borderBottomRightRadius: 18, borderBottomLeftRadius: 4 },
   bubbleText: { fontSize: 15, lineHeight: 22 },
+  bubbleImg: { width: 220, height: 180, borderRadius: 12 },
   timeText: { fontSize: 10, marginTop: 2, textAlign: 'right' },
 
   replyPreview: {
@@ -397,6 +450,10 @@ const styles = StyleSheet.create({
   input: {
     flex: 1, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 10,
     fontSize: 15, maxHeight: 120, borderWidth: 1,
+  },
+  mediaBtn: {
+    width: 38, height: 38, borderRadius: 19,
+    alignItems: 'center', justifyContent: 'center',
   },
   sendBtn: {
     width: 42, height: 42, borderRadius: 21,
