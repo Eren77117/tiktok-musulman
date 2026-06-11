@@ -6,7 +6,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { COLORS, FONT, RADIUS, SPACING } from '../../constants/theme';
-import { IcClose, IcLink } from '../../components/ui/Icons';
+import { IcClose, IcLink, IcStar } from '../../components/ui/Icons';
 
 const CATEGORIES = [
   'Islam & Foi', 'Coran & Hadith', 'Famille', 'Éducation', 'Humour Halal',
@@ -17,8 +17,8 @@ const CATEGORIES = [
 interface Props {
   visible: boolean;
   onClose: () => void;
-  user: { display_name: string; bio?: string | null; username: string; bio_links?: string[]; profile_category?: string | null } | null;
-  onSave: (data: { display_name: string; bio: string; bio_links: string[]; profile_category: string | null }) => Promise<void>;
+  user: { display_name: string; bio?: string | null; username: string; bio_links?: string[]; profile_category?: string | null; is_creator?: boolean } | null;
+  onSave: (data: { display_name: string; bio: string; bio_links: string[]; profile_category: string | null; is_creator: boolean }) => Promise<void>;
 }
 
 export function EditProfileSheet({ visible, onClose, user, onSave }: Props) {
@@ -30,6 +30,7 @@ export function EditProfileSheet({ visible, onClose, user, onSave }: Props) {
   const [linkInput, setLinkInput] = useState('');
   const [bioLinks, setBioLinks] = useState<string[]>([]);
   const [category, setCategory] = useState<string | null>(null);
+  const [isCreator, setIsCreator] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -38,6 +39,7 @@ export function EditProfileSheet({ visible, onClose, user, onSave }: Props) {
       setBio(user.bio ?? '');
       setBioLinks(user.bio_links ?? []);
       setCategory(user.profile_category ?? null);
+      setIsCreator(user.is_creator ?? false);
       setLinkInput('');
     }
   }, [visible, user]);
@@ -76,7 +78,7 @@ export function EditProfileSheet({ visible, onClose, user, onSave }: Props) {
     if (!displayName.trim()) return;
     setSaving(true);
     try {
-      await onSave({ display_name: displayName.trim(), bio: bio.trim(), bio_links: bioLinks, profile_category: category });
+      await onSave({ display_name: displayName.trim(), bio: bio.trim(), bio_links: bioLinks, profile_category: category, is_creator: isCreator });
     } finally {
       setSaving(false);
     }
@@ -168,6 +170,24 @@ export function EditProfileSheet({ visible, onClose, user, onSave }: Props) {
             ))}
           </View>
 
+          {/* Mode créateur */}
+          <TouchableOpacity
+            style={[styles.creatorRow, { backgroundColor: theme.card, borderColor: isCreator ? COLORS.primary : theme.border }]}
+            onPress={() => setIsCreator(v => !v)}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.creatorIcon, { backgroundColor: isCreator ? COLORS.primary : theme.inputBg }]}>
+              <IcStar size={16} color={isCreator ? '#fff' : theme.textMuted} fill={isCreator ? '#fff' : 'none'} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.creatorTitle, { color: theme.text }]}>Mode créateur</Text>
+              <Text style={[styles.creatorSub, { color: theme.textMuted }]}>Accède aux statistiques et outils créateurs</Text>
+            </View>
+            <View style={[styles.toggle, { backgroundColor: isCreator ? COLORS.primary : theme.border }]}>
+              <View style={[styles.toggleThumb, { marginLeft: isCreator ? 18 : 2 }]} />
+            </View>
+          </TouchableOpacity>
+
           {/* Username read-only */}
           <Text style={[styles.usernameNote, { color: theme.textSubtle }]}>
             @{user?.username} — le nom d'utilisateur n'est pas modifiable
@@ -236,4 +256,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3, shadowRadius: 10,
   },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+
+  creatorRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    borderRadius: RADIUS.lg, borderWidth: 1.5,
+    paddingHorizontal: 14, paddingVertical: 12, marginBottom: 16,
+  },
+  creatorIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  creatorTitle: { fontSize: 14, fontWeight: '700' },
+  creatorSub: { fontSize: 12, marginTop: 2 },
+  toggle: { width: 42, height: 24, borderRadius: 12 },
+  toggleThumb: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff', marginTop: 2 },
 });

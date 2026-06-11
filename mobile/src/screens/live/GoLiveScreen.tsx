@@ -5,7 +5,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
-  Alert, ActivityIndicator, Dimensions, Platform, StatusBar, Modal, FlatList, Image,
+  Alert, ActivityIndicator, Dimensions, Platform, StatusBar, Modal, FlatList, Image, Share,
 } from 'react-native';
 import { RTCPeerConnection, RTCView, mediaDevices, MediaStream, RTCSessionDescription, RTCIceCandidate } from 'react-native-webrtc';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,7 +16,7 @@ import { API_BASE_URL } from '../../constants/theme';
 import { useAuthStore } from '../../stores/authStore';
 import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, SPACING, RADIUS } from '../../constants/theme';
-import { IcClose, IcUsers, IcMail, IcRefresh, IcClock } from '../../components/ui/Icons';
+import { IcClose, IcUsers, IcMail, IcRefresh, IcClock, IcShare } from '../../components/ui/Icons';
 
 const { width: W, height: H } = Dimensions.get('window');
 const SOCKET_URL = API_BASE_URL.replace('/api', '');
@@ -354,6 +354,17 @@ export default function GoLiveScreen({ navigation }: Props) {
         </TouchableOpacity>
         <TouchableOpacity style={[styles.ctrlBtn, slowMode > 0 && { backgroundColor: 'rgba(245,158,11,0.2)' }]} onPress={toggleSlowMode} activeOpacity={0.8}>
           <IcClock size={18} color={slowMode > 0 ? '#F59E0B' : COLORS.white} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.ctrlBtn}
+          onPress={() => {
+            if (!sessionRef.current || !user) return;
+            const url = `https://nour.app/@${user.username}/live/${sessionRef.current}`;
+            Share.share({ message: `Rejoins mon live sur Nour !\n${url}`, url }).catch(() => {});
+          }}
+          activeOpacity={0.8}
+        >
+          <IcShare size={18} color={COLORS.white} />
         </TouchableOpacity>
       </View>
 

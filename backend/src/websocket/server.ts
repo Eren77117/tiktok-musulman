@@ -19,6 +19,8 @@ export function createSocketServer(httpServer: HttpServer) {
   const liveRanks = new Map<string, string | null>(); // userId → rank
   const liveSlowMode = new Map<string, number>(); // sessionId → seconds (0 = off)
   const liveLastComment = new Map<string, number>(); // `${sessionId}:${userId}` → timestamp
+  // sessionId → Map<userId, { username, display_name, avatar_url }>
+  const liveViewers = new Map<string, Map<string, { username: string; display_name: string; avatar_url: string | null }>>();
 
   io.use(async (socket: AuthSocket, next) => {
     const token = socket.handshake.auth.token as string;
@@ -106,8 +108,25 @@ export function createSocketServer(httpServer: HttpServer) {
       io.to(`conversation:${data.conversationId}`).emit('message:new', message);
     });
 
+    socket.on('live:viewers:list', (sessionId: string) => {
+      const viewers = liveViewers.get(sessionId);
+      socket.emit('live:viewers:list', viewers ? Array.from(viewers.values()) : []);
+    });
+
     socket.on('live:join', async (sessionId: string) => {
       socket.join(`live:${sessionId}`);
+
+      // Track viewer info
+      const viewerUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { username: true, display_name: true, avatar_url: true },
+      }).catch(() => null);
+      if (viewerUser) {
+        if (!liveViewers.has(sessionId)) liveViewers.set(sessionId, new Map());
+        liveViewers.get(sessionId)!.set(userId, viewerUser);
+        io.to(`live:${sessionId}`).emit('live:viewers:list', Array.from(liveViewers.get(sessionId)!.values()));
+      }
+
       const [session] = await Promise.all([
         prisma.liveSession.update({
           where: { id: sessionId },
@@ -151,6 +170,13 @@ export function createSocketServer(httpServer: HttpServer) {
 
     socket.on('live:leave', async (sessionId: string) => {
       socket.leave(`live:${sessionId}`);
+      // Remove from viewer map
+      const viewerMap = liveViewers.get(sessionId);
+      if (viewerMap) {
+        viewerMap.delete(userId);
+        if (viewerMap.size === 0) liveViewers.delete(sessionId);
+        else io.to(`live:${sessionId}`).emit('live:viewers:list', Array.from(viewerMap.values()));
+      }
       const session = await prisma.liveSession.update({
         where: { id: sessionId },
         data: { viewer_count: { decrement: 1 } },

@@ -716,6 +716,13 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, o
         <Text style={styles.speedText}>{rate === 1 ? '1×' : `${rate}×`}</Text>
       </TouchableOpacity>
 
+      {/* Time display when playing at speed ≠ 1 */}
+      {rate !== 1 && (
+        <View style={styles.speedTimeBadge} pointerEvents="none">
+          <Text style={styles.timeBadgeText}>{fmtDuration(seekTime)} / {fmtDuration(totalDurationRef.current)}</Text>
+        </View>
+      )}
+
       {/* Plein écran — videos horizontales uniquement */}
       {isHorizontal && (
         <TouchableOpacity
@@ -1134,6 +1141,13 @@ const styles = StyleSheet.create({
     width: 110, alignItems: 'center',
   },
   timeBadgeText: { fontSize: 12, fontWeight: '600', color: COLORS.white },
+
+  speedTimeBadge: {
+    position: 'absolute', top: 92, right: 8,
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 8,
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+  },
 
   muteBadge: {
     position: 'absolute', top: 60, left: 14,

@@ -5,7 +5,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
-  FlatList, Alert, ActivityIndicator, Dimensions, StatusBar, Animated, Easing,
+  FlatList, Alert, ActivityIndicator, Dimensions, StatusBar, Animated, Easing, Modal, Image,
 } from 'react-native';
 import { RTCPeerConnection, RTCView, RTCSessionDescription, RTCIceCandidate } from 'react-native-webrtc';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -89,6 +89,8 @@ export default function LiveViewerScreen({ route, navigation }: Props) {
   const [liveEnded, setLiveEnded] = useState(false);
   const [hearts, setHearts] = useState<FloatingHeart[]>([]);
   const [liveSeconds, setLiveSeconds] = useState(0);
+  const [viewerList, setViewerList] = useState<{ username: string; display_name: string; avatar_url: string | null }[]>([]);
+  const [showViewerList, setShowViewerList] = useState(false);
 
   const socketRef = useRef<Socket | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -180,6 +182,7 @@ export default function LiveViewerScreen({ route, navigation }: Props) {
 
       // Viewer count updates (real-time from backend)
       socket.on('live:viewer:count', (count: number) => setViewerCount(count));
+      socket.on('live:viewers:list', (list: { username: string; display_name: string; avatar_url: string | null }[]) => setViewerList(list));
     })();
 
     return () => {
@@ -246,7 +249,12 @@ export default function LiveViewerScreen({ route, navigation }: Props) {
           </View>
           <Text style={styles.hostName} numberOfLines={1}>{session?.user.display_name ?? ''}</Text>
         </View>
-        <ViewerCountBadge count={viewerCount} />
+        <TouchableOpacity onPress={() => {
+          socketRef.current?.emit('live:viewers:list', sessionId);
+          setShowViewerList(true);
+        }} activeOpacity={0.8}>
+          <ViewerCountBadge count={viewerCount} />
+        </TouchableOpacity>
         <View style={styles.liveTimerBadge}>
           <Text style={styles.liveTimerText}>
             {String(Math.floor(liveSeconds / 60)).padStart(2,'0')}:{String(liveSeconds % 60).padStart(2,'0')}
@@ -323,6 +331,32 @@ export default function LiveViewerScreen({ route, navigation }: Props) {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Viewer list modal */}
+      <Modal visible={showViewerList} transparent animationType="slide" onRequestClose={() => setShowViewerList(false)}>
+        <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowViewerList(false)} />
+        <View style={styles.viewerModal}>
+          <View style={styles.modalHandle} />
+          <Text style={styles.modalTitle}>{viewerList.length} spectateurs</Text>
+          <FlatList
+            data={viewerList}
+            keyExtractor={v => v.username}
+            renderItem={({ item: v }) => (
+              <View style={styles.viewerRow}>
+                {v.avatar_url
+                  ? <Image source={{ uri: v.avatar_url }} style={styles.viewerAvatar} />
+                  : <View style={[styles.viewerAvatar, styles.viewerAvatarFallback]} />
+                }
+                <View>
+                  <Text style={styles.viewerName}>{v.display_name}</Text>
+                  <Text style={styles.viewerUsername}>@{v.username}</Text>
+                </View>
+              </View>
+            )}
+            contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
+          />
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -362,4 +396,14 @@ const styles = StyleSheet.create({
   backBtnText: { color: COLORS.white, fontWeight: '700' },
   slowModeBadge: { position: 'absolute', top: -28, left: 0, right: 0, backgroundColor: 'rgba(245,158,11,0.85)', borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10, alignItems: 'center' },
   slowModeText: { fontSize: 11, fontWeight: '600', color: '#fff' },
+
+  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
+  viewerModal: { position: 'absolute', bottom: 0, left: 0, right: 0, maxHeight: H * 0.6, backgroundColor: '#111', borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, paddingHorizontal: SPACING.md, paddingTop: 12 },
+  modalHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#444', alignSelf: 'center', marginBottom: 16 },
+  modalTitle: { fontSize: FONT.size.base, fontWeight: '700', color: COLORS.white, marginBottom: 16 },
+  viewerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
+  viewerAvatar: { width: 38, height: 38, borderRadius: 19 },
+  viewerAvatarFallback: { backgroundColor: '#333' },
+  viewerName: { fontSize: FONT.size.sm, fontWeight: '600', color: COLORS.white },
+  viewerUsername: { fontSize: FONT.size.xs, color: '#888' },
 });
