@@ -6,7 +6,7 @@ export async function searchRoutes(app: FastifyInstance) {
   app.get('/', { preHandler: authenticate }, async (req, reply) => {
     const { q, type = 'all', cursor, limit = '20' } = req.query as {
       q: string;
-      type?: 'all' | 'users' | 'posts' | 'categories';
+      type?: 'all' | 'users' | 'posts' | 'categories' | 'sounds';
       cursor?: string;
       limit?: string;
     };
@@ -59,6 +59,20 @@ export async function searchRoutes(app: FastifyInstance) {
       });
       result.categories = cats;
       result.hashtags = cats.map((c) => ({ tag: c.name, count: c.post_count ?? 0 }));
+    }
+
+    if (type === 'all' || type === 'sounds') {
+      result.sounds = await prisma.sound.findMany({
+        where: {
+          OR: [
+            { title: { contains: q, mode: 'insensitive' } },
+            { artist: { contains: q, mode: 'insensitive' } },
+          ],
+        },
+        take: lim,
+        select: { id: true, title: true, artist: true, use_count: true, cover_url: true },
+        orderBy: { use_count: 'desc' },
+      }).catch(() => []);
     }
 
     return reply.send(result);

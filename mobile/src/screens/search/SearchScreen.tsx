@@ -9,7 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { IcSearch, IcClose, IcHash, IcUsers, IcBack, IcClock } from '../../components/ui/Icons';
+import { IcSearch, IcClose, IcHash, IcUsers, IcBack, IcClock, IcMusic } from '../../components/ui/Icons';
 import { COLORS, FONT, SPACING, RADIUS } from '../../constants/theme';
 import { api } from '../../api/client';
 import { RootStackParamList } from '../../navigation';
@@ -27,10 +27,11 @@ interface UserResult {
   follower_count: number;
 }
 interface HashtagResult { tag: string; count: number }
-interface SearchData { users?: UserResult[]; hashtags?: HashtagResult[] }
+interface SoundResult { id: string; title: string; artist: string | null; use_count: number; cover_url: string | null }
+interface SearchData { users?: UserResult[]; hashtags?: HashtagResult[]; sounds?: SoundResult[] }
 interface TrendingData { hashtags?: HashtagResult[]; users?: UserResult[] }
 
-type Tab = 'tout' | 'comptes' | 'hashtags';
+type Tab = 'tout' | 'comptes' | 'hashtags' | 'sons';
 
 function fmtCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -171,6 +172,7 @@ export default function SearchScreen() {
     }
     const users = searchData?.users ?? [];
     const hashtags = searchData?.hashtags ?? [];
+    const sounds = searchData?.sounds ?? [];
 
     if (tab === 'comptes') {
       return (
@@ -191,6 +193,32 @@ export default function SearchScreen() {
           renderItem={({ item }) => renderHashRow(item)}
           contentContainerStyle={{ padding: SPACING.md }}
           ListEmptyComponent={<Text style={s.empty}>Aucun hashtag trouvé</Text>}
+        />
+      );
+    }
+    if (tab === 'sons') {
+      return (
+        <FlatList
+          data={sounds}
+          keyExtractor={s => s.id}
+          renderItem={({ item: snd }) => (
+            <TouchableOpacity
+              style={s.soundRow}
+              onPress={() => nav.navigate('Sound', { soundId: snd.id, title: snd.title, artist: snd.artist })}
+              activeOpacity={0.8}
+            >
+              <View style={[s.soundIcon, { backgroundColor: `${COLORS.primary}18` }]}>
+                <IcMusic size={18} color={COLORS.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.soundTitle, { color: theme.text }]} numberOfLines={1}>{snd.title}</Text>
+                {snd.artist && <Text style={[s.soundArtist, { color: theme.textMuted }]} numberOfLines={1}>{snd.artist}</Text>}
+              </View>
+              <Text style={[s.soundCount, { color: theme.textMuted }]}>{fmtCount(snd.use_count)} vidéos</Text>
+            </TouchableOpacity>
+          )}
+          contentContainerStyle={{ padding: SPACING.md }}
+          ListEmptyComponent={<Text style={s.empty}>Aucun son trouvé</Text>}
         />
       );
     }
@@ -303,10 +331,10 @@ export default function SearchScreen() {
       {/* Tabs (only when searching) */}
       {debouncedQ.length > 0 && (
         <View style={s.tabs}>
-          {(['tout', 'comptes', 'hashtags'] as Tab[]).map(t => (
+          {(['tout', 'comptes', 'hashtags', 'sons'] as Tab[]).map(t => (
             <TouchableOpacity key={t} style={[s.tabBtn, tab === t && s.tabBtnActive]} onPress={() => setTab(t)} activeOpacity={0.7}>
               <Text style={[s.tabLabel, tab === t && s.tabLabelActive]}>
-                {t === 'tout' ? 'Tout' : t === 'comptes' ? 'Comptes' : 'Hashtags'}
+                {t === 'tout' ? 'Tout' : t === 'comptes' ? 'Comptes' : t === 'hashtags' ? 'Hashtags' : 'Sons'}
               </Text>
             </TouchableOpacity>
           ))}
@@ -374,4 +402,9 @@ const styles = (t: ReturnType<typeof import('../../hooks/useTheme').useTheme>) =
   trendUser: { alignItems: 'center', width: 80, gap: 4 },
   trendUserName: { fontSize: FONT.size.xs, fontWeight: FONT.weight.semibold, color: t.text, textAlign: 'center' },
   trendUserHandle: { fontSize: FONT.size.xs, color: t.textMuted, textAlign: 'center' },
+  soundRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
+  soundIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  soundTitle: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold },
+  soundArtist: { fontSize: FONT.size.xs, marginTop: 2 },
+  soundCount: { fontSize: FONT.size.xs },
 });

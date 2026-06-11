@@ -26,8 +26,35 @@ export async function notificationRoutes(app: FastifyInstance) {
     });
 
     const hasMore = notifications.length > parseInt(limit);
-    const items = hasMore ? notifications.slice(0, -1) : notifications;
-    return reply.send({ items, next_cursor: hasMore ? items[items.length - 1].id : null });
+    const raw = hasMore ? notifications.slice(0, -1) : notifications;
+
+    // Group consecutive LIKE notifications for the same post
+    const grouped: typeof raw = [];
+    for (const n of raw) {
+      if (n.type !== 'LIKE') { grouped.push(n); continue; }
+      const postId = (n.data as any)?.post_id;
+      if (!postId) { grouped.push(n); continue; }
+      const existing = grouped.find(
+        g => g.type === 'LIKE' && (g.data as any)?.post_id === postId && !g.is_read
+      );
+      if (existing) {
+        // Merge: update title to show count
+        const count = ((existing.data as any)._group_count ?? 1) + 1;
+        (existing.data as any)._group_count = count;
+        const names = (existing.data as any)._group_names ?? [(existing.data as any).liker_name];
+        const newName = (n.data as any).liker_name;
+        if (newName && !names.includes(newName)) names.push(newName);
+        (existing.data as any)._group_names = names;
+        existing.title = names.length >= 2
+          ? `@${names[0]} et ${count - 1} autre${count - 1 > 1 ? 's' : ''} ont aimé votre vidéo`
+          : existing.title;
+      } else {
+        (n.data as any)._group_count = 1;
+        grouped.push(n);
+      }
+    }
+
+    return reply.send({ items: grouped, next_cursor: hasMore ? raw[raw.length - 1].id : null });
   });
 
   app.patch('/read-all', { preHandler: authenticate }, async (req, reply) => {

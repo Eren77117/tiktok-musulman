@@ -571,7 +571,7 @@ export async function postRoutes(app: FastifyInstance) {
           type: 'LIKE',
           title: `@${liker?.username ?? 'quelqu\'un'} a aimé votre vidéo`,
           body: liker?.display_name ? `${liker.display_name} a aimé votre publication` : 'Quelqu\'un a aimé votre publication',
-          data: { post_id: id, liker_id: userId },
+          data: { post_id: id, liker_id: userId, liker_name: liker?.username ?? '' },
         },
       }).catch(() => {});
     }
