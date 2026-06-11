@@ -21,6 +21,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { useTheme } from '../../hooks/useTheme';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { useVideoPreloader } from '../../hooks/useVideoPreloader';
+import HadithCard from '../../components/ui/HadithCard';
 import { useSettingsStore } from '../../stores/settingsStore';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;

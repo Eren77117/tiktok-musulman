@@ -90,6 +90,14 @@ export default function UploadScreen() {
   const [caption, setCaption] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'followers' | 'private'>('public');
   const [customCover, setCustomCover] = useState<string | null>(null);
+  const [videoFrames, setVideoFrames] = useState<{ uri: string; ts: number }[]>([]);
+  const [selectedFrameIdx, setSelectedFrameIdx] = useState<number | null>(null);
+  const [framesLoading, setFramesLoading] = useState(false);
+  const [overlayText, setOverlayText] = useState('');
+  const [overlayStyle, setOverlayStyle] = useState<'white' | 'black' | 'green' | 'gold'>('white');
+  const [overlayPosition, setOverlayPosition] = useState<'top' | 'center' | 'bottom'>('bottom');
+  const [scheduledAt, setScheduledAt] = useState<Date | null>(null);
+  const [showSchedulePicker, setShowSchedulePicker] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadStep, setUploadStep] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -111,6 +119,22 @@ export default function UploadScreen() {
     queryFn: () => api.get('/search', { params: { q: mentionQuery } }).then(r => r.data).catch(() => ({})),
     enabled: mentionQuery.length >= 1,
   });
+
+  // Generate video frames for cover selector when video is picked
+  useEffect(() => {
+    if (!media || media.isImage) { setVideoFrames([]); setSelectedFrameIdx(null); return; }
+    setFramesLoading(true);
+    setVideoFrames([]);
+    setSelectedFrameIdx(null);
+    const TIMESTAMPS = [0, 1000, 2000, 4000, 6000, 8000, 12000, 16000];
+    Promise.allSettled(
+      TIMESTAMPS.map(ts => createThumbnail({ url: media.uri, timeStamp: ts, format: 'jpeg' }).then(r => ({ uri: r.path, ts })))
+    ).then(results => {
+      const frames = results.filter((r): r is PromiseFulfilledResult<{ uri: string; ts: number }> => r.status === 'fulfilled').map(r => r.value);
+      setVideoFrames(frames);
+      if (frames.length > 0) setSelectedFrameIdx(0);
+    }).finally(() => setFramesLoading(false));
+  }, [media?.uri]);
 
   const handleCaptionChange = useCallback((text: string, sel?: { start: number }) => {
     setCaption(text);
@@ -189,6 +213,13 @@ export default function UploadScreen() {
     const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.9 });
     if (result.didCancel || !result.assets?.[0]?.uri) return;
     setCustomCover(result.assets[0].uri);
+    setSelectedFrameIdx(null);
+  };
+
+  const selectFrame = (idx: number) => {
+    ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
+    setSelectedFrameIdx(idx);
+    setCustomCover(null);
   };
 
   const handleSaveDraft = async () => {
@@ -257,11 +288,12 @@ export default function UploadScreen() {
       // ── Thumbnail — priorité: custom cover → backend Cloudinary → local extract → fallback ──
       let thumbnailUrl: string | undefined = undefined;
 
-      // Custom cover selected by user
-      if (customCover) {
+      // Custom cover selected by user (gallery or frame)
+      const coverUri = customCover ?? (selectedFrameIdx !== null ? videoFrames[selectedFrameIdx]?.uri : null);
+      if (coverUri) {
         try {
           const coverForm = new FormData();
-          coverForm.append('file', { uri: customCover, type: 'image/jpeg', name: 'cover.jpg' } as any);
+          coverForm.append('file', { uri: coverUri, type: 'image/jpeg', name: 'cover.jpg' } as any);
           const coverRes = await fetch(`${API_BASE_URL}/upload/image`, {
             method: 'POST',
             headers: { Authorization: `Bearer ${tokens.access}` },
@@ -313,6 +345,8 @@ export default function UploadScreen() {
         duration: 1,
         is_public: visibility === 'public',
         visibility,
+        text_overlay: overlayText.trim() ? { text: overlayText.trim(), style: overlayStyle, position: overlayPosition } : undefined,
+        scheduled_at: scheduledAt ? scheduledAt.toISOString() : undefined,
       });
 
       animateProgress(100);
@@ -454,7 +488,7 @@ export default function UploadScreen() {
               return (
                 <TouchableOpacity
                   key={v}
-                  style={[styles.visBtn, { borderColor: theme.border }, visibility === v && styles.visBtnActive]}
+                  style={[styles.visBtn, { backgroundColor: theme.card }, visibility === v && styles.visBtnActive]}
                   onPress={() => setVisibility(v)}
                   activeOpacity={0.8}
                 >
@@ -467,28 +501,146 @@ export default function UploadScreen() {
           </View>
         </View>
 
-        {/* ── Custom cover ── */}
+        {/* ── Schedule ── */}
         {media && !media.isImage && (
           <View style={styles.field}>
-            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>Couverture</Text>
-            <TouchableOpacity style={styles.coverRow} onPress={pickCustomCover} activeOpacity={0.8}>
-              {customCover ? (
-                <Image source={{ uri: customCover }} style={styles.coverThumb} resizeMode="cover" />
-              ) : (
-                <View style={[styles.coverThumb, { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' }]}>
-                  <IcImage size={22} color={theme.textMuted} />
-                </View>
-              )}
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.coverLabel, { color: theme.text }]}>{customCover ? 'Couverture personnalisée' : 'Choisir une image de couverture'}</Text>
-                <Text style={[styles.coverHint, { color: theme.textMuted }]}>{customCover ? 'Appuie pour changer' : 'Depuis votre galerie · sinon auto-générée'}</Text>
-              </View>
-              {customCover && (
-                <TouchableOpacity onPress={() => setCustomCover(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>Planifier la publication</Text>
+            <TouchableOpacity
+              style={[styles.scheduleBtn, { backgroundColor: theme.card }]}
+              onPress={() => setShowSchedulePicker(true)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.scheduleBtnText, { color: scheduledAt ? theme.text : theme.textMuted }]}>
+                {scheduledAt
+                  ? `Planifié · ${scheduledAt.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                  : 'Publier maintenant (défaut)'}
+              </Text>
+              {scheduledAt && (
+                <TouchableOpacity onPress={() => setScheduledAt(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <IcClose size={16} color={COLORS.textMuted} />
                 </TouchableOpacity>
               )}
             </TouchableOpacity>
+            {showSchedulePicker && (
+              <View style={[styles.schedulePickerWrap, { backgroundColor: theme.card }]}>
+                {/* Quick presets */}
+                <Text style={[styles.schedulePickerLabel, { color: theme.textMuted }]}>Dans combien de temps ?</Text>
+                <View style={styles.schedulePresetsRow}>
+                  {[
+                    { label: '1h', ms: 60 * 60 * 1000 },
+                    { label: '6h', ms: 6 * 60 * 60 * 1000 },
+                    { label: 'Demain matin', ms: (() => { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(8, 0, 0, 0); return d.getTime() - Date.now(); })() },
+                    { label: 'Dans 3 jours', ms: 3 * 24 * 60 * 60 * 1000 },
+                    { label: 'Dans 1 semaine', ms: 7 * 24 * 60 * 60 * 1000 },
+                  ].map(p => (
+                    <TouchableOpacity key={p.label} style={[styles.schedulePreset, { backgroundColor: theme.surface }]}
+                      onPress={() => { setScheduledAt(new Date(Date.now() + p.ms)); setShowSchedulePicker(false); }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.schedulePresetText, { color: theme.text }]}>{p.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* ── Cover / Frame selector ── */}
+        {media && !media.isImage && (
+          <View style={styles.field}>
+            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>Couverture</Text>
+            {framesLoading ? (
+              <View style={styles.framesLoadingRow}>
+                <ActivityIndicator size="small" color={COLORS.primary} />
+                <Text style={[styles.coverHint, { color: theme.textMuted }]}>Extraction des frames...</Text>
+              </View>
+            ) : videoFrames.length > 0 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.framesRow}>
+                {videoFrames.map((frame, idx) => {
+                  const isSelected = selectedFrameIdx === idx && !customCover;
+                  return (
+                    <TouchableOpacity key={idx} onPress={() => selectFrame(idx)} activeOpacity={0.8} style={[styles.frameCell, isSelected && styles.frameCellSelected]}>
+                      <Image source={{ uri: frame.uri }} style={styles.frameImg} resizeMode="cover" />
+                      {isSelected && <View style={styles.frameCheck}><IcCheck size={12} color="#fff" /></View>}
+                    </TouchableOpacity>
+                  );
+                })}
+                {/* Gallery option at end */}
+                <TouchableOpacity onPress={pickCustomCover} activeOpacity={0.8} style={[styles.frameCell, !!customCover && styles.frameCellSelected]}>
+                  {customCover ? (
+                    <Image source={{ uri: customCover }} style={styles.frameImg} resizeMode="cover" />
+                  ) : (
+                    <View style={[styles.frameImg, { backgroundColor: theme.card, alignItems: 'center', justifyContent: 'center' }]}>
+                      <IcImage size={20} color={theme.textMuted} />
+                    </View>
+                  )}
+                  {!!customCover && <View style={styles.frameCheck}><IcCheck size={12} color="#fff" /></View>}
+                  <Text style={[styles.frameLabel, { color: theme.textSubtle }]}>Galerie</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            ) : (
+              <TouchableOpacity style={styles.coverRow} onPress={pickCustomCover} activeOpacity={0.8}>
+                {customCover ? (
+                  <Image source={{ uri: customCover }} style={styles.coverThumb} resizeMode="cover" />
+                ) : (
+                  <View style={[styles.coverThumb, { backgroundColor: theme.card, alignItems: 'center', justifyContent: 'center' }]}>
+                    <IcImage size={22} color={theme.textMuted} />
+                  </View>
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.coverLabel, { color: theme.text }]}>{customCover ? 'Couverture personnalisée' : 'Choisir une image de couverture'}</Text>
+                  <Text style={[styles.coverHint, { color: theme.textMuted }]}>{customCover ? 'Appuie pour changer' : 'Depuis votre galerie · sinon auto-générée'}</Text>
+                </View>
+                {customCover && (
+                  <TouchableOpacity onPress={() => setCustomCover(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <IcClose size={16} color={COLORS.textMuted} />
+                  </TouchableOpacity>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {/* ── Text overlay ── */}
+        {media && !media.isImage && (
+          <View style={styles.field}>
+            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>Texte sur la vidéo</Text>
+            <TextInput
+              style={[styles.overlayInput, { backgroundColor: theme.card, color: theme.text }]}
+              placeholder="Hadith, verset, citation... (optionnel)"
+              placeholderTextColor={theme.textSubtle}
+              value={overlayText}
+              onChangeText={setOverlayText}
+              maxLength={200}
+              multiline
+            />
+            {overlayText.length > 0 && (
+              <View style={styles.overlayOptions}>
+                <View style={styles.overlayOptionGroup}>
+                  <Text style={[styles.overlayOptionLabel, { color: theme.textMuted }]}>Style</Text>
+                  <View style={styles.overlayStyleRow}>
+                    {(['white','black','green','gold'] as const).map(s => (
+                      <TouchableOpacity key={s} onPress={() => setOverlayStyle(s)} activeOpacity={0.8}
+                        style={[styles.overlayStyleBtn, { backgroundColor: s === 'white' ? '#fff' : s === 'black' ? '#1a1a1a' : s === 'green' ? COLORS.primary : '#F59E0B' }, overlayStyle === s && styles.overlayStyleSelected]}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: s === 'white' ? '#000' : '#fff' }}>{s === 'white' ? 'Blanc' : s === 'black' ? 'Noir' : s === 'green' ? 'Vert' : 'Or'}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+                <View style={styles.overlayOptionGroup}>
+                  <Text style={[styles.overlayOptionLabel, { color: theme.textMuted }]}>Position</Text>
+                  <View style={styles.overlayStyleRow}>
+                    {(['top','center','bottom'] as const).map(p => (
+                      <TouchableOpacity key={p} onPress={() => setOverlayPosition(p)} activeOpacity={0.8}
+                        style={[styles.overlayStyleBtn, { backgroundColor: theme.card }, overlayPosition === p && { backgroundColor: COLORS.primaryBg }]}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: overlayPosition === p ? COLORS.primary : theme.textMuted }}>{p === 'top' ? 'Haut' : p === 'center' ? 'Milieu' : 'Bas'}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              </View>
+            )}
           </View>
         )}
 
@@ -534,7 +686,7 @@ export default function UploadScreen() {
           >
             {uploading
               ? <ActivityIndicator color={COLORS.white} size="small" />
-              : <Text style={styles.submitBtnText}>Publier</Text>
+              : <Text style={styles.submitBtnText}>{scheduledAt ? 'Planifier' : 'Publier'}</Text>
             }
           </TouchableOpacity>
         </View>
@@ -650,7 +802,7 @@ const styles = StyleSheet.create({
 
   visRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
   visBtn: {
-    flex: 1, borderRadius: RADIUS.full, borderWidth: 1, borderColor: COLORS.border,
+    flex: 1, borderRadius: RADIUS.full,
     paddingVertical: 8, alignItems: 'center',
   },
   visBtnActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
@@ -661,6 +813,30 @@ const styles = StyleSheet.create({
   coverThumb: { width: 56, height: 74, borderRadius: 6, backgroundColor: '#111' },
   coverLabel: { fontSize: FONT.size.sm, fontWeight: '600', color: COLORS.text },
   coverHint: { fontSize: FONT.size.xs, color: COLORS.textMuted, marginTop: 2 },
+  framesLoadingRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
+  framesRow: { gap: 8, paddingVertical: 4, paddingRight: 4 },
+  frameCell: { width: 56, alignItems: 'center', gap: 4 },
+  frameCellSelected: { opacity: 1 },
+  frameImg: { width: 56, height: 74, borderRadius: 8, overflow: 'hidden' },
+  frameCheck: {
+    position: 'absolute', top: 4, right: 4, width: 18, height: 18,
+    borderRadius: 9, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center',
+  },
+  frameLabel: { fontSize: 10, fontWeight: '500' },
+  overlayInput: { borderRadius: RADIUS.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: FONT.size.sm, minHeight: 56 },
+  overlayOptions: { marginTop: 10, gap: 10 },
+  overlayOptionGroup: { gap: 6 },
+  overlayOptionLabel: { fontSize: FONT.size.xs, fontWeight: '600' },
+  overlayStyleRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  overlayStyleBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.full },
+  overlayStyleSelected: { opacity: 1 },
+  scheduleBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: RADIUS.md, paddingHorizontal: 14, paddingVertical: 12 },
+  scheduleBtnText: { fontSize: FONT.size.sm, flex: 1 },
+  schedulePickerWrap: { borderRadius: RADIUS.md, padding: 14, marginTop: 8, gap: 10 },
+  schedulePickerLabel: { fontSize: FONT.size.xs, fontWeight: '600' },
+  schedulePresetsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  schedulePreset: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: RADIUS.full },
+  schedulePresetText: { fontSize: FONT.size.sm, fontWeight: '600' },
 
   successOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,

@@ -182,14 +182,14 @@ export default function StoryCreateScreen() {
           <Text style={[styles.pickHint, { color: theme.textMuted }]}>Choisis une photo pour ta story</Text>
           <View style={styles.pickBtns}>
             <TouchableOpacity
-              style={[styles.pickBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+              style={[styles.pickBtn, { backgroundColor: theme.card }]}
               onPress={() => pickMedia('camera')} activeOpacity={0.8}
             >
               <IcCamera size={28} color={COLORS.primary} />
               <Text style={[styles.pickBtnText, { color: theme.text }]}>Appareil photo</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.pickBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+              style={[styles.pickBtn, { backgroundColor: theme.card }]}
               onPress={() => pickMedia('library')} activeOpacity={0.8}
             >
               <IcImage size={28} color={COLORS.primary} />
@@ -215,7 +215,7 @@ export default function StoryCreateScreen() {
             </View>
 
             {/* Barre de recherche */}
-            <View style={[styles.searchBar, { backgroundColor: theme.inputBg, borderColor: theme.border }]}>
+            <View style={[styles.searchBar, { backgroundColor: theme.card }]}>
               <IcSearch size={16} color={theme.textMuted} />
               <TextInput
                 style={[styles.searchInput, { color: theme.text }]}
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
   pickBtns: { flexDirection: 'row', gap: 16, width: '100%' },
   pickBtn: {
     flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10,
-    padding: 24, borderRadius: RADIUS.lg, borderWidth: 1,
+    padding: 24, borderRadius: RADIUS.lg,
   },
   pickBtnText: { fontSize: FONT.size.sm, fontWeight: '500', textAlign: 'center' },
 

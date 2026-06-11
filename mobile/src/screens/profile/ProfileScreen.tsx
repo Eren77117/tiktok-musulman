@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { LazyImage } from '../../components/ui/LazyImage';
+import Video from 'react-native-video';
 import { createThumbnail } from 'react-native-create-thumbnail';
 import {
   View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, Linking, Share,
@@ -14,7 +16,7 @@ import { api, getTokens } from '../../api/client';
 import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, SPACING, RADIUS, SHADOW, API_BASE_URL } from '../../constants/theme';
 import { useTheme } from '../../hooks/useTheme';
-import { IcSettings, IcMenu, IcSave, IcCheck, IcHeart, IcGrid, IcEdit, IcCamera, IcChart, IcPlay, IcRepeat, IcBell, IcShare, IcQrCode } from '../../components/ui/Icons';
+import { IcSettings, IcMenu, IcSave, IcCheck, IcHeart, IcGrid, IcEdit, IcCamera, IcChart, IcPlay, IcRepeat, IcBell, IcShare, IcQrCode, IcStar } from '../../components/ui/Icons';
 import QRCode from 'react-native-qrcode-svg';
 import { LinearGradient } from 'react-native-linear-gradient';
 import { EditProfileSheet } from './EditProfileSheet';
@@ -169,7 +171,7 @@ export default function ProfileScreen() {
 
   const pickAvatar = async (src: 'camera' | 'library') => {
     const fn = src === 'camera' ? launchCamera : launchImageLibrary;
-    const result = await fn({ mediaType: 'photo', quality: 0.9, maxWidth: 500, maxHeight: 500 });
+    const result = await fn({ mediaType: 'photo', quality: 0.7, maxWidth: 400, maxHeight: 400 });
     if (result.didCancel || !result.assets?.[0]?.uri) return;
 
     setAvatarLoading(true);
@@ -348,9 +350,17 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
 
-          <Text style={[styles.displayName, { color: theme.text }]}>{user.display_name}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={[styles.displayName, { color: theme.text }]}>{user.display_name}</Text>
+            {(user as any).is_creator && (
+              <View style={[styles.creatorBadge, { backgroundColor: '#F59E0B' }]}>
+                <IcStar size={9} color="#fff" fill="#fff" />
+                <Text style={styles.creatorBadgeText}>Créateur</Text>
+              </View>
+            )}
+          </View>
           {(user as any).profile_category ? (
-            <View style={[styles.categoryBadge, { backgroundColor: `${COLORS.primary}18` }]}>
+            <View style={[styles.categoryBadge, { backgroundColor: COLORS.primaryBg }]}>
               <Text style={[styles.categoryText, { color: COLORS.primary }]}>{(user as any).profile_category}</Text>
             </View>
           ) : null}
@@ -378,28 +388,28 @@ export default function ProfileScreen() {
           </View>
 
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            <TouchableOpacity style={[styles.editBtn, { borderColor: theme.border, flex: 1 }]} onPress={() => setEditVisible(true)} activeOpacity={0.8}>
+            <TouchableOpacity style={[styles.editBtn, { backgroundColor: theme.card, flex: 1 }]} onPress={() => setEditVisible(true)} activeOpacity={0.8}>
               <Text style={[styles.editBtnText, { color: theme.text }]}>Modifier le profil</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.editBtn, { borderColor: theme.border, paddingHorizontal: 14 }]} onPress={() => navigation.navigate('Drafts')} activeOpacity={0.8}>
+            <TouchableOpacity style={[styles.editBtn, { backgroundColor: theme.card, paddingHorizontal: 14 }]} onPress={() => navigation.navigate('Drafts')} activeOpacity={0.8}>
               <IcEdit size={16} color={theme.text} />
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.editBtn, { borderColor: theme.border, paddingHorizontal: 14 }]}
+              style={[styles.editBtn, { backgroundColor: theme.card, paddingHorizontal: 14 }]}
               onPress={() => Share.share({ message: `Suis-moi sur Nour ! @${user.username}`, url: `https://nour.app/@${user.username}` })}
               activeOpacity={0.8}
             >
               <IcShare size={16} color={theme.text} />
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.editBtn, { borderColor: theme.border, paddingHorizontal: 14 }]}
+              style={[styles.editBtn, { backgroundColor: theme.card, paddingHorizontal: 14 }]}
               onPress={() => setShowQR(true)}
               activeOpacity={0.8}
             >
               <IcQrCode size={16} color={theme.text} />
             </TouchableOpacity>
             {(!(user as any).cover_url || coverError) && (
-              <TouchableOpacity style={[styles.editBtn, { borderColor: theme.border, paddingHorizontal: 12 }]} onPress={pickCover} activeOpacity={0.8} disabled={coverLoading}>
+              <TouchableOpacity style={[styles.editBtn, { backgroundColor: theme.card, paddingHorizontal: 12 }]} onPress={pickCover} activeOpacity={0.8} disabled={coverLoading}>
                 {coverLoading
                   ? <ActivityIndicator size="small" color={theme.text} />
                   : <IcCamera size={16} color={theme.text} />
@@ -486,6 +496,10 @@ export default function ProfileScreen() {
               keyExtractor={(p) => `repost-${p.id}`}
               scrollEnabled={false}
               columnWrapperStyle={styles.gridRow}
+              getItemLayout={(_d, index) => {
+                const row = Math.floor(index / 3);
+                return { length: GRID_CELL_H, offset: GRID_CELL_H * row, index };
+              }}
               renderItem={({ item }) => (
                 <GridItem
                   item={item}
@@ -506,6 +520,10 @@ export default function ProfileScreen() {
             keyExtractor={(p) => p.id}
             scrollEnabled={false}
             columnWrapperStyle={styles.gridRow}
+            getItemLayout={(_d, index) => {
+              const row = Math.floor(index / 3);
+              return { length: GRID_CELL_H, offset: GRID_CELL_H * row, index };
+            }}
             renderItem={({ item }) => <GridItem item={item} onPress={() => navigation.navigate('VideoPlayer', { postId: item.id })} onLongPress={() => setPreviewPost(item)} />}
             ListEmptyComponent={<EmptyTab tab={activeTab} theme={theme} />}
           />
@@ -518,11 +536,24 @@ export default function ProfileScreen() {
           <View style={[previewSt.card, { backgroundColor: theme.surface }]}>
             {previewPost && (
               <>
-                <Image
-                  source={{ uri: getThumbUrl(previewPost) ?? undefined }}
-                  style={previewSt.thumb}
-                  resizeMode="cover"
-                />
+                {previewPost.video_url ? (
+                  <Video
+                    source={{ uri: previewPost.video_url }}
+                    style={previewSt.thumb}
+                    resizeMode="cover"
+                    muted
+                    repeat
+                    paused={false}
+                    playInBackground={false}
+                    playWhenInactive={false}
+                  />
+                ) : (
+                  <Image
+                    source={{ uri: getThumbUrl(previewPost) ?? undefined }}
+                    style={previewSt.thumb}
+                    resizeMode="cover"
+                  />
+                )}
                 <View style={previewSt.stats}>
                   <IcPlay size={13} color={theme.textMuted} />
                   <Text style={[previewSt.stat, { color: theme.textMuted }]}>{fmtNum(previewPost.view_count)}</Text>
@@ -618,7 +649,7 @@ function GridItem({ item, onPress, onLongPress, repostBadge }: { item: Post & { 
   return (
     <TouchableOpacity style={styles.gridItem} activeOpacity={0.8} onPress={onPress} onLongPress={onLongPress} delayLongPress={350}>
       {thumb ? (
-        <Image source={{ uri: thumb }} style={styles.gridThumb} resizeMode="cover" />
+        <LazyImage uri={thumb} style={styles.gridThumb} borderRadius={0} />
       ) : loading ? (
         <View style={[styles.gridThumb, styles.gridThumbFallback]}>
           <ActivityIndicator size="small" color={COLORS.primary} />
@@ -755,8 +786,10 @@ const styles = StyleSheet.create({
   },
 
   displayName: { fontSize: FONT.size.xxl, fontWeight: FONT.weight.bold, letterSpacing: -0.5 },
-  categoryBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3, marginTop: 4, alignSelf: 'center' },
-  categoryText: { fontSize: FONT.size.xs, fontWeight: '700', letterSpacing: 0.3 },
+  creatorBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: RADIUS.full, paddingHorizontal: 7, paddingVertical: 2 },
+  creatorBadgeText: { fontSize: 10, fontWeight: '700', color: '#fff' },
+  categoryBadge: { borderRadius: RADIUS.full, paddingHorizontal: 12, paddingVertical: 3, marginTop: 4 },
+  categoryText: { fontSize: FONT.size.xs, fontWeight: FONT.weight.semibold },
   bio: { fontSize: FONT.size.sm, textAlign: 'center', lineHeight: 20 },
   bioLinksRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 6 },
   bioLinkPill: { backgroundColor: 'rgba(0,176,90,0.12)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
@@ -769,7 +802,7 @@ const styles = StyleSheet.create({
   statDivider: { width: 0.5, height: 28 },
 
   editBtn: {
-    borderWidth: 1, borderRadius: RADIUS.md,
+    borderRadius: RADIUS.md,
     paddingHorizontal: SPACING.xl, paddingVertical: 10, marginTop: 4,
   },
   editBtnText: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold, letterSpacing: 0.1 },
@@ -810,7 +843,10 @@ const styles = StyleSheet.create({
   emptySubtitle: { fontSize: FONT.size.sm, textAlign: 'center', paddingHorizontal: SPACING.xl },
 });
 
-const COLL_W = Math.round((Dimensions.get('window').width - 6) / 2);
+const SCR_W = Dimensions.get('window').width;
+const GRID_CELL_W = SCR_W / 3;
+const GRID_CELL_H = GRID_CELL_W * (16 / 9);
+const COLL_W = Math.round((SCR_W - 6) / 2);
 const collSt = StyleSheet.create({
   card: { width: COLL_W, borderRadius: RADIUS.md, overflow: 'hidden' },
   thumb: { width: '100%', aspectRatio: 1, backgroundColor: '#111' },

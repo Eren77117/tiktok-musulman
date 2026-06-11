@@ -52,9 +52,8 @@ import StoryViewerScreen from '../screens/stories/StoryViewerScreen';
 import StoryArchiveScreen from '../screens/stories/StoryArchiveScreen';
 import DraftsScreen from '../screens/upload/DraftsScreen';
 import CollectionScreen from '../screens/profile/CollectionScreen';
-import CollectionDetailScreen from '../screens/profile/CollectionDetailScreen';
 import SeriesPlayerScreen from '../screens/feed/SeriesPlayerScreen';
-import SeriesDetailScreen from '../screens/profile/SeriesDetailScreen';
+import IslamicScreen from '../screens/islamic/IslamicScreen';
 
 export type RootStackParamList = {
   Auth: undefined;
@@ -82,9 +81,8 @@ export type RootStackParamList = {
   StoryArchive: undefined;
   Drafts: undefined;
   Collection: { collectionId: string; name: string };
-  CollectionDetail: { collectionId: string; name: string };
   SeriesPlayer: { seriesId: string; startEpisode?: number };
-  SeriesDetail: { seriesId: string };
+  Islamic: undefined;
   Upload: { draft?: any } | undefined;
 };
 
@@ -411,11 +409,9 @@ export function AppNavigator() {
               options={{ animation: 'slide_from_right' }} />
             <RootStack.Screen name="Collection" component={CollectionScreen}
               options={{ headerShown: false, animation: 'slide_from_right' }} />
-            <RootStack.Screen name="CollectionDetail" component={CollectionDetailScreen}
-              options={{ headerShown: false, animation: 'slide_from_right' }} />
             <RootStack.Screen name="SeriesPlayer" component={SeriesPlayerScreen}
               options={{ headerShown: false, animation: 'slide_from_bottom' }} />
-            <RootStack.Screen name="SeriesDetail" component={SeriesDetailScreen}
+            <RootStack.Screen name="Islamic" component={IslamicScreen}
               options={{ headerShown: false, animation: 'slide_from_right' }} />
             <RootStack.Screen name="Drafts" component={DraftsScreen}
               options={{ animation: 'slide_from_right', headerShown: false }} />

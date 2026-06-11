@@ -76,7 +76,7 @@ function Section({ title, children, theme }: { title: string; children: React.Re
   return (
     <View style={rStyles.section}>
       <Text style={[rStyles.sectionTitle, { color: theme.textSubtle }]}>{title}</Text>
-      <View style={[rStyles.sectionCard, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
+      <View style={[rStyles.sectionCard, { backgroundColor: theme.surface }]}>
         {children}
       </View>
     </View>
@@ -93,6 +93,7 @@ export default function SettingsScreen({ navigation }: Props) {
   const { isDark, mode, setMode } = useThemeStore() as any;
   const theme = useTheme();
   const { autoplay, muteByDefault, setSetting } = useSettingsStore();
+  const [creatorLoading, setCreatorLoading] = useState(false);
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [loaded, setLoaded] = useState(false);
 
@@ -121,6 +122,18 @@ export default function SettingsScreen({ navigation }: Props) {
     await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
     // Persist to server (best effort)
     api.patch('/users/me', { [key]: value }).catch(() => {});
+  };
+
+  const toggleCreatorMode = async (enabled: boolean) => {
+    setCreatorLoading(true);
+    try {
+      await api.patch('/users/me/creator-mode', { enabled });
+      updateUser({ is_creator: enabled });
+    } catch {
+      Alert.alert('Erreur', 'Impossible de modifier le mode créateur.');
+    } finally {
+      setCreatorLoading(false);
+    }
   };
 
   const handleChangePassword = async () => {
@@ -222,7 +235,7 @@ export default function SettingsScreen({ navigation }: Props) {
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
 
         {/* Profile card */}
-        <View style={[styles.profileCard, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
+        <View style={[styles.profileCard, { backgroundColor: theme.surface }]}>
           <View style={[styles.profileAvatar, { backgroundColor: theme.primaryBg }]}>
             <Text style={styles.profileInitial}>{user?.display_name?.[0]?.toUpperCase() ?? 'U'}</Text>
           </View>
@@ -270,6 +283,26 @@ export default function SettingsScreen({ navigation }: Props) {
           />
         </Section>
 
+        <Section title="MODE CRÉATEUR" theme={theme}>
+          <Row theme={theme} Icon={IcStar} label="Mode Créateur"
+            right={
+              <Switch
+                value={!!user?.is_creator}
+                onValueChange={toggleCreatorMode}
+                disabled={creatorLoading}
+                trackColor={{ false: COLORS.border, true: COLORS.primary }}
+                thumbColor={COLORS.white}
+                ios_backgroundColor={COLORS.border}
+              />
+            }
+            last
+          />
+        </Section>
+
+        <Section title="ISLAMIQUE" theme={theme}>
+          <Row theme={theme} Icon={IcFlag} label="Coran, Hadiths, Duas, Tasbih" onPress={() => navigation.navigate('Islamic')} last />
+        </Section>
+
         <Section title="APPARENCE" theme={theme}>
           <View style={[rStyles.row, { borderBottomColor: theme.borderLight }]}>
             <View style={rStyles.rowLeft}>
@@ -280,7 +313,7 @@ export default function SettingsScreen({ navigation }: Props) {
             </View>
             <View style={styles.themeButtons}>
               {(['light','dark','system'] as const).map(m => (
-                <TouchableOpacity key={m} style={[styles.themeBtn, mode === m && { backgroundColor: COLORS.primary, borderColor: COLORS.primary }]}
+                <TouchableOpacity key={m} style={[styles.themeBtn, { backgroundColor: mode === m ? COLORS.primary : theme.card }]}
                   onPress={() => setMode(m)} activeOpacity={0.8}>
                   <Text style={[styles.themeBtnText, mode === m && { color: COLORS.white }]}>
                     {m === 'light' ? '☀️ Clair' : m === 'dark' ? '🌙 Sombre' : '📱 Auto'}
@@ -298,7 +331,7 @@ export default function SettingsScreen({ navigation }: Props) {
           <Row theme={theme} Icon={IcInfo} label={`Version ${currentVersion}`} value="Voir les nouveautés" onPress={() => setChangelogModal(true)} last />
         </Section>
 
-        <TouchableOpacity style={[styles.logoutBtn, { borderColor: COLORS.error, backgroundColor: theme.surface }]} onPress={confirmLogout} activeOpacity={0.8}>
+        <TouchableOpacity style={[styles.logoutBtn]} onPress={confirmLogout} activeOpacity={0.8}>
           <IcLogOut size={18} color={COLORS.error} />
           <Text style={styles.logoutText}>Se déconnecter</Text>
         </TouchableOpacity>
@@ -314,7 +347,7 @@ export default function SettingsScreen({ navigation }: Props) {
 const rStyles = StyleSheet.create({
   section: { gap: 6 },
   sectionTitle: { fontSize: FONT.size.xs, fontWeight: FONT.weight.semibold, letterSpacing: 1, paddingHorizontal: 4 },
-  sectionCard: { borderRadius: RADIUS.lg, borderWidth: 1, overflow: 'hidden', ...SHADOW.sm },
+  sectionCard: { borderRadius: RADIUS.lg, overflow: 'hidden', ...SHADOW.sm },
   row: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: SPACING.md, paddingVertical: 13, borderBottomWidth: 1,
@@ -338,7 +371,7 @@ const styles = StyleSheet.create({
 
   profileCard: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
-    borderRadius: RADIUS.lg, padding: SPACING.md, borderWidth: 1, ...SHADOW.sm,
+    borderRadius: RADIUS.lg, padding: SPACING.md, ...SHADOW.sm,
   },
   profileAvatar: { width: 52, height: 52, borderRadius: 26, borderWidth: 2, borderColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
   profileInitial: { fontSize: 20, fontWeight: FONT.weight.bold, color: COLORS.primary },
@@ -348,7 +381,7 @@ const styles = StyleSheet.create({
 
   logoutBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    borderRadius: RADIUS.lg, paddingVertical: 14, borderWidth: 1.5,
+    borderRadius: RADIUS.lg, paddingVertical: 14, backgroundColor: 'rgba(239,68,68,0.08)',
   },
   logoutText: { fontSize: FONT.size.base, fontWeight: FONT.weight.semibold, color: COLORS.error },
   deleteBtn: { alignItems: 'center', paddingVertical: 10 },
@@ -356,7 +389,6 @@ const styles = StyleSheet.create({
   themeButtons: { flexDirection: 'row', gap: 6 },
   themeBtn: {
     paddingHorizontal: 10, paddingVertical: 6, borderRadius: RADIUS.full,
-    borderWidth: 1.5, borderColor: COLORS.border,
   },
   themeBtnText: { fontSize: 11, fontWeight: FONT.weight.medium, color: COLORS.textMuted },
 

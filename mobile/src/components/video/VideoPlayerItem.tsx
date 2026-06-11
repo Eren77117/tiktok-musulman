@@ -46,6 +46,7 @@ export interface FeedPost {
   sound: { id: string; title: string; artist: string | null } | null;
   reposted_by?: { id: string; username: string; avatar_url: string | null } | null;
   series_episode?: { series_id: string; episode_num: number; series_title: string } | null;
+  text_overlay?: { text: string; style: 'white' | 'black' | 'green' | 'gold'; position: 'top' | 'center' | 'bottom' } | null;
 }
 
 interface Props {
@@ -70,6 +71,47 @@ function fmtDuration(s: number) {
   const sec = Math.floor(s % 60);
   return `${m}:${sec.toString().padStart(2, '0')}`;
 }
+
+// ── Feed comments overlay ─────────────────────────────────────────────────────
+interface FeedComment { id: string; content: string; user: { username: string } }
+
+function FeedCommentsOverlay({ postId, visible }: { postId: string; visible: boolean }) {
+  const [comments, setComments] = useState<FeedComment[]>([]);
+  const fadeAnims = useRef<Animated.Value[]>([]).current;
+
+  useEffect(() => {
+    if (!visible) return;
+    api.get(`/posts/${postId}/comments`, { params: { limit: 3, sort: 'recent' } })
+      .then(r => {
+        const items: FeedComment[] = (r.data?.items ?? []).slice(0, 3);
+        setComments(items);
+        items.forEach((_, i) => { if (!fadeAnims[i]) fadeAnims[i] = new Animated.Value(0); });
+        Animated.stagger(200, items.map((_, i) =>
+          Animated.timing(fadeAnims[i], { toValue: 1, duration: 350, useNativeDriver: true })
+        )).start();
+      }).catch(() => {});
+    return () => { setComments([]); fadeAnims.forEach(a => a.setValue(0)); };
+  }, [postId, visible]);
+
+  if (!visible || comments.length === 0) return null;
+
+  return (
+    <View style={ovStyles.container} pointerEvents="none">
+      {comments.map((c, i) => (
+        <Animated.View key={c.id} style={[ovStyles.row, { opacity: fadeAnims[i] ?? 1 }]}>
+          <Text style={ovStyles.username}>@{c.user.username}</Text>
+          <Text style={ovStyles.text} numberOfLines={1}>{c.content}</Text>
+        </Animated.View>
+      ))}
+    </View>
+  );
+}
+const ovStyles = StyleSheet.create({
+  container: { position: 'absolute', bottom: 180, left: 12, right: 80, gap: 6 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
+  username: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.9)', flexShrink: 0 },
+  text: { fontSize: 12, color: 'rgba(255,255,255,0.75)', flexShrink: 1 },
+});
 
 export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, onSeekingChange, defaultMuted = false, itemHeight }: Props) {
   const ITEM_H = itemHeight ?? H;
@@ -725,6 +767,21 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, o
         </TouchableOpacity>
       )}
 
+      {/* Text overlay */}
+      {post.text_overlay?.text ? (() => {
+        const ov = post.text_overlay!;
+        const bgColor = ov.style === 'white' ? 'rgba(255,255,255,0.85)' : ov.style === 'black' ? 'rgba(0,0,0,0.7)' : ov.style === 'green' ? 'rgba(21,128,61,0.85)' : 'rgba(161,111,0,0.85)';
+        const txtColor = ov.style === 'white' ? '#000' : '#fff';
+        const vertAlign = ov.position === 'top' ? { top: 80 } : ov.position === 'center' ? { top: '42%' as any } : { bottom: 180 };
+        return (
+          <View style={[styles.textOverlay, vertAlign, { backgroundColor: bgColor }]} pointerEvents="none">
+            <Text style={[styles.textOverlayText, { color: txtColor }]}>{ov.text}</Text>
+          </View>
+        );
+      })() : null}
+
+      <FeedCommentsOverlay postId={post.id} visible={isVisible} />
+
       {/* Bottom left — username + caption */}
       <View style={styles.bottomLeft}>
         <TouchableOpacity onPress={goToProfile} activeOpacity={0.8} style={styles.usernameRow}>
@@ -1121,6 +1178,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center',
   },
   caption: { fontSize: FONT.size.sm, color: 'rgba(255,255,255,0.92)', lineHeight: 20 },
+  textOverlay: {
+    position: 'absolute', left: 16, right: 80,
+    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, alignSelf: 'flex-start',
+  },
+  textOverlayText: { fontSize: 15, fontWeight: '700', lineHeight: 22 },
   captionTag: { color: COLORS.primaryLight, fontWeight: FONT.weight.semibold },
   captionMention: { color: COLORS.white, fontWeight: FONT.weight.semibold, textDecorationLine: 'underline' },
   soundRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },

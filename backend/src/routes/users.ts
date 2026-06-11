@@ -7,36 +7,14 @@ import { z } from 'zod';
 const updateProfileSchema = z.object({
   display_name: z.string().min(1).max(50).optional(),
   bio: z.string().max(300).optional().nullable(),
-  bio_links: z.array(z.string().url()).max(5).optional(),
-  profile_category: z.string().max(50).optional().nullable(),
+  bio_links: z.array(z.string().url()).max(3).optional(),
   avatar_url: z.string().optional().nullable(),
   cover_url: z.string().optional().nullable(),
   profile_category: z.string().max(50).optional().nullable(),
+  is_creator: z.boolean().optional(),
 }).passthrough(); // allow extra keys from mobile settings
 
-const USER_SELECT_PUBLIC = {
-  id: true, username: true, display_name: true, bio: true,
-  bio_links: true, profile_category: true,
-  avatar_url: true, cover_url: true, is_verified: true, gender: true,
-  follower_count: true, following_count: true, post_count: true,
-  like_count: true, created_at: true,
-} as const;
-
 export async function userRoutes(app: FastifyInstance) {
-  // BE-01 : lookup by username (for @mention taps)
-  app.get('/by-username/:username', { preHandler: authenticate }, async (req, reply) => {
-    const { username } = req.params as { username: string };
-    const user = await prisma.user.findUnique({
-      where: { username: username.toLowerCase() },
-      select: {
-        id: true, username: true, display_name: true,
-        avatar_url: true, bio: true, is_verified: true, follower_count: true,
-      },
-    });
-    if (!user) return reply.status(404).send({ error: 'Utilisateur non trouvé' });
-    return reply.send(user);
-  });
-
   app.get('/search', { preHandler: authenticate }, async (req, reply) => {
     const { q, cursor, limit = '20' } = req.query as { q: string; cursor?: string; limit?: string };
     if (!q) return reply.status(400).send({ error: 'Query required' });
@@ -53,7 +31,7 @@ export async function userRoutes(app: FastifyInstance) {
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       select: {
         id: true, username: true, display_name: true,
-        avatar_url: true, is_verified: true, follower_count: true,
+        avatar_url: true, is_verified: true, is_creator: true, follower_count: true,
       },
     });
 
@@ -66,7 +44,12 @@ export async function userRoutes(app: FastifyInstance) {
     const { username } = req.params as { username: string };
     const user = await prisma.user.findUnique({
       where: { username },
-      select: USER_SELECT_PUBLIC,
+      select: {
+        id: true, username: true, display_name: true, bio: true, bio_links: true,
+        avatar_url: true, cover_url: true, is_verified: true, is_creator: true, gender: true,
+        follower_count: true, following_count: true, post_count: true,
+        like_count: true, created_at: true, profile_category: true,
+      },
     });
     if (!user) return reply.status(404).send({ error: 'User not found' });
 
@@ -88,31 +71,26 @@ export async function userRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
     // Only update fields that exist in User model
-    const { display_name, bio, avatar_url, cover_url, bio_links, profile_category } = parsed.data;
+    const { display_name, bio, bio_links, avatar_url, cover_url, profile_category, is_creator } = parsed.data;
     const updateData: Record<string, unknown> = {};
     if (display_name !== undefined) updateData.display_name = display_name;
     if (bio !== undefined) updateData.bio = bio;
     if (bio_links !== undefined) updateData.bio_links = bio_links;
-    if (profile_category !== undefined) updateData.profile_category = profile_category;
     if (avatar_url !== undefined) updateData.avatar_url = avatar_url;
     if (cover_url !== undefined) updateData.cover_url = cover_url;
     if (profile_category !== undefined) updateData.profile_category = profile_category;
-
-    const ME_SELECT = {
-      id: true, username: true, display_name: true, bio: true,
-      bio_links: true, profile_category: true,
-      avatar_url: true, cover_url: true, is_verified: true,
-    } as const;
+    if (is_creator !== undefined) updateData.is_creator = is_creator;
 
     if (Object.keys(updateData).length === 0) {
-      const me = await prisma.user.findUnique({ where: { id: req.currentUser!.id }, select: ME_SELECT });
+      // Nothing to update in DB (e.g. settings-only patch)
+      const me = await prisma.user.findUnique({ where: { id: req.currentUser!.id }, select: { id: true, username: true, display_name: true, bio: true, bio_links: true, avatar_url: true, cover_url: true, is_verified: true, is_creator: true, profile_category: true } });
       return reply.send(me);
     }
 
     const user = await prisma.user.update({
       where: { id: req.currentUser!.id },
       data: updateData,
-      select: ME_SELECT,
+      select: { id: true, username: true, display_name: true, bio: true, bio_links: true, avatar_url: true, cover_url: true, is_verified: true, is_creator: true, profile_category: true },
     });
     return reply.send(user);
   });
@@ -171,7 +149,7 @@ export async function userRoutes(app: FastifyInstance) {
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       include: {
         follower: {
-          select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true },
+          select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true, is_creator: true },
         },
       },
       orderBy: { created_at: 'desc' },
@@ -195,7 +173,7 @@ export async function userRoutes(app: FastifyInstance) {
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       include: {
         following: {
-          select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true },
+          select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true, is_creator: true },
         },
       },
       orderBy: { created_at: 'desc' },
@@ -228,7 +206,7 @@ export async function userRoutes(app: FastifyInstance) {
         where: { post: { user_id: userId } },
         _count: { id: true }, _sum: { watch_time_ms: true },
       }),
-      prisma.postView.count({ where: { post: { user_id: userId }, created_at: { gte: since } } }),
+      prisma.postView.count({ where: { post: { user_id: userId }, viewed_at: { gte: since } } }),
       prisma.like.count({ where: { post: { user_id: userId }, created_at: { gte: since } } }).catch(() => 0),
       prisma.follow.count({ where: { following_id: userId, created_at: { gte: since } } }).catch(() => 0),
     ]);
@@ -333,12 +311,12 @@ export async function userRoutes(app: FastifyInstance) {
       where: { id: { notIn: [...followingIds, ...fofIds] }, is_banned: false },
       orderBy: { follower_count: 'desc' },
       take: needed,
-      select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true, follower_count: true },
+      select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true, is_creator: true, follower_count: true },
     }) : [];
 
     const fofUsers = fofIds.length > 0 ? await prisma.user.findMany({
       where: { id: { in: fofIds } },
-      select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true, follower_count: true },
+      select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true, is_creator: true, follower_count: true },
     }) : [];
 
     return reply.send({ items: [...fofUsers, ...popular] });
@@ -369,7 +347,7 @@ export async function userRoutes(app: FastifyInstance) {
     const similar = sharedFollowers.length > 0
       ? await prisma.user.findMany({
           where: { id: { in: sharedFollowers.slice(0, 8) }, is_banned: false },
-          select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true, follower_count: true },
+          select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true, is_creator: true, follower_count: true },
           orderBy: { follower_count: 'desc' },
           take: 8,
         })
@@ -377,9 +355,21 @@ export async function userRoutes(app: FastifyInstance) {
           where: { id: { notIn: [...viewerFollowingIds] }, is_banned: false },
           orderBy: { follower_count: 'desc' },
           take: 8,
-          select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true, follower_count: true },
+          select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true, is_creator: true, follower_count: true },
         });
 
     return reply.send({ items: similar });
+  });
+
+  // ── CREATOR MODE TOGGLE ──────────────────────────────────────────────────────
+  app.patch('/me/creator-mode', { preHandler: authenticate }, async (req, reply) => {
+    const { enabled } = req.body as { enabled: boolean };
+    if (typeof enabled !== 'boolean') return reply.status(400).send({ error: 'enabled must be boolean' });
+    const user = await prisma.user.update({
+      where: { id: req.currentUser!.id },
+      data: { is_creator: enabled },
+      select: { id: true, is_creator: true },
+    });
+    return reply.send(user);
   });
 }

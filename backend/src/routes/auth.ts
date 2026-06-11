@@ -142,7 +142,7 @@ export async function authRoutes(app: FastifyInstance) {
         select: {
           id: true, username: true, email: true, display_name: true,
           bio: true, avatar_url: true, gender: true, role: true,
-          is_verified: true, like_count: true, created_at: true,
+          is_verified: true, is_creator: true, like_count: true, created_at: true,
         },
       }),
       prisma.follow.count({ where: { following_id: userId } }),

@@ -8,12 +8,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Heart, MessageCircle, UserPlus, Bookmark, AtSign, Bell, Check } from 'lucide-react-native';
+import { Heart, MessageCircle, UserPlus, Bookmark, AtSign, Bell, Check, TrendingUp } from 'lucide-react-native';
 import { api } from '../../api/client';
 import { RootStackParamList } from '../../navigation';
 import { useTheme } from '../../hooks/useTheme';
 import { COLORS, FONT, SPACING } from '../../constants/theme';
 import { IcBack } from '../../components/ui/Icons';
+import HadithCard from '../../components/ui/HadithCard';
+import { LazyImage } from '../../components/ui/LazyImage';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -36,6 +38,7 @@ const TYPE_META: Record<string, { icon: any; color: string; bg: string }> = {
   MESSAGE_REQUEST:          { icon: MessageCircle, color: '#06B6D4', bg: '#CFFAFE' },
   MESSAGE_REQUEST_ACCEPTED: { icon: Check,         color: COLORS.primary, bg: COLORS.primaryBg },
   LIVE_START:               { icon: Bell,          color: '#FF3B30', bg: '#FFE5E5' },
+  TRENDING:                 { icon: TrendingUp,    color: '#10B981', bg: '#D1FAE5' },
   SYSTEM:                   { icon: Bell,          color: '#6B7280', bg: '#F3F4F6' },
 };
 
@@ -112,7 +115,7 @@ export default function NotificationsScreen() {
     const sessionId = notif.data?.session_id;
     if (sessionId && notif.type === 'LIVE_START') {
       nav.navigate('LiveViewer', { sessionId, broadcasterId: userId ?? '' });
-    } else if (postId && ['LIKE', 'COMMENT', 'SAVE', 'MENTION'].includes(notif.type)) {
+    } else if (postId && ['LIKE', 'COMMENT', 'SAVE', 'MENTION', 'TRENDING'].includes(notif.type)) {
       nav.navigate('VideoPlayer', { postId });
     } else if (userId) {
       nav.navigate('UserProfile', { userId, username: '' });
@@ -166,7 +169,7 @@ export default function NotificationsScreen() {
         <View style={styles.iconWrap}>
           {n.data?.avatar_url && isFollow ? (
             <View>
-              <Image source={{ uri: n.data.avatar_url }} style={styles.avatarImg} />
+              <LazyImage uri={n.data.avatar_url} style={styles.avatarImg as any} borderRadius={24} />
               <View style={[styles.iconBadge, { backgroundColor: meta.bg }]}>
                 <meta.icon size={11} color={meta.color} strokeWidth={2} />
               </View>
@@ -243,6 +246,8 @@ export default function NotificationsScreen() {
         </ScrollView>
         <Animated.View style={[styles.tabUnderline, { left: underlineX, width: underlineW }]} />
       </View>
+
+      {activeTab === 'all' && <HadithCard />}
 
       {isLoading ? (
         <View style={styles.center}><ActivityIndicator color={COLORS.primary} size="large" /></View>

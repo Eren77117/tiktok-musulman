@@ -119,6 +119,27 @@ export async function commentRoutes(app: FastifyInstance) {
       });
     }
 
+    // Notify @mentioned users
+    const mentionMatches = parsed.data.content.match(/@([\w.]+)/g) ?? [];
+    if (mentionMatches.length > 0) {
+      const usernames = [...new Set(mentionMatches.map(m => m.slice(1).toLowerCase()))];
+      const mentionedUsers = await prisma.user.findMany({
+        where: { username: { in: usernames }, id: { not: req.currentUser!.id } },
+        select: { id: true },
+      });
+      await Promise.allSettled(mentionedUsers.map(u =>
+        prisma.notification.create({
+          data: {
+            user_id: u.id,
+            type: 'MENTION',
+            title: `@${comment.user.username} vous a mentionné`,
+            body: parsed.data.content.slice(0, 80),
+            data: { post_id: postId, comment_id: comment.id, user_id: req.currentUser!.id },
+          },
+        })
+      ));
+    }
+
     // Broadcast new comment to everyone watching this post
     getIo()?.to(`post:${postId}`).emit('comment:new', {
       ...comment,

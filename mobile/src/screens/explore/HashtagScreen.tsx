@@ -85,7 +85,7 @@ export default function HashtagScreen({ route, navigation }: Props) {
           style={[
             styles.followBtn,
             following
-              ? { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border }
+              ? { backgroundColor: theme.card }
               : { backgroundColor: COLORS.primary },
           ]}
           onPress={() => followMutation.mutate()}
@@ -110,8 +110,8 @@ export default function HashtagScreen({ route, navigation }: Props) {
             style={[
               styles.chip,
               sort === s
-                ? { backgroundColor: COLORS.primaryBg, borderColor: COLORS.primary }
-                : { backgroundColor: theme.card, borderColor: theme.border },
+                ? { backgroundColor: COLORS.primaryBg }
+                : { backgroundColor: theme.card },
             ]}
             activeOpacity={0.7}
           >
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   sortBar: {
     flexDirection: 'row', gap: 8, paddingHorizontal: SPACING.md, paddingVertical: 10, borderBottomWidth: 1,
   },
-  chip: { borderRadius: RADIUS.full, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 6 },
+  chip: { borderRadius: RADIUS.full, paddingHorizontal: 14, paddingVertical: 6 },
   chipText: { fontSize: 12, fontWeight: '600' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   row: { gap: 1 },

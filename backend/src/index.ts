@@ -5,6 +5,8 @@ import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
+import swagger from '@fastify/swagger';
+import swaggerUi from '@fastify/swagger-ui';
 import staticFiles from '@fastify/static';
 import path from 'path';
 import fs from 'fs';
@@ -30,7 +32,7 @@ import { soundRoutes } from './routes/sounds';
 import { collectionRoutes } from './routes/collections';
 import { analyticsRoutes } from './routes/analytics';
 import { seriesRoutes } from './routes/series';
-import { hashtagRoutes } from './routes/hashtags';
+import { islamicRoutes } from './routes/islamic';
 
 process.stdout.write(`[STARTUP] Node ${process.version}\n`);
 
@@ -56,6 +58,8 @@ async function bootstrap() {
   await app.register(cors, { origin: true, credentials: true });
   await app.register(jwt, { secret: env.JWT_ACCESS_SECRET });
   await app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
+  await app.register(swagger, { openapi: { info: { title: 'Nour API', version: '1.0.0' } } });
+  await app.register(swaggerUi, { routePrefix: '/docs' });
   await app.register(multipart, { limits: { fileSize: env.UPLOAD_MAX_SIZE_MB * 1024 * 1024 } });
 
   const uploadsDir = path.join(process.cwd(), 'uploads');
@@ -83,7 +87,7 @@ async function bootstrap() {
   await app.register(collectionRoutes, { prefix: '/api/collections' });
   await app.register(analyticsRoutes, { prefix: '/api/analytics' });
   await app.register(seriesRoutes, { prefix: '/api/series' });
-  await app.register(hashtagRoutes, { prefix: '/api/hashtags' });
+  await app.register(islamicRoutes, { prefix: '/api/islamic' });
 
   app.setErrorHandler((error, _req, reply) => {
     app.log.error(error);

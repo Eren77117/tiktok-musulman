@@ -15,23 +15,16 @@ import { api, getTokens } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
 import { useTheme } from '../../hooks/useTheme';
 import { COLORS, SPACING, WS_URL, FONT, RADIUS } from '../../constants';
-import { IcSend, IcCornerUpLeft, IcTrash, IcClose, IcImage, IcPlay } from '../../components/ui/Icons';
+import { IcSend, IcCornerUpLeft, IcTrash, IcClose, IcImage, IcFlame } from '../../components/ui/Icons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Conversation'>;
-
-interface SharedPost {
-  id: string;
-  thumbnail_url: string | null;
-  caption: string | null;
-  user: { id: string; username: string; display_name: string };
-}
 
 interface Message {
   id: string;
   content: string;
   media_url?: string | null;
-  shared_post?: SharedPost | null;
   is_read: boolean;
+  is_ephemeral?: boolean;
   created_at: string;
   reactions?: Record<string, string>;
   reply_to?: { id: string; content: string; sender_name: string } | null;
@@ -67,7 +60,7 @@ function TypingBubble({ theme }: { theme: ReturnType<typeof import('../../hooks/
 
   return (
     <View style={[styles.bubbleRowThem, { marginVertical: 2, alignSelf: 'flex-start' }]}>
-      <View style={[styles.bubble, styles.bubbleThem, { backgroundColor: theme.card, borderColor: theme.borderLight, borderWidth: 1, flexDirection: 'row', gap: 4, paddingVertical: 14 }]}>
+      <View style={[styles.bubble, styles.bubbleThem, { backgroundColor: theme.card, flexDirection: 'row', gap: 4, paddingVertical: 14 }]}>
         {[dot1, dot2, dot3].map((dot, i) => (
           <Animated.View key={i} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.textMuted, transform: [{ translateY: dot }] }} />
         ))}
@@ -76,13 +69,14 @@ function TypingBubble({ theme }: { theme: ReturnType<typeof import('../../hooks/
   );
 }
 
-// Swipe-right-to-reply wrapper — slides bubble right, triggers onReply at 40px
+// Swipe-right-to-reply wrapper — slides bubble right, shows scaling reply icon at 40px
 function SwipeableMessage({ children, onReply, disabled }: {
   children: React.ReactNode;
   onReply: () => void;
   disabled?: boolean;
 }) {
   const tx = useRef(new Animated.Value(0)).current;
+  const iconScale = useRef(new Animated.Value(0)).current;
   const triggered = useRef(false);
 
   const pan = useRef(PanResponder.create({
@@ -93,6 +87,8 @@ function SwipeableMessage({ children, onReply, disabled }: {
     onPanResponderMove: (_, g) => {
       const val = Math.max(0, Math.min(55, g.dx));
       tx.setValue(val);
+      // Scale icon 0→1 as swipe goes 0→40px
+      iconScale.setValue(Math.min(1, val / 40));
       if (!triggered.current && val >= 40) {
         triggered.current = true;
         ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
@@ -100,17 +96,33 @@ function SwipeableMessage({ children, onReply, disabled }: {
       }
     },
     onPanResponderRelease: () => {
-      Animated.spring(tx, { toValue: 0, useNativeDriver: true, tension: 300, friction: 14 }).start();
+      Animated.parallel([
+        Animated.spring(tx, { toValue: 0, useNativeDriver: true, tension: 300, friction: 14 }),
+        Animated.spring(iconScale, { toValue: 0, useNativeDriver: true, tension: 300, friction: 14 }),
+      ]).start();
     },
     onPanResponderTerminate: () => {
-      Animated.spring(tx, { toValue: 0, useNativeDriver: true, tension: 300, friction: 14 }).start();
+      tx.setValue(0);
+      iconScale.setValue(0);
     },
   })).current;
 
   return (
-    <Animated.View style={{ transform: [{ translateX: tx }] }} {...pan.panHandlers}>
-      {children}
-    </Animated.View>
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <Animated.View style={{
+        transform: [{ scale: iconScale }],
+        marginLeft: 4,
+        width: 28, height: 28, borderRadius: 14,
+        backgroundColor: 'rgba(45,122,79,0.15)',
+        alignItems: 'center', justifyContent: 'center',
+        position: 'absolute', left: -36,
+      }}>
+        <IcCornerUpLeft size={14} color={COLORS.primary} />
+      </Animated.View>
+      <Animated.View style={{ flex: 1, transform: [{ translateX: tx }] }} {...pan.panHandlers}>
+        {children}
+      </Animated.View>
+    </View>
   );
 }
 
@@ -121,7 +133,12 @@ export default function ConversationScreen({ route, navigation }: Props) {
   const insets = useSafeAreaInsets();
 
   const [text, setText] = useState('');
+  const [ephemeralMode, setEphemeralMode] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [gifQuery, setGifQuery] = useState('islam');
+  const [gifs, setGifs] = useState<{ id: string; url: string; preview: string }[]>([]);
+  const [gifLoading, setGifLoading] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [reactingTo, setReactingTo] = useState<Message | null>(null);
   const [myReactions, setMyReactions] = useState<Record<string, string>>({});
@@ -218,7 +235,7 @@ export default function ConversationScreen({ route, navigation }: Props) {
   }, [conversationId]);
 
   const sendMutation = useMutation({
-    mutationFn: (payload: { content: string; media_url?: string; reply_to_id?: string }) =>
+    mutationFn: (payload: { content: string; media_url?: string; reply_to_id?: string; is_ephemeral?: boolean }) =>
       api.post(`/messages/conversations/${conversationId}/messages`, payload),
     onSuccess: res => {
       setMessages(prev => [...prev, res.data]);
@@ -232,10 +249,35 @@ export default function ConversationScreen({ route, navigation }: Props) {
     onError: () => Alert.alert('Erreur', "Impossible d'envoyer le message."),
   });
 
+  const fetchGifs = useCallback(async (q: string) => {
+    setGifLoading(true);
+    try {
+      const res = await fetch(`https://api.giphy.com/v1/gifs/search?api_key=dc6zaTOxFJmzC&q=${encodeURIComponent(q)}&limit=20&rating=g`);
+      const json = await res.json();
+      const items = (json.data ?? []).map((g: any) => ({
+        id: g.id,
+        url: g.images.original.url,
+        preview: g.images.fixed_height_small.url,
+      }));
+      setGifs(items);
+    } catch { setGifs([]); }
+    finally { setGifLoading(false); }
+  }, []);
+
+  const openGifPicker = () => {
+    setShowGifPicker(true);
+    if (gifs.length === 0) fetchGifs(gifQuery);
+  };
+
+  const sendGif = (url: string) => {
+    setShowGifPicker(false);
+    sendMutation.mutate({ content: '', media_url: url });
+  };
+
   const handleSend = useCallback(() => {
     const trimmed = text.trim();
     if (!trimmed || sendMutation.isPending) return;
-    sendMutation.mutate({ content: trimmed, reply_to_id: replyTo?.id });
+    sendMutation.mutate({ content: trimmed, reply_to_id: replyTo?.id, is_ephemeral: ephemeralMode || undefined });
   }, [text, replyTo, sendMutation]);
 
   const handleAttach = useCallback(async () => {
@@ -314,34 +356,11 @@ export default function ConversationScreen({ route, navigation }: Props) {
         <View style={[
           styles.bubble,
           isMe ? [styles.bubbleMe, { backgroundColor: COLORS.primary }]
-               : [styles.bubbleThem, { backgroundColor: theme.card, borderColor: theme.borderLight, borderWidth: 1 }],
+               : [styles.bubbleThem, { backgroundColor: theme.card }],
           deleted && { opacity: 0.55 },
         ]}>
           {m.media_url && !deleted && (
             <Image source={{ uri: m.media_url }} style={styles.mediaThumb} resizeMode="cover" />
-          )}
-          {m.shared_post && !deleted && (
-            <TouchableOpacity
-              style={[styles.sharedPostCard, { borderColor: isMe ? 'rgba(255,255,255,0.2)' : theme.borderLight }]}
-              onPress={() => navigation.navigate('VideoPlayer', { postId: m.shared_post!.id })}
-              activeOpacity={0.85}
-            >
-              {m.shared_post.thumbnail_url ? (
-                <Image source={{ uri: m.shared_post.thumbnail_url }} style={styles.sharedPostThumb} resizeMode="cover" />
-              ) : (
-                <View style={[styles.sharedPostThumb, { backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' }]}>
-                  <IcPlay size={20} color="rgba(255,255,255,0.5)" />
-                </View>
-              )}
-              <View style={styles.sharedPostInfo}>
-                <Text style={[styles.sharedPostCaption, { color: isMe ? '#fff' : theme.text }]} numberOfLines={2}>
-                  {m.shared_post.caption ?? 'Vidéo'}
-                </Text>
-                <Text style={[styles.sharedPostUser, { color: isMe ? 'rgba(255,255,255,0.7)' : theme.textMuted }]}>
-                  @{m.shared_post.user.username}
-                </Text>
-              </View>
-            </TouchableOpacity>
           )}
           {(m.content.trim().length > 0 || deleted) && (
             <Text style={[styles.bubbleText, { color: isMe ? '#fff' : theme.text }]}>
@@ -349,6 +368,9 @@ export default function ConversationScreen({ route, navigation }: Props) {
             </Text>
           )}
           <View style={styles.metaRow}>
+            {m.is_ephemeral && !deleted && (
+              <IcFlame size={12} color={isMe ? 'rgba(255,200,200,0.9)' : '#EF4444'} />
+            )}
             <Text style={[styles.timeText, { color: isMe ? 'rgba(255,255,255,0.6)' : theme.textMuted }]}>
               {fmtTime(m.created_at)}
             </Text>
@@ -391,7 +413,7 @@ export default function ConversationScreen({ route, navigation }: Props) {
     >
       <Modal visible={!!reactingTo} transparent animationType="fade" onRequestClose={() => setReactingTo(null)}>
         <Pressable style={styles.rxBackdrop} onPress={() => setReactingTo(null)}>
-          <View style={[styles.rxPicker, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <View style={[styles.rxPicker, { backgroundColor: theme.card }]}>
             {REACTIONS.map(emoji => (
               <TouchableOpacity
                 key={emoji}
@@ -409,6 +431,45 @@ export default function ConversationScreen({ route, navigation }: Props) {
             )}
           </View>
         </Pressable>
+      </Modal>
+
+      {/* GIF Picker */}
+      <Modal visible={showGifPicker} transparent animationType="slide" onRequestClose={() => setShowGifPicker(false)}>
+        <View style={[styles.gifModal, { backgroundColor: theme.surface }]}>
+          <View style={[styles.gifHeader, { borderBottomColor: theme.borderLight }]}>
+            <Text style={[styles.gifTitle, { color: theme.text }]}>GIFs islamiques</Text>
+            <TouchableOpacity onPress={() => setShowGifPicker(false)} activeOpacity={0.7}>
+              <IcClose size={22} color={theme.textMuted} />
+            </TouchableOpacity>
+          </View>
+          <View style={[styles.gifSearchRow, { backgroundColor: theme.card }]}>
+            <TextInput
+              style={[styles.gifSearchInput, { color: theme.text }]}
+              value={gifQuery}
+              onChangeText={q => { setGifQuery(q); }}
+              onSubmitEditing={() => fetchGifs(gifQuery)}
+              placeholder="Rechercher un GIF..."
+              placeholderTextColor={theme.textMuted}
+              returnKeyType="search"
+            />
+          </View>
+          {gifLoading ? (
+            <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
+          ) : (
+            <FlatList
+              data={gifs}
+              numColumns={2}
+              keyExtractor={g => g.id}
+              contentContainerStyle={{ padding: 8, gap: 8 }}
+              columnWrapperStyle={{ gap: 8 }}
+              renderItem={({ item }) => (
+                <TouchableOpacity onPress={() => sendGif(item.url)} activeOpacity={0.8} style={styles.gifCell}>
+                  <Image source={{ uri: item.preview }} style={styles.gifImg} resizeMode="cover" />
+                </TouchableOpacity>
+              )}
+            />
+          )}
+        </View>
       </Modal>
 
       {isLoading ? (
@@ -460,6 +521,16 @@ export default function ConversationScreen({ route, navigation }: Props) {
         <TouchableOpacity style={styles.attachBtn} onPress={handleAttach} disabled={attachLoading} activeOpacity={0.7}>
           {attachLoading ? <ActivityIndicator size="small" color={COLORS.primary} /> : <IcImage size={22} color={theme.textMuted} />}
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.attachBtn, ephemeralMode && { backgroundColor: 'rgba(239,68,68,0.12)', borderRadius: 18 }]}
+          onPress={() => { ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true }); setEphemeralMode(m => !m); }}
+          activeOpacity={0.7}
+        >
+          <IcFlame size={22} color={ephemeralMode ? '#EF4444' : theme.textMuted} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.attachBtn} onPress={openGifPicker} activeOpacity={0.7}>
+          <Text style={{ fontSize: 12, fontWeight: '800', color: theme.textMuted }}>GIF</Text>
+        </TouchableOpacity>
         <TextInput
           ref={inputRef}
           style={[styles.input, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
@@ -505,15 +576,6 @@ const styles = StyleSheet.create({
   tickText: { fontSize: 10, fontWeight: '700' },
 
   mediaThumb: { width: 200, height: 200, borderRadius: 12, marginBottom: 6 },
-  sharedPostCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderRadius: 10, borderWidth: 1, overflow: 'hidden',
-    width: 220, marginBottom: 6,
-  },
-  sharedPostThumb: { width: 64, height: 64 },
-  sharedPostInfo: { flex: 1, paddingRight: 8, paddingVertical: 4 },
-  sharedPostCaption: { fontSize: FONT.size.xs, fontWeight: '600', lineHeight: 15 },
-  sharedPostUser: { fontSize: 10, marginTop: 2 },
 
   replyPreview: { borderLeftWidth: 3, paddingLeft: 8, paddingVertical: 4, marginBottom: 4, borderRadius: 4 },
   replyName: { fontSize: 11, fontWeight: '700', marginBottom: 1 },
@@ -541,10 +603,17 @@ const styles = StyleSheet.create({
   sendBtnDisabled: { opacity: 0.4 },
 
   rxBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
-  rxPicker: { flexDirection: 'row', borderRadius: 20, padding: 8, gap: 4, borderWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12 },
+  rxPicker: { flexDirection: 'row', borderRadius: 20, padding: 8, gap: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12 },
   rxBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   rxBtnEmoji: { fontSize: 24 },
 
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
   emptyText: { fontSize: FONT.size.sm },
+  gifModal: { flex: 1, marginTop: 100, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  gifHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1 },
+  gifTitle: { fontSize: 16, fontWeight: '700' },
+  gifSearchRow: { margin: 12, borderRadius: 12, paddingHorizontal: 14 },
+  gifSearchInput: { fontSize: 14, paddingVertical: 10 },
+  gifCell: { flex: 1, aspectRatio: 1, borderRadius: 10, overflow: 'hidden', backgroundColor: '#111' },
+  gifImg: { width: '100%', height: '100%' },
 });

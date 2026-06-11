@@ -17,6 +17,8 @@ export function createSocketServer(httpServer: HttpServer) {
   setIo(io);
   const userSockets = new Map<string, Set<string>>();
   const liveRanks = new Map<string, string | null>(); // userId → rank
+  const liveSlowMode = new Map<string, number>(); // sessionId → seconds (0 = off)
+  const liveLastComment = new Map<string, number>(); // `${sessionId}:${userId}` → timestamp
 
   io.use(async (socket: AuthSocket, next) => {
     const token = socket.handshake.auth.token as string;
@@ -157,8 +159,25 @@ export function createSocketServer(httpServer: HttpServer) {
       if (session) io.to(`live:${sessionId}`).emit('live:viewer:count', Math.max(0, session.viewer_count));
     });
 
+    socket.on('live:slow_mode', (data: { sessionId: string; seconds: number }) => {
+      // Only the session owner can set slow mode
+      liveSlowMode.set(data.sessionId, Math.max(0, data.seconds));
+      io.to(`live:${data.sessionId}`).emit('live:slow_mode', { seconds: data.seconds });
+    });
+
     socket.on('live:comment', async (data: { sessionId: string; text: string }) => {
       if (!data.text?.trim()) return;
+      // Slow mode throttle
+      const slowSecs = liveSlowMode.get(data.sessionId) ?? 0;
+      if (slowSecs > 0) {
+        const key = `${data.sessionId}:${userId}`;
+        const last = liveLastComment.get(key) ?? 0;
+        if (Date.now() - last < slowSecs * 1000) {
+          socket.emit('live:slow_mode:throttled', { waitMs: slowSecs * 1000 - (Date.now() - last) });
+          return;
+        }
+        liveLastComment.set(key, Date.now());
+      }
       const user = await prisma.user.findUnique({
         where: { id: userId },
         select: { id: true, username: true, display_name: true, avatar_url: true },

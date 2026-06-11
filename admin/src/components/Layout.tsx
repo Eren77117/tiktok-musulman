@@ -1,7 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Film, Flag, MessageSquare,
-  LogOut, Activity, ChevronRight, ListTodo,
+  LogOut, Activity, ChevronRight, ListTodo, BarChart2, Sliders,
 } from 'lucide-react';
 import { useAuth } from '../stores/auth';
 import { cn } from '@/lib/utils';
@@ -14,6 +14,8 @@ const nav = [
   { to: '/reports', label: 'Reports', icon: Flag },
   { to: '/tickets', label: 'Support', icon: MessageSquare },
   { to: '/roadmap', label: 'Roadmap', icon: ListTodo },
+  { to: '/analytics', label: 'Analytics', icon: BarChart2 },
+  { to: '/algo', label: 'Algo Tuning', icon: Sliders },
 ];
 
 export function Layout() {

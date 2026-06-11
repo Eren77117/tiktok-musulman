@@ -11,11 +11,17 @@ const createPostSchema = z.object({
   sound_id: z.string().uuid().optional(),
   category_ids: z.array(z.string().uuid()).optional(),
   is_public: z.boolean().default(true),
+  scheduled_at: z.string().datetime().optional(),
+  text_overlay: z.object({
+    text: z.string().max(200),
+    style: z.enum(['white', 'black', 'green', 'gold']).default('white'),
+    position: z.enum(['top', 'center', 'bottom']).default('bottom'),
+  }).optional(),
 });
 
 const POST_INCLUDE = {
   user: {
-    select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true },
+    select: { id: true, username: true, display_name: true, avatar_url: true, is_verified: true, is_creator: true },
   },
   sound: { select: { id: true, title: true, artist: true, url: true } },
   post_categories: { include: { category: { select: { id: true, name: true, slug: true } } } },
@@ -362,6 +368,7 @@ export async function postRoutes(app: FastifyInstance) {
 
     const where: Record<string, unknown> = {
       video_url: { not: '' }, status: 'ACTIVE', is_public: true,
+      OR: [{ scheduled_at: null }, { scheduled_at: { lte: new Date() } }],
       NOT: { not_interested: { some: { user_id: userId } } },
     };
 
@@ -423,10 +430,30 @@ export async function postRoutes(app: FastifyInstance) {
     const { watch_time = 0, completed = false } = req.body as { watch_time?: number; completed?: boolean };
     const userId = req.currentUser!.id;
 
-    await prisma.post.update({
+    const updatedPost = await prisma.post.update({
       where: { id },
       data: { view_count: { increment: 1 } },
-    }).catch(() => {});
+      select: { view_count: true, user_id: true, caption: true },
+    }).catch(() => null);
+
+    // Notify creator when post hits trending thresholds (first time only)
+    if (updatedPost) {
+      const THRESHOLDS = [100, 1000, 10000, 100000];
+      for (const threshold of THRESHOLDS) {
+        if (updatedPost.view_count === threshold && updatedPost.user_id !== userId) {
+          prisma.notification.create({
+            data: {
+              user_id: updatedPost.user_id,
+              type: 'TRENDING',
+              title: `Ta vidéo est en tendance !`,
+              body: `${threshold >= 1000 ? `${threshold / 1000}k` : threshold} vues sur "${(updatedPost.caption ?? '').slice(0, 40)}"`,
+              data: { post_id: id, threshold },
+            },
+          }).catch(() => {});
+          break;
+        }
+      }
+    }
 
     // Store watch time for personalization algo
     if (watch_time > 0) {
@@ -617,8 +644,14 @@ export async function postRoutes(app: FastifyInstance) {
     const { userId } = req.params as { userId: string };
     const { cursor, limit = '12' } = req.query as { cursor?: string; limit?: string };
 
+    const requesterId = req.currentUser!.id;
+    const isOwner = requesterId === userId;
     const posts = await prisma.post.findMany({
-      where: { user_id: userId, video_url: { not: '' } },
+      where: {
+        user_id: userId, video_url: { not: '' }, status: 'ACTIVE',
+        OR: [{ scheduled_at: null }, { scheduled_at: { lte: new Date() } }],
+        ...(isOwner ? {} : { is_public: true }),
+      },
       take: parseInt(limit) + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       orderBy: { created_at: 'desc' },
@@ -704,5 +737,25 @@ export async function postRoutes(app: FastifyInstance) {
       return { ...other, conversation_id: r.conversation?.id ?? null };
     });
     return reply.send({ items: contacts });
+  });
+
+  // ── Scheduled posts ──────────────────────────────────────────────────────────
+  app.get('/scheduled', { preHandler: authenticate }, async (req, reply) => {
+    const userId = req.currentUser!.id;
+    const posts = await prisma.post.findMany({
+      where: { user_id: userId, scheduled_at: { gt: new Date() } },
+      orderBy: { scheduled_at: 'asc' },
+      include: { ...POST_INCLUDE },
+    });
+    return reply.send({ items: posts });
+  });
+
+  app.delete('/scheduled/:id', { preHandler: authenticate }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const post = await prisma.post.findUnique({ where: { id } });
+    if (!post || post.user_id !== req.currentUser!.id) return reply.status(403).send({ error: 'Forbidden' });
+    if (!post.scheduled_at || post.scheduled_at <= new Date()) return reply.status(400).send({ error: 'Not scheduled' });
+    await prisma.post.delete({ where: { id } });
+    return reply.send({ ok: true });
   });
 }

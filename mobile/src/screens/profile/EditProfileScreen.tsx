@@ -78,7 +78,7 @@ export function EditProfileScreen({ onClose }: Props) {
 
   const pickAvatar = async (src: 'camera' | 'library') => {
     const fn = src === 'camera' ? launchCamera : launchImageLibrary;
-    const result = await fn({ mediaType: 'photo', quality: 0.9, maxWidth: 500, maxHeight: 500 });
+    const result = await fn({ mediaType: 'photo', quality: 0.7, maxWidth: 400, maxHeight: 400 });
     if (result.didCancel || !result.assets?.[0]?.uri) return;
 
     setAvatarLoading(true);

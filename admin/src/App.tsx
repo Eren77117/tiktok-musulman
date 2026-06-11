@@ -9,6 +9,8 @@ import Posts from './pages/Posts';
 import Reports from './pages/Reports';
 import Tickets from './pages/Tickets';
 import Roadmap from './pages/Roadmap';
+import AnalyticsPage from './pages/AnalyticsPage';
+import AlgoPage from './pages/AlgoPage';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -40,6 +42,8 @@ export default function App() {
           <Route path="reports" element={<Reports />} />
           <Route path="tickets" element={<Tickets />} />
           <Route path="roadmap" element={<Roadmap />} />
+          <Route path="analytics" element={<AnalyticsPage />} />
+          <Route path="algo" element={<AlgoPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -1,9 +1,10 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity, Image,
   ActivityIndicator, RefreshControl, ScrollView, ActionSheetIOS, Platform, Alert,
 } from 'react-native';
 import { ConversationSkeleton } from '../../components/ui/Skeleton';
+import { LazyImage } from '../../components/ui/LazyImage';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,6 +23,8 @@ interface Conversation {
   last_message: { content: string; created_at: string; sender_id: string; is_read: boolean } | null;
   updated_at: string;
   unread_count?: number;
+  is_pinned?: boolean;
+  is_archived?: boolean;
 }
 
 function formatTime(iso: string) {
@@ -36,7 +39,7 @@ function formatTime(iso: string) {
 function AvatarCircle({ user, size = 56 }: { user: { display_name: string; avatar_url: string | null }; size?: number }) {
   const theme = useTheme();
   if (user.avatar_url) {
-    return <Image source={{ uri: user.avatar_url }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
+    return <LazyImage uri={user.avatar_url} style={{ width: size, height: size }} borderRadius={size / 2} />;
   }
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: theme.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
@@ -54,30 +57,39 @@ export default function MessagesScreen() {
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
   const [archivedIds, setArchivedIds] = useState<Set<string>>(new Set());
 
+  const togglePin = useCallback(async (c: Conversation) => {
+    const isPinned = pinnedIds.has(c.id);
+    setPinnedIds(prev => { const s = new Set(prev); isPinned ? s.delete(c.id) : s.add(c.id); return s; });
+    api.patch(`/messages/conversations/${c.id}/pin`).catch(() => {
+      setPinnedIds(prev => { const s = new Set(prev); isPinned ? s.add(c.id) : s.delete(c.id); return s; });
+    });
+  }, [pinnedIds]);
+
+  const toggleArchive = useCallback(async (c: Conversation) => {
+    const isArchived = archivedIds.has(c.id);
+    setArchivedIds(prev => { const s = new Set(prev); isArchived ? s.delete(c.id) : s.add(c.id); return s; });
+    api.patch(`/messages/conversations/${c.id}/archive`).catch(() => {
+      setArchivedIds(prev => { const s = new Set(prev); isArchived ? s.add(c.id) : s.delete(c.id); return s; });
+    });
+  }, [archivedIds]);
+
   const handleLongPressConv = useCallback((c: Conversation) => {
     const isPinned = pinnedIds.has(c.id);
     const isArchived = archivedIds.has(c.id);
-    const options = [
-      'Annuler',
-      isPinned ? 'Désépingler' : 'Épingler',
-      isArchived ? 'Désarchiver' : 'Archiver',
-    ];
+    const options = ['Annuler', isPinned ? 'Désépingler' : 'Épingler', isArchived ? 'Désarchiver' : 'Archiver'];
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions({ options, cancelButtonIndex: 0 }, (idx) => {
-        if (idx === 1) {
-          setPinnedIds(prev => { const s = new Set(prev); isPinned ? s.delete(c.id) : s.add(c.id); return s; });
-        } else if (idx === 2) {
-          setArchivedIds(prev => { const s = new Set(prev); isArchived ? s.delete(c.id) : s.add(c.id); return s; });
-        }
+        if (idx === 1) togglePin(c);
+        else if (idx === 2) toggleArchive(c);
       });
     } else {
       Alert.alert(c.other_user.display_name, undefined, [
-        { text: isPinned ? 'Désépingler' : 'Épingler', onPress: () => setPinnedIds(prev => { const s = new Set(prev); isPinned ? s.delete(c.id) : s.add(c.id); return s; }) },
-        { text: isArchived ? 'Désarchiver' : 'Archiver', onPress: () => setArchivedIds(prev => { const s = new Set(prev); isArchived ? s.delete(c.id) : s.add(c.id); return s; }) },
+        { text: isPinned ? 'Désépingler' : 'Épingler', onPress: () => togglePin(c) },
+        { text: isArchived ? 'Désarchiver' : 'Archiver', onPress: () => toggleArchive(c) },
         { text: 'Annuler', style: 'cancel' },
       ]);
     }
-  }, [pinnedIds, archivedIds]);
+  }, [pinnedIds, archivedIds, togglePin, toggleArchive]);
 
   const { data: notifCount } = useQuery<{ count: number }>({
     queryKey: ['notif-count'],
@@ -93,6 +105,15 @@ export default function MessagesScreen() {
   });
 
   const allConvs = data ?? [];
+
+  // Sync pin/archive state from API on first load
+  useEffect(() => {
+    if (data && data.length > 0) {
+      setPinnedIds(new Set(data.filter(c => c.is_pinned).map(c => c.id)));
+      setArchivedIds(new Set(data.filter(c => c.is_archived).map(c => c.id)));
+    }
+  }, [data]);
+
   // Pinned first, archived hidden
   const conversations = [
     ...allConvs.filter(c => pinnedIds.has(c.id) && !archivedIds.has(c.id)),

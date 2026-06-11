@@ -83,6 +83,8 @@ export default function LiveViewerScreen({ route, navigation }: Props) {
   const [chatText, setChatText] = useState('');
   const [viewerCount, setViewerCount] = useState(0);
   const [chatEnabled, setChatEnabled] = useState(true);
+  const [slowModeSeconds, setSlowModeSeconds] = useState(0);
+  const [slowModeUntil, setSlowModeUntil] = useState(0);
   const [connected, setConnected] = useState(false);
   const [liveEnded, setLiveEnded] = useState(false);
   const [hearts, setHearts] = useState<FloatingHeart[]>([]);
@@ -139,6 +141,8 @@ export default function LiveViewerScreen({ route, navigation }: Props) {
         setMessages(prev => [...prev.slice(-200), msg]);
         setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
       });
+      socket.on('live:slow_mode', ({ seconds }: { seconds: number }) => setSlowModeSeconds(seconds));
+      socket.on('live:slow_mode:throttled', ({ waitMs }: { waitMs: number }) => setSlowModeUntil(Date.now() + waitMs));
 
       // WebRTC: receive offer from broadcaster
       socket.on('webrtc:offer', async ({ sdp }: any) => {
@@ -200,7 +204,9 @@ export default function LiveViewerScreen({ route, navigation }: Props) {
 
   const sendMessage = () => {
     if (!chatText.trim() || !socketRef.current) return;
+    if (slowModeUntil > Date.now()) return; // throttled — button shows countdown
     socketRef.current.emit('live:comment', { sessionId, text: chatText.trim() });
+    if (slowModeSeconds > 0) setSlowModeUntil(Date.now() + slowModeSeconds * 1000);
     setChatText('');
   };
 
@@ -297,14 +303,20 @@ export default function LiveViewerScreen({ route, navigation }: Props) {
       {/* Chat input */}
       {chatEnabled && (
         <View style={[styles.chatInputRow, { bottom: insets.bottom + 14 }]}>
+          {slowModeSeconds > 0 && slowModeUntil > Date.now() && (
+            <View style={styles.slowModeBadge}>
+              <Text style={styles.slowModeText}>Mode lent actif</Text>
+            </View>
+          )}
           <TextInput
-            style={styles.chatInput}
+            style={[styles.chatInput, slowModeUntil > Date.now() && { opacity: 0.5 }]}
             value={chatText}
             onChangeText={setChatText}
-            placeholder="Écrire un message..."
+            placeholder={slowModeUntil > Date.now() ? `Mode lent...` : 'Écrire un message...'}
             placeholderTextColor="rgba(255,255,255,0.5)"
             onSubmitEditing={sendMessage}
             returnKeyType="send"
+            editable={slowModeUntil <= Date.now()}
           />
           <TouchableOpacity style={styles.sendBtn} onPress={sendMessage}>
             <IcSend size={16} color={COLORS.white} />
@@ -348,4 +360,6 @@ const styles = StyleSheet.create({
   endedText: { fontSize: FONT.size.xl, fontWeight: '700', color: COLORS.white },
   backBtn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.full, paddingHorizontal: 30, paddingVertical: 12 },
   backBtnText: { color: COLORS.white, fontWeight: '700' },
+  slowModeBadge: { position: 'absolute', top: -28, left: 0, right: 0, backgroundColor: 'rgba(245,158,11,0.85)', borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10, alignItems: 'center' },
+  slowModeText: { fontSize: 11, fontWeight: '600', color: '#fff' },
 });

@@ -12,6 +12,7 @@ export interface User {
   gender: 'MALE' | 'FEMALE';
   role: string;
   is_verified: boolean;
+  is_creator: boolean;
   follower_count: number;
   following_count: number;
   post_count: number;

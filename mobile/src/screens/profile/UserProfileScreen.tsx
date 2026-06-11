@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createThumbnail } from 'react-native-create-thumbnail';
+import { LazyImage } from '../../components/ui/LazyImage';
 import {
   View, Text, StyleSheet, Image, TouchableOpacity, Modal, Pressable,
   FlatList, ActivityIndicator, Alert, Dimensions, ActionSheetIOS, Platform,
@@ -13,7 +14,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { useTheme } from '../../hooks/useTheme';
 import { api } from '../../api/client';
 import { COLORS, FONT, SPACING, RADIUS, SHADOW } from '../../constants/theme';
-import { IcBack, IcFollow, IcFollowing, IcMail, IcHeart, IcPlay, IcCheck, IcMore, IcShare, IcRepeat } from '../../components/ui/Icons';
+import { IcBack, IcFollow, IcFollowing, IcMail, IcHeart, IcPlay, IcCheck, IcMore, IcShare, IcRepeat, IcStar } from '../../components/ui/Icons';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { Skeleton } from '../../components/ui/Skeleton';
 
@@ -25,9 +26,9 @@ interface Profile {
   display_name: string;
   bio: string | null;
   bio_links: string[];
-  profile_category: string | null;
   avatar_url: string | null;
   is_verified: boolean;
+  is_creator?: boolean;
   is_following: boolean;
   follower_count: number;
   following_count: number;
@@ -101,6 +102,13 @@ export default function UserProfileScreen({ route, navigation }: Props) {
     staleTime: 30_000,
   });
   const hasStory = (userStories ?? []).length > 0;
+
+  const { data: similarData } = useQuery<{ items: Array<{ id: string; username: string; display_name: string; avatar_url: string | null; follower_count: number }> }>({
+    queryKey: ['similar-accounts', profile?.id],
+    queryFn: () => api.get(`/users/${profile!.id}/similar`).then(r => r.data).catch(() => ({ items: [] })),
+    enabled: !!profile?.id,
+    staleTime: 5 * 60_000,
+  });
 
   const followMutation = useMutation({
     mutationFn: () => api.post(`/users/${profile?.id}/follow`),
@@ -329,9 +337,17 @@ export default function UserProfileScreen({ route, navigation }: Props) {
               )}
             </TouchableOpacity>
 
-            <Text style={[styles.displayName, { color: theme.text }]}>{profile.display_name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={[styles.displayName, { color: theme.text }]}>{profile.display_name}</Text>
+              {profile.is_creator && (
+                <View style={[styles.creatorBadge]}>
+                  <IcStar size={9} color="#fff" fill="#fff" />
+                  <Text style={styles.creatorBadgeText}>Créateur</Text>
+                </View>
+              )}
+            </View>
             {profile.profile_category ? (
-              <View style={[styles.categoryBadge, { backgroundColor: `${COLORS.primary}18` }]}>
+              <View style={[styles.categoryBadge, { backgroundColor: COLORS.primaryBg }]}>
                 <Text style={[styles.categoryText, { color: COLORS.primary }]}>{profile.profile_category}</Text>
               </View>
             ) : null}
@@ -445,6 +461,32 @@ export default function UserProfileScreen({ route, navigation }: Props) {
               <Text style={[styles.emptyText, { color: theme.textMuted }]}>Aucune publication</Text>
             </View>
           )
+        }
+        ListFooterComponent={
+          (similarData?.items?.length ?? 0) > 0 ? (
+            <View style={[simStyles.section, { backgroundColor: theme.surface, borderTopColor: theme.borderLight }]}>
+              <Text style={[simStyles.title, { color: theme.text }]}>Comptes similaires</Text>
+              <View style={simStyles.list}>
+                {similarData!.items.slice(0, 5).map(u => (
+                  <TouchableOpacity
+                    key={u.id}
+                    style={simStyles.row}
+                    onPress={() => navigation.push('UserProfile', { userId: u.id, username: u.username })}
+                    activeOpacity={0.75}
+                  >
+                    {u.avatar_url
+                      ? <Image source={{ uri: u.avatar_url }} style={simStyles.avatar} />
+                      : <View style={[simStyles.avatar, simStyles.avatarFallback]}><Text style={simStyles.avatarInitial}>{u.display_name[0]?.toUpperCase()}</Text></View>
+                    }
+                    <View style={{ flex: 1 }}>
+                      <Text style={[simStyles.name, { color: theme.text }]} numberOfLines={1}>{u.display_name}</Text>
+                      <Text style={[simStyles.handle, { color: theme.textMuted }]} numberOfLines={1}>@{u.username} · {u.follower_count >= 1000 ? `${(u.follower_count / 1000).toFixed(1)}k` : u.follower_count} abonnés</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          ) : null
         }
       />
 
@@ -576,7 +618,7 @@ function LazyVideoCell({ post: p, theme, onPress, onLongPress, showRepostBadge }
   return (
     <TouchableOpacity style={[styles.cell, { backgroundColor: theme.surface }]} onPress={onPress} onLongPress={onLongPress} delayLongPress={350} activeOpacity={0.85}>
       {thumb ? (
-        <Image source={{ uri: thumb }} style={styles.cellImg} resizeMode="cover" />
+        <LazyImage uri={thumb} style={styles.cellImg as any} borderRadius={0} />
       ) : loading ? (
         <View style={[styles.cellImg, styles.cellFallback, { backgroundColor: theme.card }]}>
           <ActivityIndicator size="small" color={COLORS.primary} />
@@ -675,8 +717,10 @@ const styles = StyleSheet.create({
   liveText: { fontSize: 9, fontWeight: FONT.weight.bold, color: COLORS.white, letterSpacing: 0.3 },
 
   displayName: { fontSize: FONT.size.xxl, fontWeight: FONT.weight.bold, letterSpacing: -0.3 },
-  categoryBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3, marginTop: 4, alignSelf: 'center' },
-  categoryText: { fontSize: FONT.size.xs, fontWeight: '700', letterSpacing: 0.3 },
+  creatorBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: RADIUS.full, paddingHorizontal: 7, paddingVertical: 2, backgroundColor: '#F59E0B' } as any,
+  creatorBadgeText: { fontSize: 10, fontWeight: '700', color: '#fff' },
+  categoryBadge: { borderRadius: RADIUS.full, paddingHorizontal: 12, paddingVertical: 3, marginTop: 4 },
+  categoryText: { fontSize: FONT.size.xs, fontWeight: FONT.weight.semibold },
   bio: { fontSize: FONT.size.sm, textAlign: 'center', lineHeight: 20 },
   bioLinksRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 6 },
   bioLinkPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,176,90,0.12)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
@@ -813,4 +857,16 @@ const previewStyles = StyleSheet.create({
     paddingVertical: 12, alignItems: 'center',
   },
   viewBtnText: { color: COLORS.white, fontWeight: '700', fontSize: 15 },
+});
+
+const simStyles = StyleSheet.create({
+  section: { borderTopWidth: 0.5, paddingVertical: 16, paddingHorizontal: SPACING.md, marginTop: 8 },
+  title: { fontSize: FONT.size.base, fontWeight: FONT.weight.bold, marginBottom: 12 },
+  list: { gap: 12 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  avatar: { width: 44, height: 44, borderRadius: 22 },
+  avatarFallback: { backgroundColor: COLORS.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  avatarInitial: { color: COLORS.white, fontWeight: '700', fontSize: 16 },
+  name: { fontSize: FONT.size.sm, fontWeight: FONT.weight.semibold },
+  handle: { fontSize: FONT.size.xs, marginTop: 1 },
 });

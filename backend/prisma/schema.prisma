@@ -39,6 +39,7 @@ enum NotificationType {
   LIVE_START
   MESSAGE_REQUEST
   MESSAGE_REQUEST_ACCEPTED
+  TRENDING
   SYSTEM
 }
 
@@ -69,6 +70,7 @@ model User {
   gender            Gender
   role              Role     @default(USER)
   is_verified       Boolean  @default(false)
+  is_creator        Boolean  @default(false)
   is_banned         Boolean  @default(false)
   ban_reason        String?
   follower_count    Int      @default(0)
@@ -111,7 +113,6 @@ model User {
   collections        Collection[]
   series             Series[]
   live_watch_history LiveWatchHistory[]
-  hashtag_follows    HashtagFollow[]
 
   @@index([username])
   @@index([email])
@@ -136,8 +137,10 @@ model Post {
   user_id       String
   video_url     String
   thumbnail_url String?
-  caption       String?
-  duration      Float
+  caption        String?
+  text_overlay   Json?
+  scheduled_at   DateTime?
+  duration       Float
   view_count    Int        @default(0)
   like_count    Int        @default(0)
   comment_count Int        @default(0)
@@ -164,7 +167,6 @@ model Post {
   linked_stories Story[]         @relation("StoryLinkedPost")
   collection_posts CollectionPost[]
   series_episode   SeriesEpisode?
-  shared_in_messages Message[] @relation("SharedPost")
 
   @@index([user_id])
   @@index([created_at])
@@ -409,6 +411,8 @@ model ConversationRequest {
 model Conversation {
   id          String   @id @default(uuid())
   request_id  String   @unique
+  is_pinned   Boolean  @default(false)
+  is_archived Boolean  @default(false)
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
 
@@ -422,14 +426,12 @@ model Message {
   sender_id       String
   content         String
   media_url       String?
-  shared_post_id  String?
   is_read         Boolean  @default(false)
-  metadata        Json?
+  is_ephemeral    Boolean  @default(false)
   created_at      DateTime @default(now())
 
   conversation Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
   sender       User         @relation("sender", fields: [sender_id], references: [id], onDelete: Cascade)
-  shared_post  Post?        @relation("SharedPost", fields: [shared_post_id], references: [id], onDelete: SetNull)
 
   @@index([conversation_id, created_at])
   @@index([sender_id])
@@ -711,15 +713,4 @@ model LiveBan {
 
   @@unique([session_id, user_id])
   @@index([session_id])
-}
-
-model HashtagFollow {
-  user_id    String
-  tag        String
-  created_at DateTime @default(now())
-
-  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@id([user_id, tag])
-  @@index([tag])
 }

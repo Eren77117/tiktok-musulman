@@ -179,7 +179,7 @@ export default function ExploreScreen() {
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.historyChips}>
             {searchHistory.map((h, i) => (
-              <TouchableOpacity key={i} style={[styles.historyChip, { backgroundColor: theme.card, borderColor: theme.border }]} onPress={() => applyHistory(h)} activeOpacity={0.8}>
+              <TouchableOpacity key={i} style={[styles.historyChip, { backgroundColor: theme.card }]} onPress={() => applyHistory(h)} activeOpacity={0.8}>
                 <IcClock size={12} color={theme.textMuted} />
                 <Text style={[styles.historyChipText, { color: theme.text }]}>{h}</Text>
               </TouchableOpacity>
@@ -209,7 +209,7 @@ export default function ExploreScreen() {
               contentContainerStyle={[styles.listContent, { backgroundColor: theme.bg }]}
               renderItem={({ item: u }) => (
                 <TouchableOpacity
-                  style={[styles.userRow, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}
+                  style={[styles.userRow, { backgroundColor: theme.card }]}
                   onPress={() => navigation.navigate('UserProfile', { userId: u.id, username: u.username })}
                   activeOpacity={0.7}
                 >
@@ -256,7 +256,7 @@ export default function ExploreScreen() {
                 {CATEGORIES.map((cat) => (
                   <TouchableOpacity
                     key={cat.id}
-                    style={[styles.catChip, { backgroundColor: theme.card, borderColor: theme.border }, activeCategory === cat.id && styles.catChipActive]}
+                    style={[styles.catChip, { backgroundColor: theme.card }, activeCategory === cat.id && styles.catChipActive]}
                     onPress={() => setActiveCategory(cat.id)}
                     activeOpacity={0.8}
                   >
@@ -273,7 +273,7 @@ export default function ExploreScreen() {
                     {trendingMeta!.hashtags.slice(0, 12).map((h) => (
                       <TouchableOpacity
                         key={h.tag}
-                        style={[styles.hashChip, { backgroundColor: theme.card, borderColor: theme.border }]}
+                        style={[styles.hashChip, { backgroundColor: theme.card }]}
                         onPress={() => navigation.navigate('Hashtag', { tag: h.tag })}
                         activeOpacity={0.8}
                       >
@@ -359,7 +359,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: COLORS.inputBg, borderRadius: RADIUS.full,
     paddingHorizontal: SPACING.md, paddingVertical: 10,
-    borderWidth: 1, borderColor: COLORS.border,
   },
   searchInput: { flex: 1, fontSize: FONT.size.base },
 
@@ -375,8 +374,7 @@ const styles = StyleSheet.create({
   listContent: { padding: SPACING.sm, gap: 8 },
   userRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: COLORS.white, borderRadius: RADIUS.md,
-    padding: SPACING.sm, borderWidth: 1, borderColor: COLORS.borderLight,
+    borderRadius: RADIUS.md, padding: SPACING.sm,
   },
   userAvatar: { width: 48, height: 48, borderRadius: 24 },
   userAvatarFallback: { backgroundColor: COLORS.primaryBg, alignItems: 'center', justifyContent: 'center' },
@@ -389,9 +387,8 @@ const styles = StyleSheet.create({
   catsRow: { padding: SPACING.sm, paddingHorizontal: SPACING.md, gap: 8, backgroundColor: COLORS.white },
   catChip: {
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: RADIUS.full,
-    backgroundColor: COLORS.bg, borderWidth: 1.5, borderColor: COLORS.border,
   },
-  catChipActive: { backgroundColor: COLORS.primaryBg, borderColor: COLORS.primary },
+  catChipActive: { backgroundColor: COLORS.primaryBg },
   catLabel: { fontSize: FONT.size.sm, fontWeight: FONT.weight.medium, color: COLORS.textMuted },
   catLabelActive: { color: COLORS.primary, fontWeight: FONT.weight.semibold },
 
@@ -416,14 +413,14 @@ const styles = StyleSheet.create({
   historyChips: { paddingHorizontal: SPACING.md, gap: 8 },
   historyChip: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    borderRadius: RADIUS.full, borderWidth: 1,
+    borderRadius: RADIUS.full,
     paddingHorizontal: 12, paddingVertical: 6,
   },
   historyChipText: { fontSize: FONT.size.sm },
 
   hashChip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    borderWidth: 1, borderRadius: RADIUS.full,
+    borderRadius: RADIUS.full,
     paddingHorizontal: 12, paddingVertical: 6,
   },
   hashChipText: { fontSize: FONT.size.sm, fontWeight: FONT.weight.medium },

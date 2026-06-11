@@ -8,10 +8,8 @@ const requestSchema = z.object({ recipient_id: z.string().uuid() });
 const messageSchema = z.object({
   content: z.string().max(2000).default(''),
   media_url: z.string().url().optional(),
-  shared_post_id: z.string().uuid().optional(),
-}).refine(d => d.content.trim().length > 0 || !!d.media_url || !!d.shared_post_id, {
-  message: 'content, media_url, or shared_post_id required',
-});
+  is_ephemeral: z.boolean().optional(),
+}).refine(d => d.content.trim().length > 0 || !!d.media_url, { message: 'content or media_url required' });
 
 export async function messageRoutes(app: FastifyInstance) {
   // ── Direct conversation (same gender = no restriction) ──────────────────────
@@ -172,12 +170,17 @@ export async function messageRoutes(app: FastifyInstance) {
       orderBy: { updated_at: 'desc' },
     });
 
-    const result = conversations.map((c) => ({
-      id: c.id,
-      other_user: c.request.requester_id === userId ? c.request.recipient : c.request.requester,
-      last_message: c.messages[0] ?? null,
-      updated_at: c.updated_at,
-    }));
+    const result = conversations
+      .filter(c => !c.is_archived)
+      .map((c) => ({
+        id: c.id,
+        other_user: c.request.requester_id === userId ? c.request.recipient : c.request.requester,
+        last_message: c.messages[0] ?? null,
+        updated_at: c.updated_at,
+        is_pinned: c.is_pinned,
+        is_archived: c.is_archived,
+      }))
+      .sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0));
 
     return reply.send(result);
   });
@@ -205,12 +208,6 @@ export async function messageRoutes(app: FastifyInstance) {
       orderBy: { created_at: 'desc' },
       include: {
         sender: { select: { id: true, username: true, display_name: true, avatar_url: true } },
-        shared_post: {
-          select: {
-            id: true, thumbnail_url: true, caption: true,
-            user: { select: { id: true, username: true, display_name: true } },
-          },
-        },
       },
     });
 
@@ -223,6 +220,10 @@ export async function messageRoutes(app: FastifyInstance) {
     });
     if (unread.count > 0) {
       getIo()?.to(`conversation:${id}`).emit('message:read', { conversationId: id, readBy: userId });
+      // Delete ephemeral messages that were just read
+      prisma.message.deleteMany({
+        where: { conversation_id: id, sender_id: { not: userId }, is_ephemeral: true, is_read: true },
+      }).catch(() => {});
     }
 
     return reply.send({ items, next_cursor: hasMore ? items[items.length - 1].id : null });
@@ -250,12 +251,6 @@ export async function messageRoutes(app: FastifyInstance) {
         data: { conversation_id: id, sender_id: userId, ...parsed.data },
         include: {
           sender: { select: { id: true, username: true, display_name: true, avatar_url: true } },
-          shared_post: {
-            select: {
-              id: true, thumbnail_url: true, caption: true,
-              user: { select: { id: true, username: true, display_name: true } },
-            },
-          },
         },
       });
       await tx.conversation.update({ where: { id }, data: { updated_at: new Date() } });
@@ -299,6 +294,30 @@ export async function messageRoutes(app: FastifyInstance) {
     if (message.sender_id !== userId) return reply.status(403).send({ error: 'Forbidden' });
     await prisma.message.update({ where: { id: msgId }, data: { content: '[DELETED]' } });
     return reply.send({ ok: true });
+  });
+
+  // ── Pin / unpin conversation ────────────────────────────────────────────────
+  app.patch('/conversations/:id/pin', { preHandler: authenticate }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const userId = req.currentUser!.id;
+    const conv = await prisma.conversation.findUnique({ where: { id }, include: { request: { select: { requester_id: true, recipient_id: true } } } });
+    if (!conv) return reply.status(404).send({ error: 'Not found' });
+    const isParticipant = conv.request.requester_id === userId || conv.request.recipient_id === userId;
+    if (!isParticipant) return reply.status(403).send({ error: 'Forbidden' });
+    const updated = await prisma.conversation.update({ where: { id }, data: { is_pinned: !conv.is_pinned } });
+    return reply.send({ is_pinned: updated.is_pinned });
+  });
+
+  // ── Archive / unarchive conversation ────────────────────────────────────────
+  app.patch('/conversations/:id/archive', { preHandler: authenticate }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const userId = req.currentUser!.id;
+    const conv = await prisma.conversation.findUnique({ where: { id }, include: { request: { select: { requester_id: true, recipient_id: true } } } });
+    if (!conv) return reply.status(404).send({ error: 'Not found' });
+    const isParticipant = conv.request.requester_id === userId || conv.request.recipient_id === userId;
+    if (!isParticipant) return reply.status(403).send({ error: 'Forbidden' });
+    const updated = await prisma.conversation.update({ where: { id }, data: { is_archived: !conv.is_archived } });
+    return reply.send({ is_archived: updated.is_archived });
   });
 
   app.get('/requests/pending', { preHandler: authenticate }, async (req, reply) => {

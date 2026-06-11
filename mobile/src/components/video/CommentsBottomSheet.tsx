@@ -12,7 +12,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { useTheme } from '../../hooks/useTheme';
 import { COLORS, FONT, SPACING, RADIUS, API_BASE_URL } from '../../constants/theme';
 import { IcClose, IcSend, IcHeartFill, IcHeart, IcComment, IcMore, IcFilterSort, IcAt, IcPin } from '../ui/Icons';
-import { NotifSkeleton } from '../ui/Skeleton';
+import { NotifSkeleton, Skeleton } from '../ui/Skeleton';
 
 interface MentionUser {
   id: string; username: string; display_name: string; avatar_url: string | null;
@@ -412,7 +412,7 @@ function CommentRow({
         {showReplies && (
           <View style={styles.repliesWrap}>
             {repliesLoading
-              ? <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: 6 }} />
+              ? <View style={{ gap: 8 }}>{[0,1].map(i => <View key={i} style={{ flexDirection:'row', gap:8, paddingLeft:4 }}><Skeleton width={28} height={28} borderRadius={14}/><View style={{flex:1, gap:4}}><Skeleton width="40%" height={10} borderRadius={5}/><Skeleton width="80%" height={10} borderRadius={5}/></View></View>)}</View>
               : repliesData?.items.map(r => (
                   <View key={r.id} style={styles.replyItem}>
                     {r.user.avatar_url

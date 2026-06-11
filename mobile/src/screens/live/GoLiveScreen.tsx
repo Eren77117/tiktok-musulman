@@ -16,7 +16,7 @@ import { API_BASE_URL } from '../../constants/theme';
 import { useAuthStore } from '../../stores/authStore';
 import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, SPACING, RADIUS } from '../../constants/theme';
-import { IcClose, IcUsers, IcMail, IcRefresh } from '../../components/ui/Icons';
+import { IcClose, IcUsers, IcMail, IcRefresh, IcClock } from '../../components/ui/Icons';
 
 const { width: W, height: H } = Dimensions.get('window');
 const SOCKET_URL = API_BASE_URL.replace('/api', '');
@@ -44,6 +44,7 @@ export default function GoLiveScreen({ navigation }: Props) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [chatText, setChatText] = useState('');
   const [chatEnabled, setChatEnabled] = useState(true);
+  const [slowMode, setSlowMode] = useState(0); // 0 = off, 30 = 30s
   const [loading, setLoading] = useState(false);
   const [cameraFront, setCameraFront] = useState(true);
   const [liveSeconds, setLiveSeconds] = useState(0);
@@ -204,6 +205,14 @@ export default function GoLiveScreen({ navigation }: Props) {
     socketRef.current?.emit('live:comment', { sessionId: sessionRef.current, text: `Chat ${newState ? 'activé' : 'désactivé'}` });
   };
 
+  const toggleSlowMode = () => {
+    if (!sessionRef.current) return;
+    const newSecs = slowMode === 0 ? 30 : 0;
+    setSlowMode(newSecs);
+    socketRef.current?.emit('live:slow_mode', { sessionId: sessionRef.current, seconds: newSecs });
+    socketRef.current?.emit('live:comment', { sessionId: sessionRef.current, text: newSecs > 0 ? `Mode lent activé (${newSecs}s)` : 'Mode lent désactivé' });
+  };
+
   const CATEGORIES = ['general', 'rappel', 'coran', 'motivation', 'question'];
 
   if (step === 'setup') {
@@ -267,9 +276,17 @@ export default function GoLiveScreen({ navigation }: Props) {
 
       {/* Live badge + viewers */}
       <View style={[styles.liveHeader, { paddingTop: insets.top + 8 }]}>
-        <View style={styles.liveBadge}>
-          <View style={styles.liveDot} />
-          <Text style={styles.liveBadgeText}>LIVE</Text>
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+          <View style={styles.liveBadge}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveBadgeText}>LIVE</Text>
+          </View>
+          {slowMode > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(245,158,11,0.8)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 }}>
+              <IcClock size={10} color="#fff" />
+              <Text style={{ fontSize: 10, fontWeight: '700', color: '#fff' }}>{slowMode}s</Text>
+            </View>
+          )}
         </View>
         <TouchableOpacity
           style={styles.viewerBadge}
@@ -334,6 +351,9 @@ export default function GoLiveScreen({ navigation }: Props) {
         </TouchableOpacity>
         <TouchableOpacity style={styles.ctrlBtn} onPress={toggleChat} activeOpacity={0.8}>
           <IcMail size={18} color={chatEnabled ? COLORS.primary : COLORS.white} />
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.ctrlBtn, slowMode > 0 && { backgroundColor: 'rgba(245,158,11,0.2)' }]} onPress={toggleSlowMode} activeOpacity={0.8}>
+          <IcClock size={18} color={slowMode > 0 ? '#F59E0B' : COLORS.white} />
         </TouchableOpacity>
       </View>
 
