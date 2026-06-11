@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import {
@@ -132,6 +132,20 @@ function useUnreadCount() {
 
 function TabItemAnimated({ route, isFocused, theme, showBadge, unread, onPress }: any) {
   const scale = useRef(new Animated.Value(1)).current;
+  const badgePulse = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!showBadge) { badgePulse.setValue(1); return; }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(badgePulse, { toValue: 1.35, duration: 600, useNativeDriver: true }),
+        Animated.timing(badgePulse, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.delay(1800),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [showBadge]);
 
   const handlePress = () => {
     ReactNativeHapticFeedback.trigger('impactLight', { enableVibrateFallback: true });
@@ -150,9 +164,9 @@ function TabItemAnimated({ route, isFocused, theme, showBadge, unread, onPress }
         )}
         <TabIcon name={route.name} focused={isFocused} theme={theme} />
         {showBadge && (
-          <View style={[styles.notifBadge, { borderColor: theme.tabBg }]}>
+          <Animated.View style={[styles.notifBadge, { borderColor: theme.tabBg, transform: [{ scale: badgePulse }] }]}>
             <Text style={styles.notifBadgeText}>{unread > 99 ? '99+' : String(unread)}</Text>
-          </View>
+          </Animated.View>
         )}
       </Animated.View>
       <Text style={[

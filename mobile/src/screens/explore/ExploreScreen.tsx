@@ -13,6 +13,7 @@ import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, SPACING, RADIUS } from '../../constants/theme';
 import { useTheme } from '../../hooks/useTheme';
 import { IcSearch, IcClose, IcHeart, IcPlay, IcClock, IcHash } from '../../components/ui/Icons';
+import { ExploreGridSkeleton } from '../../components/ui/Skeleton';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -200,7 +201,7 @@ export default function ExploreScreen() {
           </View>
 
           {searchLoading ? (
-            <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
+            <View style={{ marginTop: 4 }}><ExploreGridSkeleton /></View>
           ) : searchTab === 'users' ? (
             <FlatList
               data={searchData?.users ?? []}
@@ -316,7 +317,7 @@ export default function ExploreScreen() {
           renderItem={renderGridItem}
           ListEmptyComponent={
             trendingLoading ? (
-              <ActivityIndicator color={COLORS.primary} style={{ marginTop: 60 }} />
+              <ExploreGridSkeleton />
             ) : (
               <View style={[styles.emptyWrap, { backgroundColor: theme.bg }]}>
                 <Text style={[styles.emptyTitle, { color: theme.text }]}>Aucun contenu</Text>

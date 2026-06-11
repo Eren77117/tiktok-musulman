@@ -19,6 +19,7 @@ import {
   AtSign, Hash, Repeat2, ThumbsUp, Smile, Flag,
   Radio, PenLine, Maximize2, SlidersHorizontal, CornerUpLeft,
   Download, Link, Copy, Folder, FolderPlus, Pin, Archive,
+  QrCode,
 } from 'lucide-react-native';
 import { COLORS } from '../../constants/theme';
 
@@ -149,6 +150,7 @@ export const IcFolder      = mk(Folder);
 export const IcFolderPlus  = mk(FolderPlus);
 export const IcPin         = mk(Pin);
 export const IcArchive     = mk(Archive);
+export const IcQrCode      = mk(QrCode);
 
 // ── Brand icon (moon = symbole islamique propre) ──────────────────────────────
 export const IcBrand = ({ size = 32, color = COLORS.primary }: IconProps) =>

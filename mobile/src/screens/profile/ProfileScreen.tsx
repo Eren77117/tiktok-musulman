@@ -14,7 +14,8 @@ import { api, getTokens } from '../../api/client';
 import { RootStackParamList } from '../../navigation';
 import { COLORS, FONT, SPACING, RADIUS, SHADOW, API_BASE_URL } from '../../constants/theme';
 import { useTheme } from '../../hooks/useTheme';
-import { IcSettings, IcMenu, IcSave, IcCheck, IcHeart, IcGrid, IcEdit, IcCamera, IcChart, IcPlay, IcRepeat, IcBell, IcShare } from '../../components/ui/Icons';
+import { IcSettings, IcMenu, IcSave, IcCheck, IcHeart, IcGrid, IcEdit, IcCamera, IcChart, IcPlay, IcRepeat, IcBell, IcShare, IcQrCode } from '../../components/ui/Icons';
+import QRCode from 'react-native-qrcode-svg';
 import { LinearGradient } from 'react-native-linear-gradient';
 import { EditProfileSheet } from './EditProfileSheet';
 
@@ -78,6 +79,7 @@ export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState(0);
   const [likeSubTab, setLikeSubTab] = useState<LikeSubTab>('Pour toi');
   const [editVisible, setEditVisible] = useState(false);
+  const [showQR, setShowQR] = useState(false);
   const [avatarLoading, setAvatarLoading] = useState(false);
   const [coverLoading, setCoverLoading] = useState(false);
   const [coverError, setCoverError] = useState(false);
@@ -389,6 +391,13 @@ export default function ProfileScreen() {
             >
               <IcShare size={16} color={theme.text} />
             </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.editBtn, { borderColor: theme.border, paddingHorizontal: 14 }]}
+              onPress={() => setShowQR(true)}
+              activeOpacity={0.8}
+            >
+              <IcQrCode size={16} color={theme.text} />
+            </TouchableOpacity>
             {(!(user as any).cover_url || coverError) && (
               <TouchableOpacity style={[styles.editBtn, { borderColor: theme.border, paddingHorizontal: 12 }]} onPress={pickCover} activeOpacity={0.8} disabled={coverLoading}>
                 {coverLoading
@@ -532,9 +541,53 @@ export default function ProfileScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* QR Code modal */}
+      <Modal visible={showQR} transparent animationType="fade" onRequestClose={() => setShowQR(false)}>
+        <TouchableOpacity style={previewSt.backdrop} activeOpacity={1} onPress={() => setShowQR(false)}>
+          <View style={[qrSt.card, { backgroundColor: theme.surface }]}>
+            <Text style={[qrSt.title, { color: theme.text }]}>Mon profil Nour</Text>
+            <Text style={[qrSt.handle, { color: theme.textMuted }]}>@{user?.username}</Text>
+            <View style={[qrSt.qrWrap, { backgroundColor: '#fff' }]}>
+              <QRCode
+                value={`https://nour.app/@${user?.username}`}
+                size={200}
+                color="#000"
+                backgroundColor="#fff"
+              />
+            </View>
+            <TouchableOpacity
+              style={[qrSt.shareBtn, { backgroundColor: COLORS.primary }]}
+              onPress={() => {
+                setShowQR(false);
+                setTimeout(() => Share.share({ message: `Suis-moi sur Nour ! @${user?.username}`, url: `https://nour.app/@${user?.username}` }), 300);
+              }}
+              activeOpacity={0.8}
+            >
+              <IcShare size={16} color="#fff" />
+              <Text style={qrSt.shareBtnText}>Partager le QR</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
+
+const qrSt = StyleSheet.create({
+  card: {
+    borderRadius: 20, padding: 28, alignItems: 'center', gap: 12,
+    marginHorizontal: 32,
+  },
+  title: { fontSize: 18, fontWeight: '700' },
+  handle: { fontSize: 14 },
+  qrWrap: { padding: 16, borderRadius: 12, marginVertical: 4 },
+  shareBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 24, paddingVertical: 12, borderRadius: 100, marginTop: 4,
+  },
+  shareBtnText: { color: '#fff', fontWeight: '600', fontSize: 15 },
+});
 
 // In-memory thumbnail cache (persists for app session)
 const THUMB_CACHE = new Map<string, string>();
