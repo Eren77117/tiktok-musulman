@@ -11,7 +11,7 @@ import { api, getTokens } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
 import { useTheme } from '../../hooks/useTheme';
 import { COLORS, FONT, SPACING, RADIUS, API_BASE_URL } from '../../constants/theme';
-import { IcClose, IcSend, IcHeartFill, IcHeart, IcComment, IcMore, IcFilterSort, IcAt } from '../ui/Icons';
+import { IcClose, IcSend, IcHeartFill, IcHeart, IcComment, IcMore, IcFilterSort, IcAt, IcPin } from '../ui/Icons';
 
 interface MentionUser {
   id: string; username: string; display_name: string; avatar_url: string | null;
@@ -29,6 +29,7 @@ interface Comment {
   like_count: number;
   reply_count: number;
   is_liked?: boolean;
+  is_pinned?: boolean;
   created_at: string;
   user: { id: string; username: string; display_name: string; avatar_url: string | null };
 }
@@ -43,13 +44,15 @@ function fmtTime(iso: string) {
 
 interface Props {
   postId: string | null;
+  postOwnerId?: string;
   onClose: () => void;
 }
 
-export function CommentsBottomSheet({ postId, onClose }: Props) {
+export function CommentsBottomSheet({ postId, postOwnerId, onClose }: Props) {
   const theme = useTheme();
   const qc = useQueryClient();
   const { user } = useAuthStore();
+  const isCreator = !!postOwnerId && postOwnerId === user?.id;
   const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState<{ id: string; username: string } | null>(null);
   const [mentionQuery, setMentionQuery] = useState('');
@@ -214,9 +217,15 @@ export function CommentsBottomSheet({ postId, onClose }: Props) {
                   comment={c}
                   theme={theme}
                   currentUserId={user?.id}
+                  isCreator={isCreator}
                   onReply={(username?: string) => setReplyTo({ id: c.id, username: username ?? c.user.username })}
                   onDelete={() => {
                     api.delete(`/comments/${c.id}`).then(() => {
+                      qc.invalidateQueries({ queryKey: ['comments', postId] });
+                    }).catch(() => {});
+                  }}
+                  onPin={() => {
+                    api.patch(`/comments/${c.id}/pin`).then(() => {
                       qc.invalidateQueries({ queryKey: ['comments', postId] });
                     }).catch(() => {});
                   }}
@@ -309,10 +318,10 @@ export function CommentsBottomSheet({ postId, onClose }: Props) {
 }
 
 function CommentRow({
-  comment: c, theme, currentUserId, onReply, onDelete, postId,
+  comment: c, theme, currentUserId, isCreator, onReply, onDelete, onPin, postId,
 }: {
-  comment: Comment; theme: any; currentUserId?: string;
-  onReply: (username?: string) => void; onDelete: () => void; postId: string;
+  comment: Comment; theme: any; currentUserId?: string; isCreator?: boolean;
+  onReply: (username?: string) => void; onDelete: () => void; onPin: () => void; postId: string;
 }) {
   const [liked, setLiked] = useState(c.is_liked ?? false);
   const [count, setCount] = useState(c.like_count);
@@ -337,16 +346,21 @@ function CommentRow({
   };
 
   const handleMore = () => {
+    const pinLabel = c.is_pinned ? 'Désépingler' : 'Épingler';
     if (Platform.OS === 'ios') {
+      const options: string[] = ['Répondre'];
+      if (isCreator) options.push(pinLabel);
+      if (isOwn) options.push('Supprimer');
+      options.push('Annuler');
+      const cancelIdx = options.length - 1;
+      const destructIdx = isOwn ? options.indexOf('Supprimer') : undefined;
       ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: isOwn ? ['Répondre', 'Supprimer', 'Annuler'] : ['Répondre', 'Annuler'],
-          cancelButtonIndex: isOwn ? 2 : 1,
-          destructiveButtonIndex: isOwn ? 1 : undefined,
-        },
+        { options, cancelButtonIndex: cancelIdx, destructiveButtonIndex: destructIdx },
         (i) => {
-          if (i === 0) onReply();
-          if (isOwn && i === 1) {
+          const chosen = options[i];
+          if (chosen === 'Répondre') onReply();
+          else if (chosen === pinLabel) { ReactNativeHapticFeedback.trigger('impactMedium', { enableVibrateFallback: true }); onPin(); }
+          else if (chosen === 'Supprimer') {
             Alert.alert('Supprimer', 'Supprimer ce commentaire ?', [
               { text: 'Annuler', style: 'cancel' },
               { text: 'Supprimer', style: 'destructive', onPress: onDelete },
@@ -357,6 +371,7 @@ function CommentRow({
     } else {
       Alert.alert('Commentaire', '', [
         { text: 'Répondre', onPress: onReply },
+        ...(isCreator ? [{ text: pinLabel, onPress: onPin }] : []),
         ...(isOwn ? [{ text: 'Supprimer', style: 'destructive' as const, onPress: onDelete }] : []),
         { text: 'Annuler', style: 'cancel' },
       ]);
@@ -372,7 +387,10 @@ function CommentRow({
           </View>
       }
       <View style={styles.commentBody}>
-        <Text style={[styles.commentUser, { color: COLORS.primary }]}>@{c.user.username}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={[styles.commentUser, { color: COLORS.primary }]}>@{c.user.username}</Text>
+          {c.is_pinned && <IcPin size={11} color={COLORS.primary} />}
+        </View>
         <Text style={[styles.commentText, { color: theme.text }]}>{c.content}</Text>
         <View style={styles.commentMeta}>
           <Text style={[styles.commentTime, { color: theme.textSubtle }]}>{fmtTime(c.created_at)}</Text>

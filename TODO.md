@@ -71,7 +71,7 @@
 - [x] Répondre à un commentaire (parent_id + banner @username) ✅
 - [x] Liker un commentaire (API réelle + toggle) ✅
 - [x] Mentionner @utilisateur dans un commentaire (autocomplete @) ✅
-- [ ] Épingler un commentaire (créateur seulement)
+- [x] Épingler un commentaire (créateur seulement) ✅
 - [x] Supprimer son propre commentaire (ActionSheet + API) ✅
 - [x] Pagination des commentaires (load more) ✅
 - [ ] Afficher les commentaires en live dans le player (overlay)
@@ -79,9 +79,9 @@
 ### 👤 Profil
 - [x] Bannière/cover photo sur le profil (LinearGradient + pickCover) ✅
 - [x] Lien externe dans la bio (cliquable, Linking.openURL) ✅
-- [ ] Catégorie/niche du compte (Islam, Coran, Famille...)
+- [x] Catégorie/niche du compte (Islam, Coran, Famille...) ✅
 - [x] Statistiques avancées (CreatorStatsScreen: vues, likes, complétion, top posts) ✅
-- [ ] QR Code du profil (partager son compte)
+- [x] QR Code du profil (partager son compte) ✅
 - [x] Bouton "Partager le profil" (Share sheet natif) ✅
 - [ ] Mode créateur vs mode standard
 - [ ] Onglet "Reposts" sur le profil

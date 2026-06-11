@@ -54,6 +54,7 @@ export default function FeedScreen() {
   const [tab, setTab] = useState<FeedTab>('pourtoi');
   const [visibleId, setVisibleId] = useState<string | null>(null);
   const [commentsPostId, setCommentsPostId] = useState<string | null>(null);
+  const [commentsPostOwnerId, setCommentsPostOwnerId] = useState<string | undefined>(undefined);
   const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
   const hidePost = useCallback((id: string) => setHiddenPostIds(prev => new Set([...prev, id])), []);
   // Disable FlatList scroll while user drags progress bar (prevents accidental swipe to next video)
@@ -272,7 +273,7 @@ export default function FeedScreen() {
             <VideoPlayerItem
               post={item}
               isVisible={effectiveVisibleId === item.id}
-              onComment={() => setCommentsPostId(item.id)}
+              onComment={() => { setCommentsPostId(item.id); setCommentsPostOwnerId(item.user?.id); }}
               onNotInterested={() => hidePost(item.id)}
               onSeekingChange={s => setScrollEnabled(!s)}
               itemHeight={ITEM_H}
@@ -341,7 +342,7 @@ export default function FeedScreen() {
               <VideoPlayerItem
                 post={item.data}
                 isVisible={effectiveVisibleId === item.data.id}
-                onComment={() => setCommentsPostId(item.data.id)}
+                onComment={() => { setCommentsPostId(item.data.id); setCommentsPostOwnerId(item.data.user?.id); }}
                 onNotInterested={() => hidePost(item.data.id)}
                 onSeekingChange={s => setScrollEnabled(!s)}
                 itemHeight={ITEM_H}
@@ -373,7 +374,7 @@ export default function FeedScreen() {
 
 
       {/* Comments bottom sheet */}
-      <CommentsBottomSheet postId={commentsPostId} onClose={() => setCommentsPostId(null)} />
+      <CommentsBottomSheet postId={commentsPostId} postOwnerId={commentsPostOwnerId} onClose={() => { setCommentsPostId(null); setCommentsPostOwnerId(undefined); }} />
 
       {/* ── FILS — text threads ── */}
       {tab === 'fils' && (

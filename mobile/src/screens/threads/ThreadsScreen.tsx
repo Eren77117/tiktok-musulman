@@ -14,6 +14,7 @@ import { RootStackParamList } from '../../navigation';
 import { Avatar } from '../../components/ui/Avatar';
 import { COLORS, FONT, SPACING, RADIUS } from '../../constants/theme';
 import { IcHeart, IcHeartFill, IcComment, IcShare, IcClose, IcPlus, IcEdit } from '../../components/ui/Icons';
+import { ThreadSkeleton } from '../../components/ui/Skeleton';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -171,9 +172,16 @@ export default function ThreadsScreen() {
         </KeyboardAvoidingView>
       )}
 
+      {/* Skeleton loading */}
+      {isLoading && (
+        <View>
+          {[0, 1, 2, 3, 4].map(i => <ThreadSkeleton key={i} />)}
+        </View>
+      )}
+
       {/* Feed */}
       <FlatList
-        data={threads}
+        data={isLoading ? [] : threads}
         keyExtractor={(t) => t.id}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}

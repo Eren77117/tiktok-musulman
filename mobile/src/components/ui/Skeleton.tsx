@@ -87,6 +87,24 @@ export function NotifSkeleton() {
   );
 }
 
+// ── Thread skeleton ───────────────────────────────────────────────────────────
+export function ThreadSkeleton() {
+  return (
+    <View style={skStyles.threadRow}>
+      <Skeleton width={42} height={42} borderRadius={21} />
+      <View style={{ flex: 1, gap: 8 }}>
+        <Skeleton width="40%" height={13} borderRadius={6} />
+        <Skeleton width="90%" height={13} borderRadius={6} />
+        <Skeleton width="65%" height={13} borderRadius={6} />
+        <View style={{ flexDirection: 'row', gap: 16, marginTop: 4 }}>
+          <Skeleton width={36} height={11} borderRadius={5} />
+          <Skeleton width={36} height={11} borderRadius={5} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
 // ── Explore grid skeleton ─────────────────────────────────────────────────────
 export function ExploreGridSkeleton({ cols = 2 }: { cols?: number }) {
   const W = Dimensions.get('window').width;
@@ -113,5 +131,9 @@ const skStyles = StyleSheet.create({
   },
   notifRow: {
     flexDirection: 'row', padding: 16, gap: 12, alignItems: 'center',
+  },
+  threadRow: {
+    flexDirection: 'row', padding: 16, gap: 12, alignItems: 'flex-start',
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'transparent',
   },
 });
