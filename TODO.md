@@ -64,7 +64,7 @@
 - [x] Replay automatique après la fin (seek(0) + replayAnim) ✅
 - [x] Plein écran paysage si la vidéo est en 16:9 horizontal (presentFullscreenPlayer) ✅
 - [x] Pinch-to-zoom sur la vidéo (GestureDetector + Reanimated, x1→x3) ✅
-- [ ] Option désactiver l'autoplay (accessibilité)
+- [x] Option désactiver l'autoplay (accessibilité) ✅
 
 ### 💬 Commentaires
 - [x] Commentaires en temps réel (Socket.IO post:watch/comment:new) ✅

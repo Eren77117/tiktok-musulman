@@ -54,6 +54,7 @@ interface Props {
   onComment: () => void;
   onNotInterested?: () => void;
   onSeekingChange?: (seeking: boolean) => void;
+  defaultMuted?: boolean;
   /** Height allocated for this item (screen H minus tab bar) */
   itemHeight?: number;
 }
@@ -70,7 +71,7 @@ function fmtDuration(s: number) {
   return `${m}:${sec.toString().padStart(2, '0')}`;
 }
 
-export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, onSeekingChange, itemHeight }: Props) {
+export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, onSeekingChange, defaultMuted = false, itemHeight }: Props) {
   const ITEM_H = itemHeight ?? H;
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const videoRef = useRef<VideoRef>(null);
@@ -81,7 +82,7 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, o
   const [saved, setSaved] = useState(post.is_saved ?? false);
   const [collectionSheetVisible, setCollectionSheetVisible] = useState(false);
   const [following, setFollowing] = useState(post.user.is_following ?? false);
-  const [muted, setMuted] = useState(false);
+  const [muted, setMuted] = useState(defaultMuted);
   const [paused, setPaused] = useState(!isVisible);
   const [rate, setRate] = useState(1);
   const [buffering, setBuffering] = useState(true);

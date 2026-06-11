@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppNavigator } from './navigation';
 import { useAuthStore } from './stores/authStore';
 import { useThemeStore } from './stores/themeStore';
+import { useSettingsStore } from './stores/settingsStore';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SplashScreen } from './components/ui/SplashScreen';
 import { ToastProvider } from './components/ui/Toast';
@@ -79,6 +80,7 @@ async function bootPrefetch() {
 function AppRoot() {
   const { loadMe, user } = useAuthStore();
   const { loadTheme, syncSystem } = useThemeStore();
+  const { load: loadSettings } = useSettingsStore();
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
   const [booted, setBooted] = useState(false);
   const [splashDone, setSplashDone] = useState(false);
@@ -88,6 +90,7 @@ function AppRoot() {
     (async () => {
       await loadMe();
       await loadTheme();
+      await loadSettings();
       const v = await AsyncStorage.getItem(ONBOARDING_KEY);
       setOnboarded(!!v);
     })();

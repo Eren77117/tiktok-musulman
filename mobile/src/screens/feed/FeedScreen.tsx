@@ -21,6 +21,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { useTheme } from '../../hooks/useTheme';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { useVideoPreloader } from '../../hooks/useVideoPreloader';
+import { useSettingsStore } from '../../stores/settingsStore';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 const { height: H } = Dimensions.get('window');
@@ -59,14 +60,15 @@ export default function FeedScreen() {
   const hidePost = useCallback((id: string) => setHiddenPostIds(prev => new Set([...prev, id])), []);
   // Disable FlatList scroll while user drags progress bar (prevents accidental swipe to next video)
   const [scrollEnabled, setScrollEnabled] = useState(true);
+  const { autoplay, muteByDefault } = useSettingsStore();
 
   // Height = actual FlatList rendered height (measured via onLayout — avoids calculation bugs)
   const tabBarHeight = useBottomTabBarHeight();
   const [listHeight, setListHeight] = React.useState(H - tabBarHeight);
   const ITEM_H = listHeight > 100 ? listHeight : H - tabBarHeight;
 
-  // Pause all videos when leaving this screen
-  const effectiveVisibleId = isFocused && (tab === 'pourtoi' || tab === 'abonnes') ? visibleId : null;
+  // Pause all videos when leaving this screen, or when autoplay disabled
+  const effectiveVisibleId = isFocused && autoplay && (tab === 'pourtoi' || tab === 'abonnes') ? visibleId : null;
   const seenIds = useRef<string[]>([]);
   const pourToiRef = useRef<any>(null);
   const pourToiIndexRef = useRef(0);
@@ -276,6 +278,7 @@ export default function FeedScreen() {
               onComment={() => { setCommentsPostId(item.id); setCommentsPostOwnerId(item.user?.id); }}
               onNotInterested={() => hidePost(item.id)}
               onSeekingChange={s => setScrollEnabled(!s)}
+              defaultMuted={muteByDefault}
               itemHeight={ITEM_H}
             />
           )}

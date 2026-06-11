@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronRight } from 'lucide-react-native';
 import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore } from '../../stores/themeStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { CHANGELOG } from '../../constants/changelog';
 import { useTheme } from '../../hooks/useTheme';
 import { api } from '../../api/client';
@@ -91,6 +92,7 @@ export default function SettingsScreen({ navigation }: Props) {
   const { user, logout, updateUser } = useAuthStore();
   const { isDark, mode, setMode } = useThemeStore() as any;
   const theme = useTheme();
+  const { autoplay, muteByDefault, setSetting } = useSettingsStore();
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [loaded, setLoaded] = useState(false);
 
@@ -256,6 +258,16 @@ export default function SettingsScreen({ navigation }: Props) {
           <Row theme={theme} Icon={IcBell}    label="Afficher l'activité"     right={<Toggle value={settings.showActivity}    onChange={v => updateSetting('showActivity', v)} />} />
           <Row theme={theme} Icon={IcMail}    label="Autoriser les demandes de contact" right={<Toggle value={settings.allowDMRequests} onChange={v => updateSetting('allowDMRequests', v)} />} />
           <Row theme={theme} Icon={IcUsers}   label="Blocages"  value="Gérer" onPress={() => Alert.alert('Bientôt', 'Gestion des blocages dans la prochaine version.')} last />
+        </Section>
+
+        <Section title="LECTURE VIDÉO" theme={theme}>
+          <Row theme={theme} Icon={IcVideo} label="Lecture automatique"
+            right={<Switch value={autoplay} onValueChange={v => setSetting('autoplay', v)} trackColor={{ false: COLORS.border, true: COLORS.primary }} thumbColor={COLORS.white} ios_backgroundColor={COLORS.border} />}
+          />
+          <Row theme={theme} Icon={IcVideo} label="Son désactivé par défaut"
+            right={<Switch value={muteByDefault} onValueChange={v => setSetting('muteByDefault', v)} trackColor={{ false: COLORS.border, true: COLORS.primary }} thumbColor={COLORS.white} ios_backgroundColor={COLORS.border} />}
+            last
+          />
         </Section>
 
         <Section title="APPARENCE" theme={theme}>
