@@ -140,6 +140,38 @@ export default function IslamicScreen() {
         {/* ── PRIÈRES ── */}
         {tab === 'prayers' && (
           <View style={{ gap: 12 }}>
+            {/* Ramadan countdown card */}
+            {(() => {
+              // Ramadan 2026: Feb 18 – Mar 19 (approx)
+              const now = new Date();
+              const year = now.getFullYear();
+              const ramadanStart = new Date(year, 1, 18); // ~Feb 18
+              const ramadanEnd = new Date(year, 2, 19);   // ~Mar 19
+              const isRamadan = now >= ramadanStart && now <= ramadanEnd;
+              const daysUntil = Math.ceil((ramadanStart.getTime() - now.getTime()) / 86400000);
+              const daysLeft = Math.ceil((ramadanEnd.getTime() - now.getTime()) / 86400000);
+              if (now > ramadanEnd) return null; // over
+              if (isRamadan) {
+                return (
+                  <LinearGradient colors={['#7C3AED', '#4C1D95']} style={[styles.ayahCard, { paddingVertical: 16 }]}>
+                    <Text style={{ fontSize: 22 }}>🌙</Text>
+                    <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>Ramadan Moubarak</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13 }}>Encore {daysLeft} jour{daysLeft > 1 ? 's' : ''}</Text>
+                    {prayerData?.Maghrib && <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 4 }}>Iftar : {prayerData.Maghrib} · Suhoor : {prayerData?.Fajr}</Text>}
+                  </LinearGradient>
+                );
+              }
+              if (daysUntil > 0 && daysUntil <= 30) {
+                return (
+                  <View style={[styles.hadithCard, { backgroundColor: theme.card, alignItems: 'center', paddingVertical: 14 }]}>
+                    <Text style={{ fontSize: 20 }}>🌙</Text>
+                    <Text style={[{ fontWeight: '700', fontSize: 15, marginTop: 4 }, { color: theme.text }]}>Ramadan dans {daysUntil} jours</Text>
+                    <Text style={{ color: theme.textMuted, fontSize: 12, marginTop: 4 }}>Prépare-toi spirituellement</Text>
+                  </View>
+                );
+              }
+              return null;
+            })()}
             <LinearGradient colors={['#0A2918', '#0F3D22']} style={[styles.ayahCard, { gap: 6 }]}>
               <Text style={[styles.ayahRef, { color: 'rgba(255,255,255,0.7)', marginBottom: 4 }]}>Horaires · Paris, France</Text>
               {prayerData ? (
