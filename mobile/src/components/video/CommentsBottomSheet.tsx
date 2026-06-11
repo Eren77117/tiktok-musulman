@@ -12,6 +12,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { useTheme } from '../../hooks/useTheme';
 import { COLORS, FONT, SPACING, RADIUS, API_BASE_URL } from '../../constants/theme';
 import { IcClose, IcSend, IcHeartFill, IcHeart, IcComment, IcMore, IcFilterSort, IcAt, IcPin } from '../ui/Icons';
+import { NotifSkeleton } from '../ui/Skeleton';
 
 interface MentionUser {
   id: string; username: string; display_name: string; avatar_url: string | null;
@@ -203,7 +204,9 @@ export function CommentsBottomSheet({ postId, postOwnerId, onClose }: Props) {
 
           {/* Comments list */}
           {isLoading ? (
-            <View style={styles.center}><ActivityIndicator color={COLORS.primary} /></View>
+            <View style={{ paddingTop: 8 }}>
+              {[0, 1, 2, 3].map(i => <NotifSkeleton key={i} />)}
+            </View>
           ) : (
             <FlatList
               ref={flatListRef}

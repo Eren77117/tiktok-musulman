@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   ScrollView, Alert, ActivityIndicator, ActionSheetIOS, Platform,
@@ -44,6 +44,42 @@ function parseCaption(text: string): React.ReactNode[] {
 }
 
 interface Draft { id: string; caption: string; videoUri: string | null; thumbnailUri: string | null; createdAt: string }
+
+const CONFETTI_COLORS = [COLORS.primary, '#4CD964', '#FFD60A', '#FF6B6B', '#5AC8FA', '#AF52DE'];
+const CONFETTI_PRESETS = [
+  { dx: -80, dy: -180, rot: 45 }, { dx: 80, dy: -200, rot: -30 }, { dx: -40, dy: -220, rot: 60 },
+  { dx: 120, dy: -160, rot: -60 }, { dx: -120, dy: -150, rot: 90 }, { dx: 20, dy: -240, rot: -45 },
+  { dx: -160, dy: -120, rot: 30 }, { dx: 160, dy: -110, rot: -90 }, { dx: 60, dy: -190, rot: 75 },
+  { dx: -60, dy: -210, rot: -75 },
+];
+
+function ConfettiDot({ preset, color, show }: { preset: typeof CONFETTI_PRESETS[0]; color: string; show: boolean }) {
+  const tx = useRef(new Animated.Value(0)).current;
+  const ty = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!show) { tx.setValue(0); ty.setValue(0); opacity.setValue(0); scale.setValue(0); return; }
+    Animated.parallel([
+      Animated.timing(tx, { toValue: preset.dx, duration: 900, useNativeDriver: true }),
+      Animated.timing(ty, { toValue: preset.dy, duration: 900, useNativeDriver: true }),
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0, duration: 700, delay: 200, useNativeDriver: true }),
+      ]),
+      Animated.spring(scale, { toValue: 1, tension: 300, friction: 10, useNativeDriver: true }),
+    ]).start();
+  }, [show]);
+
+  return (
+    <Animated.View style={{
+      position: 'absolute', width: 10, height: 10, borderRadius: 5,
+      backgroundColor: color, opacity,
+      transform: [{ translateX: tx }, { translateY: ty }, { scale }],
+    }} />
+  );
+}
 
 export default function UploadScreen() {
   const insets = useSafeAreaInsets();
@@ -510,8 +546,11 @@ export default function UploadScreen() {
       {showSuccess && (
         <Animated.View style={[styles.successOverlay, { opacity: successOpacity }]} pointerEvents="none">
           <Animated.View style={[styles.successCard, { backgroundColor: theme.surface, transform: [{ scale: successScale }] }]}>
-            <View style={styles.successCheckWrap}>
+            <View style={[styles.successCheckWrap, { overflow: 'visible' }]}>
               <IcCheck size={42} color={COLORS.white} strokeWidth={3} />
+              {CONFETTI_PRESETS.map((p, i) => (
+                <ConfettiDot key={i} preset={p} color={CONFETTI_COLORS[i % CONFETTI_COLORS.length]} show={showSuccess} />
+              ))}
             </View>
             <Text style={[styles.successTitle, { color: theme.text }]}>Publiée !</Text>
             <Text style={[styles.successSub, { color: theme.textMuted }]}>Ta vidéo est en ligne dans le feed</Text>

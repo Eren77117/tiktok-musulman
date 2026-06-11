@@ -121,8 +121,34 @@ export default function NotificationsScreen() {
 
   const allNotifs = data?.items ?? [];
   const types = TAB_TYPES[activeTab];
-  const filtered = types.length === 0 ? allNotifs : allNotifs.filter(n => types.includes(n.type));
+  const rawFiltered = types.length === 0 ? allNotifs : allNotifs.filter(n => types.includes(n.type));
   const unreadCount = allNotifs.filter(n => !n.is_read).length;
+
+  // Group consecutive LIKE notifs for the same post
+  const filtered = React.useMemo(() => {
+    const result: (Notification & { _groupCount?: number; _groupTitles?: string[] })[] = [];
+    const seen = new Map<string, number>();
+    for (const n of rawFiltered) {
+      const key = n.type === 'LIKE' && n.data?.post_id ? `LIKE:${n.data.post_id}` : null;
+      if (key) {
+        const idx = seen.get(key);
+        if (idx !== undefined) {
+          const head = result[idx];
+          head._groupCount = (head._groupCount ?? 1) + 1;
+          head._groupTitles = [...(head._groupTitles ?? [head.title]), n.title];
+          const names = head._groupTitles.slice(0, 2).join(', ');
+          const rest = head._groupCount - 2;
+          head.title = rest > 0 ? `${names} et ${rest} autres` : names;
+          head.body = "ont aimé ta vidéo";
+          head.is_read = head.is_read && n.is_read;
+          continue;
+        }
+        seen.set(key, result.length);
+      }
+      result.push({ ...n });
+    }
+    return result;
+  }, [rawFiltered]);
 
   const renderNotif = useCallback(({ item: n }: { item: Notification }) => {
     const meta = TYPE_META[n.type] ?? TYPE_META.SYSTEM;
