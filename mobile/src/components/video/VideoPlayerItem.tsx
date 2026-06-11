@@ -630,8 +630,8 @@ export function VideoPlayerItem({ post, isVisible, onComment, onNotInterested, o
       <View style={styles.seekBarHit} {...seekPanResponder.panHandlers}>
         <View style={styles.progressBg}>
           <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
-          {/* Thumb */}
-          <Animated.View style={[styles.progressThumb, { left: `${Math.round(progress * 100)}%`, transform: [{ scale: thumbScale }] }]} />
+          {/* Thumb — visible only when seeking */}
+          <Animated.View style={[styles.progressThumb, { left: `${Math.round(progress * 100)}%`, opacity: seeking ? 1 : 0, transform: [{ scale: thumbScale }] }]} />
         </View>
       </View>
 
