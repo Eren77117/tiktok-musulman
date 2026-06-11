@@ -5,6 +5,7 @@ import { createThumbnail } from 'react-native-create-thumbnail';
 import {
   View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, Linking, Share,
   FlatList, ScrollView, Alert, ActivityIndicator, RefreshControl, Modal, ActionSheetIOS, Platform,
+  Animated,
 } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
@@ -68,6 +69,19 @@ export default function ProfileScreen() {
   const navigation = useNavigation<Nav>();
   const { user, updateUser, loadMe } = useAuthStore();
   const theme = useTheme();
+
+  // Pulse animation for notification badge
+  const notifPulse = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(notifPulse, { toValue: 1.35, duration: 600, useNativeDriver: true }),
+        Animated.timing(notifPulse, { toValue: 1, duration: 600, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
 
   // Real-time stats — reload user every 15s
   useQuery({
@@ -277,11 +291,11 @@ export default function ProfileScreen() {
             <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Notifications')} activeOpacity={0.7}>
               <IcBell size={22} color={theme.text} />
               {(notifData?.count ?? 0) > 0 && (
-                <View style={[styles.notifBadge, { borderColor: theme.bg }]}>
+                <Animated.View style={[styles.notifBadge, { borderColor: theme.bg, transform: [{ scale: notifPulse }] }]}>
                   <Text style={styles.notifBadgeText}>
                     {(notifData?.count ?? 0) > 99 ? '99+' : String(notifData?.count)}
                   </Text>
-                </View>
+                </Animated.View>
               )}
             </TouchableOpacity>
             {/* Settings */}

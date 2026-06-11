@@ -523,6 +523,36 @@ export default function UserProfileScreen({ route, navigation }: Props) {
               </View>
             </TouchableOpacity>
 
+            {/* Partager en DM */}
+            <TouchableOpacity
+              style={optStyles.option}
+              onPress={async () => {
+                if (!profile || !user) return;
+                setOptionsVisible(false);
+                if (user.gender !== profile.gender) { setVerseModalVisible(true); return; }
+                try {
+                  const { data } = await api.post('/messages/direct', { recipient_id: profile.id });
+                  const profileUrl = `https://nour.app/u/${profile.username}`;
+                  await api.post(`/messages/conversations/${data.conversation_id}/messages`, {
+                    content: `👤 Profil : @${profile.username}\n${profileUrl}`,
+                  });
+                  navigation.navigate('Conversation', {
+                    conversationId: data.conversation_id,
+                    otherUser: { id: profile.id, display_name: profile.display_name },
+                  });
+                } catch {}
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={[optStyles.optionIcon, { backgroundColor: `${COLORS.primary}18` }]}>
+                <IcMail size={20} color={COLORS.primary} />
+              </View>
+              <View style={optStyles.optionText}>
+                <Text style={[optStyles.optionTitle, { color: theme.text }]}>Envoyer en message</Text>
+                <Text style={[optStyles.optionSub, { color: theme.textMuted }]}>Partage ce profil par DM</Text>
+              </View>
+            </TouchableOpacity>
+
             {/* Bloquer / Débloquer */}
             <TouchableOpacity style={optStyles.option} onPress={handleBlock} activeOpacity={0.7}>
               <View style={[optStyles.optionIcon, { backgroundColor: isBlocked ? '#F0FDF4' : '#FEF2F2' }]}>
